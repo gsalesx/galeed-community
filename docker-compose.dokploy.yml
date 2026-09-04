@@ -1,6 +1,6 @@
-# Galeed + Evolution — deploy Dokploy (atrás do Traefik).
+# Galeed — deploy Dokploy (atrás do Traefik).
 # Sem publicar 80/443 no host (o Traefik do Dokploy roteia pro serviço `web:80`).
-# Sem profiles: sobe app + Evolution juntos.
+# Evolution NÃO sobe aqui — compose separado: docker-compose.evolution.dokploy.yml
 # Uso no Dokploy: composePath = ./docker-compose.dokploy.yml
 
 x-backend: &backend
@@ -14,9 +14,9 @@ x-backend: &backend
     DATABASE_URL: postgresql://galeed:galeed@db:5432/galeed?sslmode=disable
     GALEED_SCHEMA_PACK: /app/apps/server/schema-packs/a360.json
     GALEED_BLOB_DIR: /data/blobs
-    EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution:8080}
+    EVOLUTION_API_URL: http://galeed-evolution:8080
     EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-galeed-local-evolution-key}
-    EVOLUTION_WEBHOOK_BASE: ${EVOLUTION_WEBHOOK_BASE:-http://gateway:8790}
+    EVOLUTION_WEBHOOK_BASE: http://galeed-gateway:8790
     GALEED_PROVIDER: ${GALEED_PROVIDER:-codex}
     GALEED_CLI_BACKEND: ${GALEED_CLI_BACKEND:-codex}
     GALEED_CODEX_MODEL: ${GALEED_CODEX_MODEL:-gpt-5.4-mini}
@@ -55,6 +55,11 @@ services:
       TRUST_PROXY: "1"
       SECURE_COOKIES: "${GALEED_SECURE_COOKIES:-1}"
     expose: ["8789"]
+    networks:
+      default: {}
+      dokploy-network:
+        aliases:
+          - galeed-bff
     healthcheck:
       test: ["CMD", "node", "-e", "require('net').connect(8789,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       interval: 10s
@@ -70,6 +75,11 @@ services:
       GATEWAY_PORT: "8790"
       TRUST_PROXY: "1"
     expose: ["8790"]
+    networks:
+      default: {}
+      dokploy-network:
+        aliases:
+          - galeed-gateway
     healthcheck:
       test: ["CMD", "node", "-e", "require('net').connect(8790,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       interval: 10s
@@ -106,52 +116,13 @@ services:
       - caddy-config:/config
     restart: unless-stopped
 
-  evolution-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: evolution
-      POSTGRES_PASSWORD: evolution
-      POSTGRES_DB: evolution
-    volumes:
-      - evolution-pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  evolution-redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-
-  evolution:
-    image: evoapicloud/evolution-api:v2.3.0
-    restart: unless-stopped
-    depends_on:
-      evolution-db:
-        condition: service_healthy
-      evolution-redis:
-        condition: service_started
-    expose: ["8080"]
-    environment:
-      SERVER_URL: ${EVOLUTION_SERVER_URL:-http://evolution:8080}
-      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-galeed-local-evolution-key}
-      DATABASE_ENABLED: "true"
-      DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://evolution:evolution@evolution-db:5432/evolution?schema=public
-      DATABASE_CONNECTION_CLIENT_NAME: galeed_evolution
-      CACHE_REDIS_ENABLED: "true"
-      CACHE_REDIS_URI: redis://evolution-redis:6379/0
-      CACHE_REDIS_PREFIX_KEY: evolution
-      LOG_LEVEL: ERROR,WARN,INFO
-    volumes:
-      - evolution-instances:/evolution/instances
-
 volumes:
   galeed-pgdata:
   galeed-blobs:
   caddy-data:
   caddy-config:
-  evolution-pgdata:
-  evolution-instances:
+
+networks:
+  dokploy-network:
+    external: true
+    name: dokploy-network

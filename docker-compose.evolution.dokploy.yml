@@ -1,0 +1,65 @@
+# Evolution API — stack separado do Galeed (Dokploy).
+# Redeploy do Galeed NÃO recria estes containers nem os volumes da sessão WhatsApp.
+# Sem porta na internet: só na dokploy-network (alias DNS galeed-evolution).
+# Uso no Dokploy: composePath = ./docker-compose.evolution.dokploy.yml
+# Webhook interno → Galeed: http://galeed-gateway:8790/v1/ingestors/evolution-whatsapp
+
+networks:
+  dokploy-network:
+    external: true
+    name: dokploy-network
+
+volumes:
+  evolution-pgdata:
+    name: galeed_evolution_pgdata
+  evolution-instances:
+    name: galeed_evolution_instances
+
+services:
+  evolution-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  evolution-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.0
+    container_name: galeed-evolution
+    restart: unless-stopped
+    depends_on:
+      evolution-db:
+        condition: service_healthy
+      evolution-redis:
+        condition: service_started
+    expose: ["8080"]
+    environment:
+      SERVER_URL: http://galeed-evolution:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-galeed-local-evolution-key}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:evolution@evolution-db:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: galeed_evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/0
+      CACHE_REDIS_PREFIX_KEY: evolution
+      LOG_LEVEL: ERROR,WARN,INFO
+    volumes:
+      - evolution-instances:/evolution/instances
+    networks:
+      default: {}
+      dokploy-network:
+        aliases:
+          - galeed-evolution

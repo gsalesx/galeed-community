@@ -136,7 +136,8 @@ services:
     restart: unless-stopped
     profiles: ["app"]
 
-  # ── WhatsApp (Evolution API) — profile "evolution", mesma rede do Galeed.
+  # ── WhatsApp (Evolution API) — só LOCAL (profile evolution).
+  #    Dokploy: stack separado em docker-compose.evolution.dokploy.yml (não sobe aqui).
   #    Local: docker compose --profile app --profile evolution up -d --build
   #    Webhook interno Evolution → Galeed:
   #      http://gateway:8790/v1/ingestors/evolution-whatsapp?token=gld_live_...

@@ -627,7 +627,7 @@ function errMessage(status: number, raw: string): string {
 
 async function request<T>(
   path: string,
-  opts: { method?: string; body?: unknown; query?: Query; tenant?: boolean } = {},
+  opts: { method?: string; body?: unknown; query?: Query; tenant?: boolean; timeoutMs?: number } = {},
 ): Promise<T> {
   const tenant = opts.tenant ?? true;
   const init: RequestInit = {
@@ -639,12 +639,20 @@ async function request<T>(
     (init.headers as Record<string, string>)["content-type"] = "application/json";
     init.body = JSON.stringify(opts.body);
   }
+  const ctrl = opts.timeoutMs ? new AbortController() : null;
+  const timer = opts.timeoutMs ? setTimeout(() => ctrl!.abort(), opts.timeoutMs) : null;
+  if (ctrl) init.signal = ctrl.signal;
 
   let res: Response;
   try {
     res = await fetch(BASE + path + qs(opts.query, tenant), init);
   } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new ApiError(0, "A Evolution não respondeu a tempo. Tente de novo ou Renovar QR.");
+    }
     throw new ApiError(0, `falha de rede: ${(e as Error).message}`);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 
   if (res.status === 401) {
@@ -938,9 +946,9 @@ export const api = {
   },
   /** WhatsApp via Evolution (local/Docker) — QR no painel. */
   evolution: {
-    status: () => get<EvolutionStatus>("/api/evolution/status"),
-    connect: () => post<EvolutionStatus>("/api/evolution/connect", {}),
-    refreshQr: () => post<EvolutionStatus>("/api/evolution/qr", {}),
+    status: () => request<EvolutionStatus>("/api/evolution/status", { timeoutMs: 15_000 }),
+    connect: () => request<EvolutionStatus>("/api/evolution/connect", { method: "POST", body: {}, timeoutMs: 28_000 }),
+    refreshQr: () => request<EvolutionStatus>("/api/evolution/qr", { method: "POST", body: {}, timeoutMs: 28_000 }),
   },
   llmCodex: {
     status: () => get<CodexOauthStatus>("/api/llm/codex/status"),

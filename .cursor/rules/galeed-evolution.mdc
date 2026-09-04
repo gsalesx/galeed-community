@@ -25,6 +25,7 @@ docker compose --profile app --profile evolution up -d --build
 - Evolution: `http://localhost:8080` · apikey = `EVOLUTION_API_KEY`
 - Webhook interno: `http://gateway:8790/v1/ingestors/evolution-whatsapp?token=gld_live_...`
 - Nunca use `localhost` **de dentro** do container da Evolution pra falar com o Galeed.
+- Dokploy: Evolution é compose separado (`docker-compose.evolution.dokploy.yml`). DNS: `galeed-evolution:8080` ↔ `galeed-gateway:8790` na `dokploy-network`.
 
 ## Rede (Evolution chama o Galeed)
 
