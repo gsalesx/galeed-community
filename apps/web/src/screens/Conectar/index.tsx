@@ -7,8 +7,7 @@
  *  BFF até o M7; shapes idênticos). Token cru é mostrado UMA vez (gld_live_…); depois só
  *  ····last4. Endpoints são o contrato público /v1 (Caddy serve front e /v1 no mesmo domínio):
  *    - REST  → POST /v1/ask, /v1/facts, /v1/ingest  (Authorization: Bearer gld_live_…)
- *    - MCP   → servidor MCP LOCAL do repo (apps/server/src/mcp/server.ts, via `npx tsx`).
- *              Exemplo pronto: mcp.json.example na raiz do projeto. Nenhum pacote npm publicado.
+ *    - MCP   → pacote HTTP `@galeed/mcp` (npx). Autentica com a chave deste cérebro; sem Postgres.
  *    - brain → derivado do token (não precisa de header extra)
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -91,15 +90,15 @@ export default function Conectar() {
   -H "Content-Type: application/json" \\
   -d '{"question":"quem é o Fernando?"}'`;
 
-  // Espelha o mcp.json.example da raiz do repo: servidor MCP local rodado via tsx, sem pacote npm.
+  // Contrato real de @galeed/mcp: GALEED_TOKEN + GALEED_API_URL (raiz /v1). Sem DB.
   const mcpConfig = `{
   "mcpServers": {
     "galeed": {
       "command": "npx",
-      "args": ["tsx", "ABS_PATH/galeed/apps/server/src/mcp/server.ts"],
+      "args": ["-y", "@galeed/mcp"],
       "env": {
-        "DATABASE_URL": "postgresql://galeed:galeed@localhost:5434/galeed",
-        "GALEED_BRAIN": "${brainId || "minha-empresa"}"
+        "GALEED_TOKEN": "gld_live_SUA_CHAVE",
+        "GALEED_API_URL": "${V1_BASE}"
       }
     }
   }
@@ -167,15 +166,14 @@ export default function Conectar() {
           }
         >
           <p style={{ margin: "0 0 9px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
-            Cole no <span className="mono">mcpServers</span> do cliente. Expõe as tools{" "}
-            <span className="mono">galeed_retrieve</span>, <span className="mono">galeed_search</span>,{" "}
-            <span className="mono">galeed_ask</span> e mais.
+            Cole no <span className="mono">mcpServers</span> do cliente. Autentica com a chave deste cérebro.
+            Não precisa de Postgres — o pacote fala só com <span className="mono">/v1</span>.
           </p>
           <TokenBlock code={mcpConfig} onCopy={() => copy(mcpConfig, "Config MCP copiada.")} />
           <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--faint)", lineHeight: 1.5 }}>
-            Servidor local do repo: <span className="mono">apps/server/src/mcp/server.ts</span> (roda via{" "}
-            <span className="mono">npx tsx</span>, sem pacote npm). Exemplo pronto em{" "}
-            <span className="mono">mcp.json.example</span> na raiz do projeto.
+            Tools: <span className="mono">galeed_ask</span> · <span className="mono">galeed_facts</span> ·{" "}
+            <span className="mono">galeed_ingest</span> · <span className="mono">galeed_ingest_status</span>.
+            Pacote <span className="mono">npx @galeed/mcp</span>.
           </p>
         </Card>
       </div>
