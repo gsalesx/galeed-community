@@ -17,8 +17,15 @@ x-backend: &backend
     EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution:8080}
     EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-galeed-local-evolution-key}
     EVOLUTION_WEBHOOK_BASE: ${EVOLUTION_WEBHOOK_BASE:-http://gateway:8790}
+    GALEED_PROVIDER: ${GALEED_PROVIDER:-codex}
+    GALEED_CLI_BACKEND: ${GALEED_CLI_BACKEND:-codex}
+    GALEED_CODEX_MODEL: ${GALEED_CODEX_MODEL:-gpt-5.4-mini}
+    CODEX_HOME: /root/.codex
+    HOME: /root
   volumes:
     - galeed-blobs:/data/blobs
+    # Dokploy File Mount (Advanced → Mounts): files/codex-auth.json. NÃO commitar auth.json.
+    - ../files/codex-auth.json:/root/.codex/auth.json
   depends_on:
     db:
       condition: service_healthy

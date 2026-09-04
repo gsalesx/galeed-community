@@ -65,21 +65,22 @@ import { stripeWebhookHandler, createCheckoutHandler, createPortalHandler, getSu
 import { evolutionStatusHandler, evolutionConnectHandler, evolutionQrHandler } from "./bff/bff-evolution.ts";
 import { gateAndDebit, grantTrial, billingEnabled, CREDIT_COST, listLedger, getSpendCap, setSpendCap, topupRemainingOfBrain, type GateResult } from "../core/platform/credits.ts";
 import { assertEntitledByBrain } from "../core/platform/entitlement.ts";
-import { resolveProvider, cliAvailable } from "../lib/llm.ts";
+import { resolveProvider, subscriptionAvailable } from "../lib/llm.ts";
 import { config as platformConfig } from "../core/platform/config.ts";
 import { registerBuiltinIngestors } from "../core/ingestion/ingestors/boot.ts";
 import { listIngestors } from "../core/ingestion/ingestors/registry.ts";
 
-/** Preflight de IA nas rotas de síntese (ask): sem ANTHROPIC_API_KEY e sem o binário `claude`, a
- *  síntese falharia lá na frente como "erro interno" (SSE) ou uma resposta vazia que parece "o cérebro
- *  não sabe nada". Melhor um 503 que diz exatamente o que falta. Busca/FTS não passam por aqui. */
+/** Preflight de IA nas rotas de síntese (ask): sem ANTHROPIC_API_KEY, sem `claude` e sem
+ *  ChatGPT/Codex (`~/.codex/auth.json`), a síntese falharia lá na frente. Melhor um 503 claro.
+ *  Busca/FTS não passam por aqui. */
 function aiUnavailableMsg(): string | null {
   const msg =
-    "Este servidor está sem IA configurada: defina ANTHROPIC_API_KEY no .env (ou instale o CLI `claude` " +
-    "na máquina do servidor) e reinicie. A busca por palavra-chave continua funcionando sem IA.";
+    "Este servidor está sem IA configurada: defina ANTHROPIC_API_KEY, instale o CLI `claude`, ou " +
+    "autentique ChatGPT/Codex (`~/.codex/auth.json` + GALEED_PROVIDER=codex) e reinicie. " +
+    "A busca por palavra-chave continua funcionando sem IA.";
   try {
     const p = resolveProvider(platformConfig().provider);
-    if (p === "cli") return cliAvailable() ? null : msg;
+    if (p === "cli") return subscriptionAvailable() ? null : msg;
     return process.env.ANTHROPIC_API_KEY ? null : msg;
   } catch {
     return msg;

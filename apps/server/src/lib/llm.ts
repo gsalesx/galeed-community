@@ -1,16 +1,18 @@
 /** Camada de provider de LLM — abstrai DE ONDE vem a inteligência.
  *
- *  - "cli": usa o binário `claude` local (autenticado pela ASSINATURA do usuário). Zero API key.
- *           Carrega o contexto do harness Claude Code por chamada (mais lento, mas não custa $ —
- *           consome cota da assinatura). Default, pra facilitar.
+ *  - "cli": assinatura local — backend Claude (`claude` binário) OU ChatGPT/Codex OAuth
+ *           (`~/.codex/auth.json`, mesmo caminho do Hermes). Zero API key de LLM.
+ *           Backend: GALEED_CLI_BACKEND=claude|codex|auto (ou GALEED_PROVIDER=codex).
  *  - "api": usa api.anthropic.com com ANTHROPIC_API_KEY (tool_use forçado, enxuto/rápido pra
  *           batches grandes). Caminho de escala.
  *
  *  extract/ask falam SÓ com esta camada — nunca direto com um provider. */
 import { spawn, spawnSync } from "node:child_process";
 import { toolCall, textCall as apiText, textStream, hasKey, type Tool, type AnthropicUsage } from "./anthropic.ts";
+import { hasCodexAuth, codexText, resolveCodexModel } from "./chatgpt-codex.ts";
 
 export type Provider = "cli" | "api";
+type CliBackend = "claude" | "codex";
 
 /** Evento de consumo de uma chamada de LLM (M20). O `meter` é injetado pelo CALLER (core), que fecha
  *  home+op e grava via recordUsage. Mantém esta camada (lib) PURA — sem import de core/DB. */
@@ -71,31 +73,79 @@ export function cliAvailable(): boolean {
   return _cliAvail;
 }
 
+export function codexAvailable(): boolean {
+  return hasCodexAuth();
+}
+
+/** Assinatura local disponível (Claude CLI e/ou ChatGPT Codex OAuth). */
+export function subscriptionAvailable(): boolean {
+  return cliAvailable() || codexAvailable();
+}
+
+function isCodexPreferAlias(v?: string): boolean {
+  const s = (v || "").toLowerCase();
+  return s === "codex" || s === "chatgpt" || s === "openai-codex";
+}
+
+/** Backend da assinatura (`cli`): Claude binário ou ChatGPT/Codex OAuth. */
+export function resolveCliBackend(prefer?: string): CliBackend {
+  const envBackend = (process.env.GALEED_CLI_BACKEND || "").toLowerCase();
+  if (envBackend === "codex" || envBackend === "chatgpt") return "codex";
+  if (envBackend === "claude") return "claude";
+  if (isCodexPreferAlias(prefer) || isCodexPreferAlias(process.env.GALEED_PROVIDER)) return "codex";
+  // auto: Claude se houver; senão Codex se houver auth
+  if (cliAvailable()) return "claude";
+  if (codexAvailable()) return "codex";
+  return "claude";
+}
+
 /** Resolve o provider: respeita a preferência explícita; em "auto" prefere a assinatura (cli). */
 export function resolveProvider(prefer?: string): Provider {
-  if (prefer === "cli" || prefer === "api") return prefer;
-  if (cliAvailable()) return "cli";
+  if (prefer === "api") return "api";
+  if (prefer === "cli" || isCodexPreferAlias(prefer)) return "cli";
+  if (subscriptionAvailable()) return "cli";
   if (hasKey()) return "api";
   return "cli"; // erro claro depois, se faltar tudo
 }
 
 /** Resolução de provider PARA EXTRAÇÃO. Preferência: 'api' explícito → api; 'auto' com chave →
- *  api (a API tem tool-use nativo, o caminho mais fiel). Desde que o `structured()` do caminho
- *  'cli' passou a instruir o modelo com o PRÓPRIO tool.input_schema (schema tipado completo:
- *  value_num/unit/period/tier + guidance da receita), o 'cli' deixou de degradar em silêncio —
- *  então 'auto' SEM chave cai no binário `claude` local quando ele existe (self-host/dev com
- *  assinatura, zero chave). Sem chave E sem binário → erro claro. */
+ *  api (a API tem tool-use nativo, o caminho mais fiel). Sem chave → assinatura local
+ *  (Claude CLI ou ChatGPT/Codex). Sem chave E sem assinatura → erro claro. */
 export function resolveExtractionProvider(prefer?: string): Provider {
   if (prefer === "api") return "api";
-  if (prefer !== "cli" && hasKey()) return "api";
-  // daqui pra baixo a resolução cai em 'cli'
-  if (cliAvailable()) {
-    console.warn("[llm] extração via binário `claude` local (sem ANTHROPIC_API_KEY) — o schema tipado vai por instrução; a API tem tool-use nativo e é preferível em produção.");
+  if (prefer !== "cli" && !isCodexPreferAlias(prefer) && hasKey()) return "api";
+  if (subscriptionAvailable()) {
+    const backend = resolveCliBackend(prefer);
+    console.warn(
+      backend === "codex"
+        ? "[llm] extração via ChatGPT/Codex (assinatura, ~/.codex/auth.json) — schema tipado por instrução; a API Anthropic tem tool-use nativo e é preferível em produção."
+        : "[llm] extração via binário `claude` local (sem ANTHROPIC_API_KEY) — o schema tipado vai por instrução; a API tem tool-use nativo e é preferível em produção.",
+    );
     return "cli";
   }
   throw new Error(
-    "extração de fatos precisa de IA — configure ANTHROPIC_API_KEY no .env (ou instale o CLI `claude` na máquina do servidor) e reinicie.",
+    "extração de fatos precisa de IA — configure ANTHROPIC_API_KEY no .env, instale o CLI `claude`, ou autentique o ChatGPT/Codex (`~/.codex/auth.json`) e reinicie.",
   );
+}
+
+/** Texto via assinatura: Claude CLI ou ChatGPT/Codex. */
+async function subscriptionText(
+  model: string,
+  prompt: string,
+  system: string,
+  meter?: UsageMeter,
+): Promise<string> {
+  const backend = resolveCliBackend();
+  if (backend === "codex") {
+    const m = resolveCodexModel(model);
+    return codexText(m, prompt, system, (u) => {
+      if (!meter) return;
+      meter({ provider: "cli", model: m, tokensIn: u.input_tokens, tokensOut: u.output_tokens });
+    });
+  }
+  const envelope = await runClaude(["-p", "--model", model, "--system-prompt", system, "--output-format", "json"], prompt);
+  cliMeter(meter, model, envelope);
+  return unwrapResult(envelope);
 }
 
 /** Roda `claude -p ... --output-format json`, prompt via stdin (suporta prompts grandes). */
@@ -168,9 +218,7 @@ export async function structured(o: StructuredOpts): Promise<any> {
     JSON.stringify(o.tool.input_schema);
   const sys = (o.system ? o.system + " " : "") + hint;
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const envelope = await runClaude(["-p", "--model", o.model, "--system-prompt", sys, "--output-format", "json"], o.prompt);
-    cliMeter(o.meter, o.model, envelope); // a chamada custou — registra mesmo se o parse falhar
-    const result = unwrapResult(envelope);
+    const result = await subscriptionText(o.model, o.prompt, sys, o.meter);
     try {
       return parseJsonLoose(result);
     } catch {
@@ -191,8 +239,7 @@ export interface SynthesisOpts {
 /** Síntese ESTRUTURADA (M17/S2) — saída JSON `{claims:[{text,cite_slug,quote}], gaps:[]}`.
  *  Diferente de `structured` (orientado a EXTRAÇÃO entity/predicate/value): aqui o hint do caminho `cli`
  *  descreve o shape de claims/gaps, NÃO o de extração. provider `api` → `toolCall(tool)`; `cli` →
- *  instrui o shape + `parseJsonLoose`, 2 tentativas (espelha `structured`). Reusa
- *  `runClaude`/`unwrapResult`/`parseJsonLoose` (já no módulo). Sem dep nova. */
+ *  instrui o shape + `parseJsonLoose`, 2 tentativas (espelha `structured`). */
 export async function structuredSynthesis(
   o: SynthesisOpts,
 ): Promise<{ claims: any[]; gaps: any[] }> {
@@ -206,9 +253,7 @@ export async function structuredSynthesis(
     `que não apareça no "quote".`;
   const sys = (o.system ? o.system + " " : "") + hint;
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const envelope = await runClaude(["-p", "--model", o.model, "--system-prompt", sys, "--output-format", "json"], o.prompt);
-    cliMeter(o.meter, o.model, envelope);
-    const result = unwrapResult(envelope);
+    const result = await subscriptionText(o.model, o.prompt, sys, o.meter);
     try {
       const parsed = parseJsonLoose(result);
       return {
@@ -233,9 +278,7 @@ export interface ProseOpts {
 /** Síntese em prosa. */
 export async function prose(o: ProseOpts): Promise<string> {
   if (o.provider === "api") return apiText(o.model, o.prompt, o.system, apiMeter(o.meter, o.model));
-  const envelope = await runClaude(["-p", "--model", o.model, "--system-prompt", o.system, "--output-format", "json"], o.prompt);
-  cliMeter(o.meter, o.model, envelope);
-  return unwrapResult(envelope);
+  return subscriptionText(o.model, o.prompt, o.system, o.meter);
 }
 
 export interface StreamProseOpts {
@@ -247,8 +290,8 @@ export interface StreamProseOpts {
 }
 
 /** Síntese em prosa STREAMADA (M18). provider `api` → textStream (token-a-token HTTP real); provider
- *  `cli` → prose() não-stream + onToken(full) UMA vez (o caminho de streaming de produção é o `api`; o
- *  cli do `claude` não expõe streaming HTTP simples — fallback honesto, não simula tokens). Devolve o
+ *  `cli` → prose() não-stream + onToken(full) UMA vez (o caminho de streaming de produção é o `api`;
+ *  assinatura Claude/Codex não expõe streaming HTTP simples — fallback honesto). Devolve o
  *  texto completo (igual a textStream/prose). */
 export async function streamProse(o: StreamProseOpts, onToken: (delta: string) => void): Promise<string> {
   if (o.provider === "api") return textStream(o.model, o.prompt, o.system, onToken, apiMeter(o.meter, o.model));
