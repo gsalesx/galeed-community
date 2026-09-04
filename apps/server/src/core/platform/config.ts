@@ -10,7 +10,7 @@ export interface EmbCfg {
 export interface Config {
   /** id do tenant/empresa — isola as linhas no Postgres (coluna `brain`). */
   brain: string;
-  /** provider do LLM: "auto" | "cli" | "api" | "codex" (ChatGPT via ~/.codex/auth.json). */
+  /** provider do LLM: "auto" | "cli" | "api" | "codex" (ChatGPT OAuth no painel / banco). */
   provider: string;
   /** modelo p/ o provider cli (alias Claude "haiku", ou id GPT se backend=codex). */
   cliModel: string;

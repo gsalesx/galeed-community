@@ -1,31 +1,52 @@
 /** ChatGPT subscription via Codex OAuth (mesmo caminho do Hermes / Codex CLI).
  *
- *  Lê `~/.codex/auth.json` (login do Codex CLI ou importável pelo Hermes),
- *  renova o access_token em `auth.openai.com` e chama
+ *  Precedência: tokens no Postgres do brain (`galeed_llm_oauth`) > `~/.codex/auth.json`
+ *  (só fallback de dev local). Renova em `auth.openai.com` e chama
  *  `https://chatgpt.com/backend-api/codex/responses` — sem OPENAI_API_KEY.
  *
  *  Headers `originator`/`User-Agent`/`ChatGPT-Account-ID` espelham o codex-rs
  *  (Cloudflare na frente do endpoint exige originator whitelisted). */
+import { AsyncLocalStorage } from "node:async_hooks";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import {
+  CODEX_PROVIDER,
+  getLlmOauth,
+  getUniqueLlmOauth,
+  upsertLlmOauth,
+  type LlmOauthTokens,
+} from "../core/platform/llm-oauth.ts";
 
-const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
-const CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token";
+export const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
+export const CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token";
+export const CODEX_DEVICE_ISSUER = "https://auth.openai.com";
 const CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
 const REFRESH_SKEW_SEC = 120;
+
+const brainAls = new AsyncLocalStorage<string>();
+
+/** Marca o brain do request/job para leitura de tokens no banco. */
+export function bindCodexBrain(brain: string): void {
+  if (brain) brainAls.enterWith(brain);
+}
+
+export function getCodexBrain(): string | undefined {
+  return brainAls.getStore();
+}
+
+export function withCodexBrain<T>(brain: string, fn: () => Promise<T>): Promise<T> {
+  return brainAls.run(brain, fn);
+}
 
 export interface CodexUsage {
   input_tokens: number;
   output_tokens: number;
 }
 
-interface CodexTokens {
-  access_token: string;
-  refresh_token: string;
-  id_token?: string;
-  account_id?: string;
-}
+type CodexTokens = LlmOauthTokens;
+
+type TokenSource = { tokens: CodexTokens; raw: any; brain?: string };
 
 function authPath(): string {
   const home = (process.env.CODEX_HOME || "").trim() || join(homedir(), ".codex");
@@ -49,6 +70,13 @@ function isExpiring(accessToken: string, skewSec = REFRESH_SKEW_SEC): boolean {
   return exp <= Date.now() / 1000 + skewSec;
 }
 
+/** ISO do `exp` do access_token — só metadado pra UI, nunca o token. */
+export function accessTokenExpiresAt(accessToken: string): string | undefined {
+  const exp = decodeJwtClaims(accessToken).exp;
+  if (typeof exp !== "number") return undefined;
+  return new Date(exp * 1000).toISOString();
+}
+
 function chatgptAccountId(accessToken: string): string | undefined {
   const auth = decodeJwtClaims(accessToken)["https://api.openai.com/auth"];
   const id = auth?.chatgpt_account_id;
@@ -67,7 +95,7 @@ function codexHeaders(accessToken: string): Record<string, string> {
   return h;
 }
 
-function readAuthFile(): { tokens: CodexTokens; raw: any } | null {
+function readAuthFile(): TokenSource | null {
   const path = authPath();
   if (!existsSync(path)) return null;
   try {
@@ -88,59 +116,94 @@ function readAuthFile(): { tokens: CodexTokens; raw: any } | null {
   }
 }
 
-function writeTokens(raw: any, tokens: CodexTokens): void {
+function writeFileTokens(raw: any, tokens: CodexTokens): void {
   const path = authPath();
   const next = { ...raw, auth_mode: raw?.auth_mode || "chatgpt", tokens: { ...raw?.tokens, ...tokens } };
   writeFileSync(path, JSON.stringify(next, null, 2), "utf8");
 }
 
-async function refreshTokens(tokens: CodexTokens, raw: any): Promise<CodexTokens> {
+async function loadDbSource(preferBrain?: string): Promise<TokenSource | null> {
+  const brain = preferBrain || getCodexBrain();
+  try {
+    if (brain) {
+      const row = await getLlmOauth(brain, CODEX_PROVIDER);
+      if (row) return { tokens: row.tokens, raw: null, brain: row.brain };
+      return null; // brain conhecido sem tokens — não usa OAuth de outro tenant
+    }
+    // CLI / processo sem ALS: uma única linha no banco (VPS de um cérebro).
+    const unique = await getUniqueLlmOauth(CODEX_PROVIDER);
+    if (unique) return { tokens: unique.tokens, raw: null, brain: unique.brain };
+  } catch {
+    /* sem DATABASE_URL / tabela — cai no arquivo */
+  }
+  return null;
+}
+
+async function persistTokens(source: TokenSource, tokens: CodexTokens): Promise<void> {
+  if (source.brain) {
+    try {
+      await upsertLlmOauth(source.brain, tokens, CODEX_PROVIDER);
+    } catch {
+      /* best-effort — token em memória ainda serve nesta chamada */
+    }
+    return;
+  }
+  try {
+    writeFileTokens(source.raw, tokens);
+  } catch {
+    /* best-effort */
+  }
+}
+
+async function refreshTokens(source: TokenSource): Promise<CodexTokens> {
   const res = await fetch(CODEX_TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      refresh_token: tokens.refresh_token,
+      refresh_token: source.tokens.refresh_token,
       client_id: CODEX_CLIENT_ID,
     }),
   });
   if (!res.ok) {
-    const body = (await res.text()).slice(0, 200);
     throw new Error(
-      `ChatGPT/Codex: falha ao renovar token (${res.status}). Rode \`codex\` ou \`hermes auth add openai-codex\` e tente de novo. ${body}`,
+      `ChatGPT/Codex: falha ao renovar token (${res.status}). Conecte de novo em Conectar → ChatGPT.`,
     );
   }
   const j: any = await res.json();
   const access = String(j.access_token || "").trim();
   if (!access) throw new Error("ChatGPT/Codex: refresh sem access_token.");
   const updated: CodexTokens = {
-    ...tokens,
+    ...source.tokens,
     access_token: access,
-    refresh_token: typeof j.refresh_token === "string" && j.refresh_token.trim() ? j.refresh_token.trim() : tokens.refresh_token,
+    refresh_token: typeof j.refresh_token === "string" && j.refresh_token.trim() ? j.refresh_token.trim() : source.tokens.refresh_token,
   };
-  try {
-    writeTokens(raw, updated);
-  } catch {
-    /* best-effort — token em memória ainda serve nesta chamada */
-  }
+  await persistTokens(source, updated);
   return updated;
 }
 
-/** True se existe `~/.codex/auth.json` com tokens ChatGPT/Codex. */
+/** True se existe `~/.codex/auth.json` (dev local). Produção usa o banco — ver hasCodexCredentials. */
 export function hasCodexAuth(): boolean {
   return !!readAuthFile();
 }
 
+/** Banco do brain (ou linha única) primeiro; arquivo só em dev. */
+export async function hasCodexCredentials(brain?: string): Promise<boolean> {
+  if (await loadDbSource(brain)) return true;
+  return !!readAuthFile();
+}
+
 async function resolveAccessToken(): Promise<string> {
-  const file = readAuthFile();
-  if (!file) {
+  // Precedência: banco do brain > arquivo ~/.codex (dev local).
+  const source = (await loadDbSource()) || readAuthFile();
+  if (!source) {
     throw new Error(
-      "ChatGPT/Codex: sem credenciais. Faça login com o Codex CLI (`codex`) ou `hermes auth add openai-codex` (arquivo ~/.codex/auth.json).",
+      "ChatGPT/Codex: sem credenciais. Conecte em Conectar → ChatGPT, ou (só em dev) autentique o Codex CLI (`~/.codex/auth.json`).",
     );
   }
-  let { tokens, raw } = file;
+  let tokens = source.tokens;
   if (isExpiring(tokens.access_token)) {
-    tokens = await refreshTokens(tokens, raw);
+    tokens = await refreshTokens(source);
   }
   return tokens.access_token;
 }

@@ -1,7 +1,7 @@
 /** Camada de provider de LLM — abstrai DE ONDE vem a inteligência.
  *
  *  - "cli": assinatura local — backend Claude (`claude` binário) OU ChatGPT/Codex OAuth
- *           (`~/.codex/auth.json`, mesmo caminho do Hermes). Zero API key de LLM.
+ *           (tokens no Postgres do brain; `~/.codex/auth.json` só em dev). Zero API key de LLM.
  *           Backend: GALEED_CLI_BACKEND=claude|codex|auto (ou GALEED_PROVIDER=codex).
  *  - "api": usa api.anthropic.com com ANTHROPIC_API_KEY (tool_use forçado, enxuto/rápido pra
  *           batches grandes). Caminho de escala.
@@ -9,7 +9,7 @@
  *  extract/ask falam SÓ com esta camada — nunca direto com um provider. */
 import { spawn, spawnSync } from "node:child_process";
 import { toolCall, textCall as apiText, textStream, hasKey, type Tool, type AnthropicUsage } from "./anthropic.ts";
-import { hasCodexAuth, codexText, resolveCodexModel } from "./chatgpt-codex.ts";
+import { hasCodexAuth, hasCodexCredentials, codexText, resolveCodexModel } from "./chatgpt-codex.ts";
 
 export type Provider = "cli" | "api";
 type CliBackend = "claude" | "codex";
@@ -77,9 +77,15 @@ export function codexAvailable(): boolean {
   return hasCodexAuth();
 }
 
-/** Assinatura local disponível (Claude CLI e/ou ChatGPT Codex OAuth). */
+/** Assinatura local disponível (Claude CLI, arquivo Codex, ou provider=codex — tokens no banco). */
 export function subscriptionAvailable(): boolean {
-  return cliAvailable() || codexAvailable();
+  return cliAvailable() || codexAvailable() || isCodexPreferAlias(process.env.GALEED_PROVIDER);
+}
+
+/** Preflight async: banco do brain > arquivo. */
+export async function subscriptionAvailableAsync(brain?: string): Promise<boolean> {
+  if (cliAvailable()) return true;
+  return hasCodexCredentials(brain);
 }
 
 function isCodexPreferAlias(v?: string): boolean {
@@ -118,13 +124,13 @@ export function resolveExtractionProvider(prefer?: string): Provider {
     const backend = resolveCliBackend(prefer);
     console.warn(
       backend === "codex"
-        ? "[llm] extração via ChatGPT/Codex (assinatura, ~/.codex/auth.json) — schema tipado por instrução; a API Anthropic tem tool-use nativo e é preferível em produção."
+        ? "[llm] extração via ChatGPT/Codex (assinatura OAuth) — schema tipado por instrução; a API Anthropic tem tool-use nativo e é preferível em produção."
         : "[llm] extração via binário `claude` local (sem ANTHROPIC_API_KEY) — o schema tipado vai por instrução; a API tem tool-use nativo e é preferível em produção.",
     );
     return "cli";
   }
   throw new Error(
-    "extração de fatos precisa de IA — configure ANTHROPIC_API_KEY no .env, instale o CLI `claude`, ou autentique o ChatGPT/Codex (`~/.codex/auth.json`) e reinicie.",
+    "extração de fatos precisa de IA — configure ANTHROPIC_API_KEY no .env, instale o CLI `claude`, ou conecte o ChatGPT em Conectar.",
   );
 }
 

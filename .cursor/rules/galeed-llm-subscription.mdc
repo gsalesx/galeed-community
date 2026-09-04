@@ -1,0 +1,25 @@
+---
+description: LLM via assinatura ChatGPT/Codex (OAuth no painel) vs API key
+alwaysApply: false
+globs: apps/server/src/lib/{llm,chatgpt-codex}.ts
+---
+
+# LLM no Galeed — assinatura vs API
+
+## Já existe hoje
+
+| Caminho | Env / fonte | O que cobre |
+| --- | --- | --- |
+| ChatGPT **assinatura** | OAuth no painel Conectar → tokens em `galeed_llm_oauth` (Postgres, por brain). `GALEED_PROVIDER=codex` | extract / ask / síntese |
+| Claude **assinatura** | binário `claude` no PATH (`provider: cli`) | idem (dev local) |
+| Anthropic **API** | `ANTHROPIC_API_KEY` (`provider: api`) | idem |
+| OpenAI **API** | `OPENAI_API_KEY` | só embeddings — **não** é ChatGPT Plus |
+
+## Produção (Dokploy)
+
+- UI: Conectar → **Conectar ChatGPT** / **Desconectar** (device flow Hermes/Codex).
+- BFF autenticado: `GET/POST /api/llm/codex/{status,start,poll,disconnect}`.
+- Tokens **nunca** voltam na resposta HTTP. Banco > `~/.codex/auth.json` (arquivo só em dev).
+- Compose **não** monta `auth.json`. Não recriar File Mount no Dokploy.
+
+**Atenção:** embeddings continuam precisando de API key OpenAI (ou desligar busca semântica). Assinatura ChatGPT ≠ key de embeddings.

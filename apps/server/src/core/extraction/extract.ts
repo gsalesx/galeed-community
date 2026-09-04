@@ -6,6 +6,7 @@ import { resolveExtractionProvider, structured } from "../../lib/llm.ts";
 import { recordUsage } from "../platform/usage.ts"; // M20 — custo de IA por chamada
 import { UNTRUSTED_SYS, wrapUntrusted } from "../../lib/prompt-safety.ts";
 import { getEngine, type PageRow } from "../platform/engine.ts";
+import { withCodexBrain, getCodexBrain } from "../../lib/chatgpt-codex.ts";
 import { buildExtractionUnits } from "../ingestion/segment.ts";
 import { getExtractSchema } from "./extractable.ts";
 import { ensureSchemaPack } from "./schema-pack.ts"; // M13 — warm-up DB-first do pack antes do consumo síncrono
@@ -235,6 +236,7 @@ export async function extractUnit(
   unit: ExtractionUnit,
   ctx: ExtractionContext,
 ): Promise<Record<string, any[]>> {
+  if (getCodexBrain() !== home) return withCodexBrain(home, () => extractUnit(home, page, unit, ctx));
   // ordem: header, contexto (mais forte), hints de frequência, corpo untrusted. ctxBlock="" ⇒ legado.
   // R9: o corpo da fonte é DADO não-confiável — delimitado, fora das instruções (anti prompt-injection).
   const prompt = `${unit.header}${ctx.ctxBlock}${ctx.hintBlock}\n\n${wrapUntrusted(unit.body)}`;
@@ -268,6 +270,7 @@ export async function extractUnit(
 }
 
 export async function extractOne(home: string, page: PageRow) {
+  if (getCodexBrain() !== home) return withCodexBrain(home, () => extractOne(home, page));
   const e = await getEngine(home);
   // P1-C (mata A8a): página carimbada por fonte (tag `src:<id>` — MESMA convenção do pipeline e
   // do reparo P0-C) re-extrai SOB o contrato; fail-closed espelho do processBlobJob. Página sem

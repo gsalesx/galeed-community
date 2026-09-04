@@ -24,8 +24,7 @@ x-backend: &backend
     HOME: /root
   volumes:
     - galeed-blobs:/data/blobs
-    # Dokploy File Mount (Advanced → Mounts): files/codex-auth.json. NÃO commitar auth.json.
-    - ../files/codex-auth.json:/root/.codex/auth.json
+    # Tokens ChatGPT/Codex: Postgres galeed_llm_oauth (painel Conectar). Sem File Mount de auth.json.
   depends_on:
     db:
       condition: service_healthy

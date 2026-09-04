@@ -4,6 +4,7 @@ import { retrieve, getPage } from "./query.ts";
 import { semanticSearch } from "./embeddings.ts";
 import { config } from "../platform/config.ts";
 import { resolveProvider, structuredSynthesis, streamProse } from "../../lib/llm.ts";
+import { withCodexBrain, getCodexBrain } from "../../lib/chatgpt-codex.ts";
 import { recordUsage } from "../platform/usage.ts"; // M20 — custo de IA por pergunta
 import { getEngine, type PercepcaoRow } from "../platform/engine.ts";
 import { inScope, type Scope } from "../access/scope.ts";
@@ -507,6 +508,7 @@ async function retrieveForAnswer(home: string, q: string, k: number, scope?: Sco
 }
 
 export async function ask(home: string, q: string, k = 8, scope?: Scope) {
+  if (getCodexBrain() !== home) return withCodexBrain(home, () => ask(home, q, k, scope));
   const r = await retrieveForAnswer(home, q, k, scope);
   if (!r) {
     return { answer: "O cérebro não tem nada indexado sobre isso.", sources: [] as string[], gaps: ["nenhuma fonte encontrada"] };
@@ -594,6 +596,7 @@ export async function askStream(
   k = 8,
   scope?: Scope,
 ): Promise<StreamPayload> {
+  if (getCodexBrain() !== home) return withCodexBrain(home, () => askStream(home, q, onToken, k, scope));
   const r = await retrieveForAnswer(home, q, k, scope);
   if (!r) {
     // espelha o "nada indexado" do ask(): nenhum token de prosa, carga vazia + gap honesto.

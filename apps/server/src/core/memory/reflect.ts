@@ -20,6 +20,7 @@
  *   - dedup por vetor: aprendizado novo ~igual a um antigo → não duplica (precisa embeddings). */
 import { config } from "../platform/config.ts";
 import { resolveProvider, prose, structured, type UsageMeter } from "../../lib/llm.ts";
+import { withCodexBrain, getCodexBrain } from "../../lib/chatgpt-codex.ts";
 import { getEngine, type FactGroupKey, type PercepcaoCite, type PercepcaoRow } from "../platform/engine.ts";
 import { verifyAnswer, type Claim, type VerifySource } from "../retrieval/answer-verify.ts";
 import { recordUsage } from "../platform/usage.ts";
@@ -60,6 +61,7 @@ export async function reflect(
   home: string,
   opts: { threshold?: number; force?: boolean; apply?: boolean; maxWindow?: number } = {},
 ): Promise<ReflectResult> {
+  if (getCodexBrain() !== home) return withCodexBrain(home, () => reflect(home, opts));
   const threshold = opts.threshold ?? DEFAULT_THRESHOLD;
   const maxWindow = opts.maxWindow ?? 20; // teto de fontes por reflexão (custo + foco)
   const e = await getEngine(home);
@@ -326,6 +328,7 @@ function sinalCicloToRow(s: SinalCiclo, texto: string): PercepcaoRow {
  *  (re-verbaliza SÓ se magnitude mudou); (3) passe conjunto; (4) verbalização ancorada.
  *  NUNCA lança por falha de LLM (fail-soft); erros de DB propagam (o M24-D faz o fail-soft dele). */
 export async function sonoReflexao(home: string, signals: RankedSignal[], opts: ReflexaoOpts = {}): Promise<ReflexaoResult> {
+  if (getCodexBrain() !== home) return withCodexBrain(home, () => sonoReflexao(home, signals, opts));
   const cfg = config(home);
   const topK = Math.max(1, opts.topK ?? REFLECT_K());
   const model = opts.model ?? REFLECT_MODEL(cfg.apiModel);

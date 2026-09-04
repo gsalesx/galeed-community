@@ -244,6 +244,8 @@ export default function Conectar() {
 
       <WhatsAppEvolution setToast={setToast} />
 
+      <ChatGptCodex setToast={setToast} />
+
       {/* ===================== Ingestores prontos ===================== */}
       <IngestoresProntos copy={copy} />
 
@@ -620,6 +622,151 @@ function WhatsAppEvolution({
         {view?.online && !view.connected && (
           <Button variant="ghost" disabled={busy} onClick={refreshQr}>
             Renovar QR
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ChatGptCodex({
+  setToast,
+}: {
+  setToast: (t: { msg: string; tone: "ok" | "neutral" | "danger" } | null) => void;
+}) {
+  const { current } = useBrain();
+  const brainId = current?.id ?? "";
+  const stQ = useQuery(`conectar:codex:${brainId}`, () => api.llmCodex.status(), [brainId]);
+  const [busy, setBusy] = useState(false);
+  const [local, setLocal] = useState<Awaited<ReturnType<typeof api.llmCodex.start>> | null>(null);
+  const view = stQ.data;
+  const pending = !view?.connected && !!(local || view?.pending);
+  const userCode = local?.userCode || view?.userCode;
+  const verificationUrl = local?.verificationUrl || view?.verificationUrl;
+  const intervalMs = Math.max(3, local?.interval ?? 5) * 1000;
+
+  async function connect() {
+    if (pending && verificationUrl) {
+      window.open(verificationUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await api.llmCodex.start();
+      setLocal(r);
+      if (r.verificationUrl) window.open(r.verificationUrl, "_blank", "noopener,noreferrer");
+      setToast({ msg: "Abra a aba do ChatGPT, entre com a conta e aprove o código.", tone: "ok" });
+      stQ.refetch();
+    } catch (e) {
+      setToast({ msg: (e as Error).message || "Falha ao iniciar o login ChatGPT.", tone: "danger" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    try {
+      await api.llmCodex.disconnect();
+      setLocal(null);
+      setToast({ msg: "ChatGPT desconectado.", tone: "neutral" });
+      stQ.refetch();
+    } catch (e) {
+      setToast({ msg: (e as Error).message || "Falha ao desconectar.", tone: "danger" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (view?.connected || !pending || !userCode) return;
+    const t = setInterval(() => {
+      api.llmCodex.poll().then((s) => {
+        if (s.connected) {
+          setLocal(null);
+          setToast({ msg: "ChatGPT conectado.", tone: "ok" });
+          stQ.refetch();
+        }
+      }).catch(() => {});
+    }, intervalMs);
+    return () => clearInterval(t);
+  }, [view?.connected, pending, userCode, intervalMs]);
+
+  return (
+    <Card padding="16px 18px 18px" style={{ marginBottom: 16 }}>
+      <EndpointHeader kind="CHATGPT" title="ChatGPT (assinatura)" note="OAuth · Plus/Pro" />
+      <p style={{ margin: "8px 0 12px", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
+        Conecte a conta ChatGPT (Plus/Pro) da mesma forma que no Hermes. Os tokens ficam neste cérebro,
+        no banco — sem arquivo no servidor.
+      </p>
+
+      {stQ.loading && !view && (
+        <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>Checando ChatGPT…</p>
+      )}
+
+      {view?.connected && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <span
+            className="mono"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              padding: "4px 9px",
+              borderRadius: 999,
+              background: "var(--st-fact-soft, oklch(95% 0.03 145))",
+              color: "var(--st-fact, oklch(42% 0.12 145))",
+            }}
+          >
+            Conectado
+          </span>
+          {view.expiresAt && (
+            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+              sessão até {new Date(view.expiresAt).toLocaleString()}
+            </span>
+          )}
+        </div>
+      )}
+
+      {pending && userCode && !view?.connected && (
+        <div style={{ marginBottom: 14 }}>
+          <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+            Aprove no ChatGPT com este código
+            {verificationUrl ? (
+              <>
+                {" "}
+                (ou <a href={verificationUrl} target="_blank" rel="noreferrer">abra de novo</a>)
+              </>
+            ) : null}
+            :
+          </p>
+          <div
+            className="mono"
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid var(--border)",
+              background: "var(--surface-2)",
+              width: "fit-content",
+            }}
+          >
+            {userCode}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {view?.connected ? (
+          <Button variant="ghost" disabled={busy} onClick={disconnect}>
+            Desconectar
+          </Button>
+        ) : (
+          <Button variant="primary" disabled={busy} onClick={connect}>
+            {pending ? "Abrir aprovação" : "Conectar ChatGPT"}
           </Button>
         )}
       </div>

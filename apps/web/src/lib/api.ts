@@ -428,6 +428,19 @@ export interface EvolutionStatus {
   lastError: string | null;
   message?: string;
 }
+/** ChatGPT/Codex OAuth — GET/POST /api/llm/codex/* (tokens no banco; nunca na resposta). */
+export interface CodexOauthStatus {
+  connected: boolean;
+  expiresAt?: string;
+  pending?: boolean;
+  userCode?: string;
+  verificationUrl?: string;
+}
+export interface CodexOauthStart {
+  verificationUrl: string;
+  userCode: string;
+  interval: number;
+}
 export interface Source {
   id: string; name: string;
   /** "upload" | "paste" para fontes manuais; fontes-conector chegam com o channel do SEED
@@ -928,6 +941,12 @@ export const api = {
     status: () => get<EvolutionStatus>("/api/evolution/status"),
     connect: () => post<EvolutionStatus>("/api/evolution/connect", {}),
     refreshQr: () => post<EvolutionStatus>("/api/evolution/qr", {}),
+  },
+  llmCodex: {
+    status: () => get<CodexOauthStatus>("/api/llm/codex/status"),
+    start: () => post<CodexOauthStart>("/api/llm/codex/start", {}),
+    poll: () => post<CodexOauthStatus>("/api/llm/codex/poll", {}),
+    disconnect: () => post<{ connected: false }>("/api/llm/codex/disconnect", {}),
   },
   hypotheses: {
     // `list` GANHA filtros ADITIVOS (reason/dimension/source_id) — defesa em profundidade do

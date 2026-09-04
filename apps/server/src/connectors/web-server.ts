@@ -63,24 +63,30 @@ import { nangoWebhookHandler, connectSessionHandler, connectorCreateHandler, con
 // M-PAY-A/B — webhook (m2m) + billing (account-scoped) do Stripe.
 import { stripeWebhookHandler, createCheckoutHandler, createPortalHandler, getSubscriptionHandler, getCreditsHandler, createTopupHandler, getFounderSeatsHandler, getBillingPrefsHandler, setBillingPrefsHandler } from "./bff/bff-stripe.ts";
 import { evolutionStatusHandler, evolutionConnectHandler, evolutionQrHandler } from "./bff/bff-evolution.ts";
+import {
+  codexStatusHandler,
+  codexStartHandler,
+  codexPollHandler,
+  codexDisconnectHandler,
+} from "./bff/bff-codex-oauth.ts";
 import { gateAndDebit, grantTrial, billingEnabled, CREDIT_COST, listLedger, getSpendCap, setSpendCap, topupRemainingOfBrain, type GateResult } from "../core/platform/credits.ts";
 import { assertEntitledByBrain } from "../core/platform/entitlement.ts";
-import { resolveProvider, subscriptionAvailable } from "../lib/llm.ts";
+import { resolveProvider, subscriptionAvailableAsync } from "../lib/llm.ts";
 import { config as platformConfig } from "../core/platform/config.ts";
 import { registerBuiltinIngestors } from "../core/ingestion/ingestors/boot.ts";
 import { listIngestors } from "../core/ingestion/ingestors/registry.ts";
 
 /** Preflight de IA nas rotas de síntese (ask): sem ANTHROPIC_API_KEY, sem `claude` e sem
- *  ChatGPT/Codex (`~/.codex/auth.json`), a síntese falharia lá na frente. Melhor um 503 claro.
- *  Busca/FTS não passam por aqui. */
-function aiUnavailableMsg(): string | null {
+ *  ChatGPT/Codex (tokens no banco do brain, ou `~/.codex/auth.json` em dev), a síntese falharia
+ *  lá na frente. Melhor um 503 claro. Busca/FTS não passam por aqui. */
+async function aiUnavailableMsg(brain?: string): Promise<string | null> {
   const msg =
     "Este servidor está sem IA configurada: defina ANTHROPIC_API_KEY, instale o CLI `claude`, ou " +
-    "autentique ChatGPT/Codex (`~/.codex/auth.json` + GALEED_PROVIDER=codex) e reinicie. " +
+    "conecte o ChatGPT em Conectar (assinatura Plus/Pro). " +
     "A busca por palavra-chave continua funcionando sem IA.";
   try {
     const p = resolveProvider(platformConfig().provider);
-    if (p === "cli") return subscriptionAvailable() ? null : msg;
+    if (p === "cli") return (await subscriptionAvailableAsync(brain)) ? null : msg;
     return process.env.ANTHROPIC_API_KEY ? null : msg;
   } catch {
     return msg;
@@ -641,7 +647,7 @@ export function startWebServer() {
         const rl = rateLimit(`ask:${account.id}`, 30, 60_000);
         if (!rl.ok) return send(res, 429, { error: "muitas tentativas" }, { "retry-after": String(rl.retryAfter) });
         if (!q) return send(res, 400, { error: "faltou ?q=" });
-        const aiMsgStream = aiUnavailableMsg();
+        const aiMsgStream = await aiUnavailableMsg(home);
         if (aiMsgStream) return send(res, 503, { error: aiMsgStream }); // JSON antes de abrir o SSE
         const k = Number(u.searchParams.get("k")) || 8;
 
@@ -874,6 +880,24 @@ export function startWebServer() {
         return send(res, 200, await evolutionQrHandler(home));
       }
 
+      // --- ChatGPT / Codex OAuth (device flow; tokens no Postgres do brain, não no host) ---
+      if (path === "/api/llm/codex/status" && method === "GET") {
+        const { home } = await requireBrain(req, u);
+        return send(res, 200, await codexStatusHandler(home));
+      }
+      if (path === "/api/llm/codex/start" && method === "POST") {
+        const { home } = await requireBrain(req, u);
+        return send(res, 200, await codexStartHandler(home));
+      }
+      if (path === "/api/llm/codex/poll" && method === "POST") {
+        const { home } = await requireBrain(req, u);
+        return send(res, 200, await codexPollHandler(home));
+      }
+      if (path === "/api/llm/codex/disconnect" && method === "POST") {
+        const { home } = await requireBrain(req, u);
+        return send(res, 200, await codexDisconnectHandler(home));
+      }
+
       // --- GITHUB SYNC (github-sync.ts): espelho organizado pra pessoas + entrada por diff. ---
       if (path === "/api/github/config" && method === "GET") {
         const { home } = await requireBrain(req, u);
@@ -1022,7 +1046,7 @@ export function startWebServer() {
             // Rota cara de LLM: limita por CONTA (autenticada via requireBrain acima).
             const rl = rateLimit(`ask:${account.id}`, 30, 60_000);
             if (!rl.ok) return send(res, 429, { error: "muitas tentativas" }, { "retry-after": String(rl.retryAfter) });
-            const aiMsg = aiUnavailableMsg();
+            const aiMsg = await aiUnavailableMsg(home);
             if (aiMsg) return send(res, 503, { error: aiMsg });
             // M-PAY-H: gate de entitlement (assinatura inadimplente fora da graça) ANTES do crédito.
             // Resolvido pelo OWNER do brain (mesma conta que o gateAndDebit cobra), não pela sessão.
