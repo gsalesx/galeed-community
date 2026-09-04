@@ -111,18 +111,48 @@ export async function setEvolutionLastError(brain: string, err: string | null): 
   await sql`update galeed_evolution set last_error = ${err} where brain = ${brain}`;
 }
 
-/** HTTP contra a Evolution. Lança Error com mensagem legível. */
-export async function evolutionFetch(path: string, init?: RequestInit): Promise<{ status: number; json: any }> {
+type EvolutionFetchInit = RequestInit & { timeoutMs?: number };
+
+function flattenEvolutionMessage(json: any, status: number): string {
+  const candidates = [json?.message, json?.error, json?.response?.message];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c;
+    if (Array.isArray(c)) {
+      const flat = c.flat(Infinity).filter((x) => typeof x === "string").join("; ");
+      if (flat) return flat;
+    }
+  }
+  return `Evolution HTTP ${status}`;
+}
+
+/** HTTP contra a Evolution. Lança Error com mensagem legível. Timeout padrão 15s. */
+export async function evolutionFetch(path: string, init?: EvolutionFetchInit): Promise<{ status: number; json: any }> {
   const env = evolutionEnv();
   if (!env) throw new Error("Evolution não configurada (EVOLUTION_API_URL / EVOLUTION_API_KEY).");
-  const res = await fetch(`${env.apiUrl}${path.startsWith("/") ? path : `/${path}`}`, {
-    ...init,
-    headers: {
-      apikey: env.apiKey,
-      "Content-Type": "application/json",
-      ...(init?.headers as Record<string, string> | undefined),
-    },
-  });
+  const timeoutMs = init?.timeoutMs ?? 15_000;
+  const { timeoutMs: _timeoutMs, ...rest } = (init ?? {}) as EvolutionFetchInit;
+  void _timeoutMs;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(`${env.apiUrl}${path.startsWith("/") ? path : `/${path}`}`, {
+      ...rest,
+      signal: ctrl.signal,
+      headers: {
+        apikey: env.apiKey,
+        "Content-Type": "application/json",
+        ...(rest.headers as Record<string, string> | undefined),
+      },
+    });
+  } catch (err) {
+    if (err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError")) {
+      throw new Error(`Evolution não respondeu em ${Math.round(timeoutMs / 1000)}s (${path}).`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   const text = await res.text();
   let json: any = null;
   try {
@@ -131,12 +161,7 @@ export async function evolutionFetch(path: string, init?: RequestInit): Promise<
     json = { raw: text };
   }
   if (!res.ok) {
-    const msg =
-      (typeof json?.message === "string" && json.message) ||
-      (typeof json?.error === "string" && json.error) ||
-      (typeof json?.response?.message === "string" && json.response.message) ||
-      `Evolution HTTP ${res.status}`;
-    throw new Error(msg);
+    throw new Error(flattenEvolutionMessage(json, res.status));
   }
   return { status: res.status, json };
 }

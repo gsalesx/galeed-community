@@ -534,9 +534,10 @@ function WhatsAppEvolution({
     }
   }
 
-  // Poll leve enquanto connecting + tem QR
+  // Poll enquanto connecting (com ou sem QR) até abrir a sessão
   useEffect(() => {
-    if (!view?.online || view.connected || !view.qrBase64) return;
+    if (!view?.online || view.connected) return;
+    if (!view.qrBase64 && view.state !== "connecting") return;
     const t = setInterval(() => {
       api.evolution.status().then((s) => {
         if (s.connected) {
@@ -547,7 +548,7 @@ function WhatsAppEvolution({
       }).catch(() => {});
     }, 4000);
     return () => clearInterval(t);
-  }, [view?.online, view?.connected, view?.qrBase64]);
+  }, [view?.online, view?.connected, view?.qrBase64, view?.state]);
 
   return (
     <Card padding="16px 18px 18px" style={{ marginBottom: 16 }}>
@@ -596,6 +597,12 @@ function WhatsAppEvolution({
         </div>
       )}
 
+      {view?.state === "connecting" && !view.qrBase64 && !view.connected && (
+        <p style={{ margin: "0 0 12px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.45 }}>
+          Aguardando QR da Evolution… se não aparecer, clique em Renovar QR.
+        </p>
+      )}
+
       {view?.qrBase64 && !view.connected && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
           <img
@@ -617,11 +624,11 @@ function WhatsAppEvolution({
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <Button variant="primary" disabled={busy || view?.configured === false} onClick={connect}>
-          {view?.connected ? "Reconfigurar webhook" : "Conectar WhatsApp"}
+          {busy ? "Conectando…" : view?.connected ? "Reconfigurar webhook" : "Conectar WhatsApp"}
         </Button>
         {view?.online && !view.connected && (
           <Button variant="ghost" disabled={busy} onClick={refreshQr}>
-            Renovar QR
+            {busy ? "Aguardando…" : "Renovar QR"}
           </Button>
         )}
       </div>

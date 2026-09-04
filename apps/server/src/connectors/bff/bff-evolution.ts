@@ -59,27 +59,40 @@ async function ensureBotAndToken(home: string): Promise<{ token: string; princip
   return { token, principalId: PRINCIPAL_ID, instanceName };
 }
 
-async function setInstanceWebhook(instanceName: string, token: string): Promise<void> {
-  const url = webhookUrlFor(token);
-  // webhookByEvents=false → POST na URL exata (sem /messages-upsert).
-  const body = {
+/** Payload webhook v2.3 — envelope `{ webhook }` (sem ele: "instance requires property webhook"). */
+function webhookPayload(token: string) {
+  return {
     enabled: true,
-    url,
-    webhookByEvents: false,
-    webhookBase64: false,
+    url: webhookUrlFor(token),
+    byEvents: false,
+    base64: false,
     events: ["MESSAGES_UPSERT"],
     headers: { Authorization: `Bearer ${token}` },
   };
+}
+
+function isTimeoutMsg(msg: string): boolean {
+  return /não respondeu em \d+s/i.test(msg);
+}
+
+async function setInstanceWebhook(instanceName: string, token: string): Promise<void> {
+  const webhook = webhookPayload(token);
   try {
     await evolutionFetch(`/webhook/set/${encodeURIComponent(instanceName)}`, {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify({ webhook }),
     });
   } catch {
-    // Algumas builds exigem envelope { webhook: {...} }.
     await evolutionFetch(`/webhook/set/${encodeURIComponent(instanceName)}`, {
       method: "POST",
-      body: JSON.stringify({ webhook: body }),
+      body: JSON.stringify({
+        enabled: true,
+        url: webhook.url,
+        webhookByEvents: false,
+        webhookBase64: false,
+        events: webhook.events,
+        headers: webhook.headers,
+      }),
     });
   }
 }
@@ -99,7 +112,7 @@ async function fetchConnectionState(instanceName: string): Promise<string> {
   }
 }
 
-async function ensureInstance(instanceName: string): Promise<{ qr: string | null; created: boolean }> {
+async function ensureInstance(instanceName: string, token: string): Promise<{ qr: string | null; created: boolean }> {
   // Já existe?
   try {
     const { json } = await evolutionFetch(`/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`);
@@ -108,24 +121,35 @@ async function ensureInstance(instanceName: string): Promise<{ qr: string | null
       const n = x?.instance?.instanceName ?? x?.name ?? x?.instanceName;
       return n === instanceName;
     });
-    if (hit) return { qr: null, created: false };
+    if (hit) return { qr: extractQrBase64(hit) ?? extractQrBase64(json), created: false };
   } catch {
     /* segue pra create */
   }
 
-  const { json } = await evolutionFetch("/instance/create", {
-    method: "POST",
-    body: JSON.stringify({
-      instanceName,
-      integration: "WHATSAPP-BAILEYS",
-      qrcode: true,
-    }),
-  });
-  return { qr: extractQrBase64(json), created: true };
+  // qrcode:false → create responde na hora; o QR vem no /instance/connect (com timeout).
+  try {
+    const { json } = await evolutionFetch("/instance/create", {
+      method: "POST",
+      timeoutMs: 12_000,
+      body: JSON.stringify({
+        instanceName,
+        integration: "WHATSAPP-BAILEYS",
+        qrcode: false,
+        webhook: webhookPayload(token),
+      }),
+    });
+    return { qr: extractQrBase64(json), created: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/already|exist|in use|já exist/i.test(msg)) return { qr: null, created: false };
+    throw err;
+  }
 }
 
 async function fetchQr(instanceName: string): Promise<string | null> {
-  const { json } = await evolutionFetch(`/instance/connect/${encodeURIComponent(instanceName)}`);
+  const { json } = await evolutionFetch(`/instance/connect/${encodeURIComponent(instanceName)}`, {
+    timeoutMs: 20_000,
+  });
   return extractQrBase64(json);
 }
 
@@ -190,17 +214,27 @@ export async function evolutionConnectHandler(home: string): Promise<EvolutionSt
 
   try {
     const { token, instanceName } = await ensureBotAndToken(home);
-    const { qr: qrCreate } = await ensureInstance(instanceName);
-    await setInstanceWebhook(instanceName, token);
+    const { qr: qrCreate } = await ensureInstance(instanceName, token);
+    try {
+      await setInstanceWebhook(instanceName, token);
+    } catch {
+      /* webhook já pode ter ido no create */
+    }
 
     const state = await fetchConnectionState(instanceName);
     let qr = qrCreate;
     if (state !== "open" && !qr) {
-      qr = await fetchQr(instanceName);
+      try {
+        qr = await fetchQr(instanceName);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!isTimeoutMsg(msg)) throw err;
+      }
     }
 
     await setEvolutionLastError(home, null);
 
+    const waitingQr = state !== "open" && !qr;
     return {
       configured: true,
       online: true,
@@ -212,7 +246,9 @@ export async function evolutionConnectHandler(home: string): Promise<EvolutionSt
       lastError: null,
       message: state === "open"
         ? "WhatsApp já conectado — mensagens vão pro cérebro."
-        : "Escaneie o QR no WhatsApp (Aparelhos conectados).",
+        : waitingQr
+          ? "A Evolution ainda está gerando o QR — clique em Renovar QR em alguns segundos."
+          : "Escaneie o QR no WhatsApp (Aparelhos conectados).",
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -244,7 +280,13 @@ export async function evolutionQrHandler(home: string): Promise<EvolutionStatusV
         message: "Já conectado — não precisa de QR.",
       };
     }
-    const qr = await fetchQr(cfg.instanceName);
+    let qr: string | null = null;
+    try {
+      qr = await fetchQr(cfg.instanceName);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!isTimeoutMsg(msg)) throw err;
+    }
     await setEvolutionLastError(home, null);
     return {
       configured: true,
