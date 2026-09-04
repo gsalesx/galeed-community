@@ -32,16 +32,80 @@ async function db(): Promise<any> {
         principal_id text not null,
         enabled boolean not null default true,
         last_error text
-      )`);
+      );
+      create table if not exists galeed_evolution_instances (
+        brain text not null,
+        instance_name text not null,
+        last_error text,
+        enabled boolean not null default true,
+        primary key (brain, instance_name)
+      );
+      insert into galeed_evolution_instances (brain, instance_name, last_error, enabled)
+      select brain, instance_name, last_error, enabled
+      from galeed_evolution
+      where instance_name is not null and instance_name <> ''
+      on conflict do nothing`);
   })();
   await _ready;
   return sql;
 }
 
-/** Nome estável da instância Evolution a partir do brain. */
-export function evolutionInstanceName(brain: string): string {
+export interface EvolutionInstanceRow {
+  brain: string;
+  instanceName: string;
+  lastError: string | null;
+  enabled: boolean;
+}
+
+/** Nome estável da instância Evolution a partir do brain. slot 2+ vira sufixo `-2`. */
+export function evolutionInstanceName(brain: string, slot = 1): string {
   const slug = brain.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
-  return `galeed-${slug || "brain"}`;
+  const base = `galeed-${slug || "brain"}`;
+  return slot <= 1 ? base : `${base}-${slot}`;
+}
+
+/** Próximo instanceName livre neste cérebro (`galeed-x`, `galeed-x-2`, …). */
+export function nextEvolutionInstanceName(brain: string, existing: string[]): string {
+  const taken = new Set(existing);
+  for (let slot = 1; slot < 100; slot++) {
+    const n = evolutionInstanceName(brain, slot);
+    if (!taken.has(n)) return n;
+  }
+  throw new Error("Limite de contas WhatsApp neste cérebro.");
+}
+
+/** DDI+DDD+número só dígitos (E.164 sem +). */
+export function normalizeWhatsAppNumber(raw: string): string {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 15) {
+    throw new Error("Número inválido — use DDI+DDD+número (ex. 5511999998888).");
+  }
+  return digits;
+}
+
+export function isZombieEvolutionState(state: string | null | undefined): boolean {
+  if (!state) return false;
+  const s = state.toLowerCase();
+  return s === "close" || s === "closed" || s.includes("not connection") || s === "refused";
+}
+
+/** Código de emparelhamento (8 chars) das formas comuns da Evolution v2. */
+export function extractPairingCode(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  const qr = d.qrcode;
+  const candidates: unknown[] = [
+    d.pairingCode,
+    d.pairing_code,
+    typeof qr === "object" && qr ? (qr as Record<string, unknown>).pairingCode : null,
+    typeof qr === "object" && qr ? (qr as Record<string, unknown>).pairing_code : null,
+  ];
+  for (const c of candidates) {
+    if (typeof c !== "string") continue;
+    const code = c.replace(/\s+/g, "").toUpperCase();
+    if (/^[A-Z0-9]{8}$/.test(code)) return code;
+  }
+  return null;
 }
 
 /** Extrai QR base64 das formas comuns da Evolution v2. */
@@ -109,6 +173,49 @@ export async function upsertEvolutionConfig(
 export async function setEvolutionLastError(brain: string, err: string | null): Promise<void> {
   const sql = await db();
   await sql`update galeed_evolution set last_error = ${err} where brain = ${brain}`;
+}
+
+export async function listEvolutionInstances(brain: string): Promise<EvolutionInstanceRow[]> {
+  const sql = await db();
+  const rows = (await sql`
+    select * from galeed_evolution_instances where brain = ${brain} order by instance_name`) as any[];
+  return rows.map((r) => ({
+    brain,
+    instanceName: r.instance_name,
+    lastError: r.last_error ?? null,
+    enabled: r.enabled === true,
+  }));
+}
+
+export async function upsertEvolutionInstance(
+  brain: string,
+  instanceName: string,
+  lastError: string | null = null,
+): Promise<void> {
+  const sql = await db();
+  await sql`
+    insert into galeed_evolution_instances (brain, instance_name, last_error, enabled)
+    values (${brain}, ${instanceName}, ${lastError}, true)
+    on conflict (brain, instance_name) do update set
+      last_error = excluded.last_error,
+      enabled = true`;
+}
+
+export async function removeEvolutionInstance(brain: string, instanceName: string): Promise<void> {
+  const sql = await db();
+  await sql`delete from galeed_evolution_instances where brain = ${brain} and instance_name = ${instanceName}`;
+}
+
+export async function setEvolutionInstanceError(
+  brain: string,
+  instanceName: string,
+  err: string | null,
+): Promise<void> {
+  const sql = await db();
+  await sql`
+    update galeed_evolution_instances set last_error = ${err}
+    where brain = ${brain} and instance_name = ${instanceName}`;
+  await setEvolutionLastError(brain, err);
 }
 
 type EvolutionFetchInit = RequestInit & { timeoutMs?: number };

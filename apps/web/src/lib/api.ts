@@ -417,13 +417,24 @@ export interface ConnectStart {
 export interface ConnectorStatusRow extends ConnectorState { source_id: string }
 export interface ConnectorsStatus { sources: ConnectorStatusRow[] }
 /** WhatsApp / Evolution — GET/POST /api/evolution/* */
+export interface EvolutionInstance {
+  instanceName: string;
+  state: string | null;
+  connected: boolean;
+  qrBase64: string | null;
+  pairingCode: string | null;
+  lastError: string | null;
+  message?: string;
+}
 export interface EvolutionStatus {
   configured: boolean;
   online: boolean;
+  instances: EvolutionInstance[];
   instanceName: string | null;
   state: string | null;
   connected: boolean;
   qrBase64: string | null;
+  pairingCode?: string | null;
   webhookHint: string | null;
   lastError: string | null;
   message?: string;
@@ -947,8 +958,12 @@ export const api = {
   /** WhatsApp via Evolution (local/Docker) — QR no painel. */
   evolution: {
     status: () => request<EvolutionStatus>("/api/evolution/status", { timeoutMs: 15_000 }),
-    connect: () => request<EvolutionStatus>("/api/evolution/connect", { method: "POST", body: {}, timeoutMs: 28_000 }),
-    refreshQr: () => request<EvolutionStatus>("/api/evolution/qr", { method: "POST", body: {}, timeoutMs: 28_000 }),
+    connect: (p?: { add?: boolean; instanceName?: string; number?: string }) =>
+      request<EvolutionStatus>("/api/evolution/connect", { method: "POST", body: p ?? {}, timeoutMs: 28_000 }),
+    refreshQr: (p?: { instanceName?: string; number?: string }) =>
+      request<EvolutionStatus>("/api/evolution/qr", { method: "POST", body: p ?? {}, timeoutMs: 28_000 }),
+    disconnect: (p: { instanceName: string }) =>
+      request<EvolutionStatus>("/api/evolution/disconnect", { method: "POST", body: p, timeoutMs: 20_000 }),
   },
   llmCodex: {
     status: () => get<CodexOauthStatus>("/api/llm/codex/status"),

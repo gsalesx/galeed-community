@@ -503,59 +503,100 @@ function WhatsAppEvolution({
     () => api.evolution.status(),
     [],
   );
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
   const [local, setLocal] = useState<Awaited<ReturnType<typeof api.evolution.connect>> | null>(null);
+  const [mode, setMode] = useState<"qr" | "number">("qr");
+  const [number, setNumber] = useState("");
+  const [adding, setAdding] = useState(false);
   const view = local ?? stQ.data;
+  const instances = view?.instances?.length
+    ? view.instances
+    : view?.instanceName
+      ? [{
+          instanceName: view.instanceName,
+          state: view.state,
+          connected: view.connected,
+          qrBase64: view.qrBase64,
+          pairingCode: view.pairingCode ?? null,
+          lastError: view.lastError,
+        }]
+      : [];
+  const waiting = instances.some((i) => !i.connected && (i.qrBase64 || i.pairingCode || i.state === "connecting"));
 
-  async function connect() {
-    setBusy(true);
+  function apply(r: Awaited<ReturnType<typeof api.evolution.connect>>) {
+    setLocal(r);
+    stQ.refetch();
+  }
+
+  async function connect(opts: { add?: boolean; instanceName?: string; number?: string }) {
+    const key = opts.instanceName || (opts.add ? "add" : "new");
+    setBusy(key);
     try {
-      const r = await api.evolution.connect();
-      setLocal(r);
-      setToast({ msg: r.message || (r.connected ? "WhatsApp conectado." : "QR pronto — escaneie."), tone: "ok" });
-      stQ.refetch();
+      const r = await api.evolution.connect(opts);
+      apply(r);
+      setAdding(false);
+      setToast({
+        msg: r.message || (r.connected ? "WhatsApp conectado." : r.pairingCode ? "Código pronto." : "QR pronto — escaneie."),
+        tone: "ok",
+      });
     } catch (e) {
       setToast({ msg: (e as Error).message || "Falha ao conectar Evolution.", tone: "danger" });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
-  async function refreshQr() {
-    setBusy(true);
+  async function refreshQr(instanceName?: string) {
+    setBusy(instanceName || "qr");
     try {
-      const r = await api.evolution.refreshQr();
-      setLocal(r);
+      const r = await api.evolution.refreshQr({ instanceName });
+      apply(r);
       setToast({ msg: r.message || "QR renovado.", tone: "neutral" });
     } catch (e) {
       setToast({ msg: (e as Error).message || "Falha ao renovar QR.", tone: "danger" });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
-  // Poll enquanto connecting (com ou sem QR) até abrir a sessão
+  async function disconnect(instanceName: string) {
+    setBusy(instanceName);
+    try {
+      const r = await api.evolution.disconnect({ instanceName });
+      apply(r);
+      setToast({ msg: r.message || "Conta desconectada.", tone: "neutral" });
+    } catch (e) {
+      setToast({ msg: (e as Error).message || "Falha ao desconectar.", tone: "danger" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   useEffect(() => {
-    if (!view?.online || view.connected) return;
-    if (!view.qrBase64 && view.state !== "connecting") return;
+    if (!view?.online || !waiting) return;
     const t = setInterval(() => {
       api.evolution.status().then((s) => {
-        if (s.connected) {
-          setLocal(s);
-          setToast({ msg: "WhatsApp conectado!", tone: "ok" });
+        const now = s.instances ?? [];
+        const was = instances.filter((i) => !i.connected).map((i) => i.instanceName);
+        const newly = now.filter((i) => i.connected && was.includes(i.instanceName));
+        setLocal(s);
+        if (newly.length) {
+          setToast({ msg: newly.length === 1 ? "WhatsApp conectado!" : "Contas WhatsApp conectadas.", tone: "ok" });
           stQ.refetch();
         }
       }).catch(() => {});
     }, 4000);
     return () => clearInterval(t);
-  }, [view?.online, view?.connected, view?.qrBase64, view?.state]);
+  }, [view?.online, waiting, instances.map((i) => `${i.instanceName}:${i.connected}`).join("|")]);
+
+  const digitsHint = number.replace(/\D/g, "");
 
   return (
     <Card padding="16px 18px 18px" style={{ marginBottom: 16 }}>
-      <EndpointHeader kind="WHATSAPP" title="WhatsApp (Evolution)" note="QR no painel" />
+      <EndpointHeader kind="WHATSAPP" title="WhatsApp (Evolution)" note="QR ou número" />
       <p style={{ margin: "8px 0 12px", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
-        Conecte o WhatsApp aqui. A Evolution roda no Docker (profile <span className="mono">evolution</span>) e
-        manda as mensagens pro ingestor — sem colar 2 links na mão.
+        Várias contas no mesmo cérebro. Cada uma tem instância e QR/código próprios — desconectar uma
+        não derruba as outras.
       </p>
 
       {stQ.loading && !view && (
@@ -574,64 +615,206 @@ function WhatsAppEvolution({
         </p>
       )}
 
-      {view?.connected && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <span
-            className="mono"
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              padding: "4px 9px",
-              borderRadius: 999,
-              background: "var(--st-fact-soft, oklch(95% 0.03 145))",
-              color: "var(--st-fact, oklch(42% 0.12 145))",
-            }}
+      {instances.map((inst) => (
+        <div
+          key={inst.instanceName}
+          style={{
+            marginBottom: 14,
+            padding: "12px 13px",
+            borderRadius: 12,
+            border: "1px solid var(--border)",
+            background: "var(--surface-2)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: inst.connected ? 0 : 10, flexWrap: "wrap" }}>
+            <span
+              className="mono"
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                padding: "4px 9px",
+                borderRadius: 999,
+                background: inst.connected
+                  ? "var(--st-fact-soft, oklch(95% 0.03 145))"
+                  : "var(--surface)",
+                color: inst.connected
+                  ? "var(--st-fact, oklch(42% 0.12 145))"
+                  : "var(--muted)",
+              }}
+            >
+              {inst.connected ? "Conectado" : inst.state === "connecting" ? "Conectando" : inst.state || "Livre"}
+            </span>
+            <span style={{ fontSize: 12.5, color: "var(--muted)" }} className="mono">
+              {inst.instanceName}
+            </span>
+          </div>
+
+          {inst.state === "connecting" && !inst.qrBase64 && !inst.pairingCode && !inst.connected && (
+            <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.45 }}>
+              Aguardando QR/código da Evolution… se não aparecer, renove abaixo.
+            </p>
+          )}
+
+          {inst.pairingCode && !inst.connected && (
+            <div style={{ marginBottom: 12 }}>
+              <div
+                className="mono"
+                style={{
+                  fontSize: 26,
+                  fontWeight: 700,
+                  letterSpacing: "0.16em",
+                  padding: "12px 16px",
+                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  width: "fit-content",
+                }}
+              >
+                {inst.pairingCode}
+              </div>
+              <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--muted)", maxWidth: 420, lineHeight: 1.45 }}>
+                WhatsApp → Aparelhos conectados → Conectar com número de telefone. O código expira ~60s.
+              </p>
+            </div>
+          )}
+
+          {inst.qrBase64 && !inst.connected && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+              <img
+                src={inst.qrBase64}
+                alt={`QR Code ${inst.instanceName}`}
+                width={220}
+                height={220}
+                style={{ borderRadius: 12, border: "1px solid var(--border)", background: "#fff" }}
+              />
+              <p style={{ margin: 0, fontSize: 12.5, color: "var(--muted)", maxWidth: 360, lineHeight: 1.45 }}>
+                WhatsApp → Aparelhos conectados → Conectar um aparelho. O QR expira ~60s.
+              </p>
+            </div>
+          )}
+
+          {inst.lastError && (
+            <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--danger)", lineHeight: 1.45 }}>{inst.lastError}</p>
+          )}
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {inst.connected ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy !== null}
+                  onClick={() => connect({ instanceName: inst.instanceName })}
+                >
+                  {busy === inst.instanceName ? "Aguardando…" : "Reconfigurar webhook"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy !== null}
+                  onClick={() => disconnect(inst.instanceName)}
+                  style={{ color: "var(--danger)" }}
+                >
+                  Desconectar
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={busy !== null || view?.configured === false}
+                  onClick={() => connect({ instanceName: inst.instanceName })}
+                >
+                  {busy === inst.instanceName ? "Conectando…" : "Conectar (QR)"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy !== null}
+                  onClick={() => refreshQr(inst.instanceName)}
+                >
+                  Renovar QR
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy !== null || digitsHint.length < 10}
+                  onClick={() => connect({ instanceName: inst.instanceName, number: digitsHint })}
+                >
+                  Pedir código
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {(adding || instances.length === 0 || instances.some((i) => !i.connected)) && view?.configured !== false && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <Button size="sm" variant={mode === "qr" ? "primary" : "secondary"} onClick={() => setMode("qr")}>
+              QR
+            </Button>
+            <Button size="sm" variant={mode === "number" ? "primary" : "secondary"} onClick={() => setMode("number")}>
+              Número
+            </Button>
+          </div>
+          {mode === "number" && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600, marginBottom: 4 }}>
+                Número (DDI+DDD, só dígitos)
+              </div>
+              <input
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+                placeholder="5511999998888"
+                inputMode="numeric"
+                autoComplete="tel"
+                style={{
+                  width: "100%",
+                  maxWidth: 280,
+                  border: "1px solid var(--border)",
+                  borderRadius: 9,
+                  background: "var(--surface-2)",
+                  padding: "8px 11px",
+                  fontSize: 14,
+                  color: "var(--fg)",
+                }}
+              />
+              {digitsHint && digitsHint.length < 10 && (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--muted)" }}>
+                  Inclua o país (55…) — {digitsHint.length} dígitos.
+                </p>
+              )}
+            </div>
+          )}
+          <Button
+            variant="primary"
+            disabled={busy !== null || view?.online === false || (mode === "number" && digitsHint.length < 10)}
+            onClick={() =>
+              connect({
+                add: instances.length > 0,
+                number: mode === "number" ? digitsHint : undefined,
+              })
+            }
           >
-            Conectado
-          </span>
-          <span style={{ fontSize: 12.5, color: "var(--muted)" }} className="mono">
-            {view.instanceName}
-          </span>
+            {busy === "add" || busy === "new" ? "Conectando…" : instances.length ? "Gerar conta" : "Conectar WhatsApp"}
+          </Button>
         </div>
       )}
 
-      {view?.state === "connecting" && !view.qrBase64 && !view.connected && (
-        <p style={{ margin: "0 0 12px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.45 }}>
-          Aguardando QR da Evolution… se não aparecer, clique em Renovar QR.
-        </p>
-      )}
-
-      {view?.qrBase64 && !view.connected && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
-          <img
-            src={view.qrBase64}
-            alt="QR Code WhatsApp"
-            width={220}
-            height={220}
-            style={{ borderRadius: 12, border: "1px solid var(--border)", background: "#fff" }}
-          />
-          <p style={{ margin: 0, fontSize: 12.5, color: "var(--muted)", maxWidth: 360, lineHeight: 1.45 }}>
-            WhatsApp → Aparelhos conectados → Conectar um aparelho. O QR expira ~60s.
-          </p>
-        </div>
-      )}
-
-      {view?.lastError && (
+      {view?.lastError && !instances.some((i) => i.lastError) && (
         <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--danger)", lineHeight: 1.45 }}>{view.lastError}</p>
       )}
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <Button variant="primary" disabled={busy || view?.configured === false} onClick={connect}>
-          {busy ? "Conectando…" : view?.connected ? "Reconfigurar webhook" : "Conectar WhatsApp"}
+      {view?.online && instances.length > 0 && !adding && (
+        <Button variant="secondary" disabled={busy !== null} onClick={() => { setAdding(true); setMode("qr"); }}>
+          Adicionar WhatsApp
         </Button>
-        {view?.online && !view.connected && (
-          <Button variant="ghost" disabled={busy} onClick={refreshQr}>
-            {busy ? "Aguardando…" : "Renovar QR"}
-          </Button>
-        )}
-      </div>
+      )}
     </Card>
   );
 }

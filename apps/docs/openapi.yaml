@@ -201,6 +201,80 @@ paths:
                         descricao: { type: string }
                         exemplo: { type: string }
 
+  /api/evolution/status:
+    get:
+      tags: [Conectores]
+      summary: Status das contas WhatsApp (Evolution) do cérebro
+      responses:
+        "200":
+          description: Lista de instâncias (QR/pairing/estado)
+        "401":
+          description: Sem sessão
+  /api/evolution/connect:
+    post:
+      tags: [Conectores]
+      summary: Cria ou reconecta uma conta WhatsApp (QR ou pairing code)
+      responses:
+        "200":
+          description: Instância + QR ou código
+        "400":
+          description: Número inválido
+        "502":
+          description: Erro da Evolution
+        "503":
+          description: Evolution não configurada
+  /api/evolution/qr:
+    post:
+      tags: [Conectores]
+      summary: Renova QR ou pairing code de uma instância
+      responses:
+        "200":
+          description: QR ou código renovado
+        "400":
+          description: Instância ainda não criada
+        "502":
+          description: Erro da Evolution
+  /api/evolution/disconnect:
+    post:
+      tags: [Conectores]
+      summary: Desconecta uma conta WhatsApp sem derrubar as outras
+      responses:
+        "200":
+          description: Instância removida
+        "400":
+          description: Instância inválida
+        "502":
+          description: Erro da Evolution
+
+  /api/llm/codex/status:
+    get:
+      tags: [Conectores]
+      summary: Status da sessão ChatGPT/Codex do cérebro
+      responses:
+        "200":
+          description: Conectado ou pendente
+  /api/llm/codex/start:
+    post:
+      tags: [Conectores]
+      summary: Inicia o device flow ChatGPT/Codex
+      responses:
+        "200":
+          description: URL e user code
+  /api/llm/codex/poll:
+    post:
+      tags: [Conectores]
+      summary: Consulta se o device flow concluiu
+      responses:
+        "200":
+          description: Status da sessão
+  /api/llm/codex/disconnect:
+    post:
+      tags: [Conectores]
+      summary: Remove os tokens ChatGPT/Codex do cérebro
+      responses:
+        "200":
+          description: Desconectado
+
   /api/github/config:
     get:
       tags: [Health]

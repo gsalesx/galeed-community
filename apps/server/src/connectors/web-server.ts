@@ -62,7 +62,7 @@ import { contextGet, contextSave, contextPreview, reextractEstimate, reextractRu
 import { nangoWebhookHandler, connectSessionHandler, connectorCreateHandler, connectorsStatusHandler, readRawBody } from "./bff/bff-connectors.ts";
 // M-PAY-A/B — webhook (m2m) + billing (account-scoped) do Stripe.
 import { stripeWebhookHandler, createCheckoutHandler, createPortalHandler, getSubscriptionHandler, getCreditsHandler, createTopupHandler, getFounderSeatsHandler, getBillingPrefsHandler, setBillingPrefsHandler } from "./bff/bff-stripe.ts";
-import { evolutionStatusHandler, evolutionConnectHandler, evolutionQrHandler } from "./bff/bff-evolution.ts";
+import { evolutionStatusHandler, evolutionConnectHandler, evolutionQrHandler, evolutionDisconnectHandler } from "./bff/bff-evolution.ts";
 import {
   codexStatusHandler,
   codexStartHandler,
@@ -873,11 +873,18 @@ export function startWebServer() {
       }
       if (path === "/api/evolution/connect" && method === "POST") {
         const { home } = await requireBrain(req, u);
-        return send(res, 200, await evolutionConnectHandler(home));
+        const b = await readJsonBody(req);
+        return send(res, 200, await evolutionConnectHandler(home, b as any));
       }
       if (path === "/api/evolution/qr" && method === "POST") {
         const { home } = await requireBrain(req, u);
-        return send(res, 200, await evolutionQrHandler(home));
+        const b = await readJsonBody(req);
+        return send(res, 200, await evolutionQrHandler(home, b as any));
+      }
+      if (path === "/api/evolution/disconnect" && method === "POST") {
+        const { home } = await requireBrain(req, u);
+        const b = await readJsonBody(req);
+        return send(res, 200, await evolutionDisconnectHandler(home, b as any));
       }
 
       // --- ChatGPT / Codex OAuth (device flow; tokens no Postgres do brain, não no host) ---
