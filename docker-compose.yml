@@ -165,7 +165,7 @@ services:
     profiles: ["evolution"]
 
   evolution:
-    image: atendai/evolution-api:v2.2.3
+    image: evoapicloud/evolution-api:v2.3.0
     container_name: galeed-evolution
     restart: unless-stopped
     depends_on:

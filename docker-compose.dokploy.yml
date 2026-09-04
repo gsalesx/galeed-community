@@ -120,7 +120,7 @@ services:
     restart: unless-stopped
 
   evolution:
-    image: atendai/evolution-api:v2.2.3
+    image: evoapicloud/evolution-api:v2.3.0
     restart: unless-stopped
     depends_on:
       evolution-db:
