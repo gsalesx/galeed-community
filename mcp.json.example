@@ -1,0 +1,15 @@
+{
+  "_comment": "Exemplo de registro do Galeed como servidor MCP. Troque ABS_PATH, a DATABASE_URL e as keys. Cole o bloco 'galeed' dentro de mcpServers no seu .mcp.json (projeto) ou ~/.claude.json.",
+  "mcpServers": {
+    "galeed": {
+      "command": "npx",
+      "args": ["tsx", "ABS_PATH/galeed/apps/server/src/mcp/server.ts"],
+      "env": {
+        "DATABASE_URL": "postgresql://galeed:galeed@localhost:5434/galeed",
+        "GALEED_BRAIN": "minha-empresa",
+        "OPENAI_API_KEY": "sk-...",
+        "NODE_NO_WARNINGS": "1"
+      }
+    }
+  }
+}

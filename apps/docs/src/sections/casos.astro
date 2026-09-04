@@ -1,0 +1,235 @@
+---
+import Section from "../components/Section.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import CodeTabs from "../components/CodeTabs.astro";
+import Admonition from "../components/Admonition.astro";
+import Principle from "../components/Principle.astro";
+
+// Casos de uso — 4 histórias curtas (problema → como o Galeed resolve → exemplo
+// copiável → resultado). Reusa qsteps/qstep (timeline numerada do design),
+// CodeTabs (curl/Node/Python), CodeBlock pras respostas, Admonition e Principle.
+// Só superfície pública: /v1, Bearer gld_, MCP.
+
+// helper: monta as 3 abas (curl/Node/Python) de um POST /v1/ask
+const askTabs = (key: string, question: string) => [
+  {
+    lang: "bash",
+    label: "curl",
+    code: `curl https://api.galeed.com/v1/ask \\
+  -H "Authorization: Bearer ${key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "question": "${question}" }'`,
+  },
+  {
+    lang: "javascript",
+    label: "Node",
+    code: `const res = await fetch("https://api.galeed.com/v1/ask", {
+  method: "POST",
+  headers: {
+    authorization: "Bearer ${key}",
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({ question: "${question}" }),
+});
+const data = await res.json();`,
+  },
+  {
+    lang: "python",
+    label: "Python",
+    code: `import requests
+
+res = requests.post(
+    "https://api.galeed.com/v1/ask",
+    headers={
+        "Authorization": "Bearer ${key}",
+        "Content-Type": "application/json",
+    },
+    json={"question": "${question}"},
+)
+data = res.json()`,
+  },
+];
+
+const caso_a = askTabs(
+  "gld_live_8x2k...e1",
+  "Qual o preço fechado com a Acme e quem aprovou?",
+);
+
+const resp_a = `{
+  "answer": "Fechou em R$ 2.500/mês; a Maria aprovou na call de 12/jun.",
+  "facts": [
+    {
+      "text": "Preço fechado com a Acme: R$ 2.500/mês",
+      "status": "fact",
+      "confidence": 0.94,
+      "source": { "type": "call_vendas", "ref": "call-8821",
+                  "occurred_at": "2026-06-12T14:03:00Z" },
+      "area": ["vendas"],
+      "valid_from": "2026-06-12T14:03:00Z",
+      "valid_until": null
+    }
+  ],
+  "withheld": { "count": 0 }
+}`;
+
+const caso_b = askTabs(
+  "gld_live_atend...9c",
+  "Qual a margem que a gente pratica nesse plano?",
+);
+
+const resp_b = `{
+  "answer": "Não tenho fatos liberados pra responder isso aqui.",
+  "facts": [],
+  "withheld": { "count": 3, "reason": "out_of_scope" }
+}`;
+
+const caso_c = [
+  {
+    lang: "bash",
+    label: "curl",
+    code: `curl -G https://api.galeed.com/v1/facts \\
+  -H "Authorization: Bearer gld_live_8x2k...e1" \\
+  --data-urlencode "area=vendas" \\
+  --data-urlencode "as_of=2026-05-01"`,
+  },
+  {
+    lang: "javascript",
+    label: "Node",
+    code: `const url = new URL("https://api.galeed.com/v1/facts");
+url.search = new URLSearchParams({
+  area: "vendas",
+  as_of: "2026-05-01",
+}).toString();
+
+const res = await fetch(url, {
+  headers: { authorization: "Bearer gld_live_8x2k...e1" },
+});
+const data = await res.json();`,
+  },
+  {
+    lang: "python",
+    label: "Python",
+    code: `import requests
+
+res = requests.get(
+    "https://api.galeed.com/v1/facts",
+    headers={"Authorization": "Bearer gld_live_8x2k...e1"},
+    params={"area": "vendas", "as_of": "2026-05-01"},
+)
+data = res.json()`,
+  },
+];
+
+const resp_c = `{
+  "facts": [
+    {
+      "text": "Preço da Accelera: R$ 12.000",
+      "status": "fact",
+      "valid_from": "2026-04-10",
+      "valid_until": "2026-05-20",
+      "supersedes": null
+    }
+  ]
+}`;
+
+const caso_d = askTabs(
+  "gld_live_onb...4f",
+  "Como a gente costuma responder objeção de preço?",
+);
+---
+
+<Section
+  id="casos"
+  ix="04"
+  title="Casos de uso"
+  intro="Quatro histórias reais de quem joga conteúdo cru e pergunta depois. Em cada uma: o problema, como o Galeed resolve, o exemplo copiável e o que volta."
+>
+  <div class="qsteps">
+    <!-- (a) Copiloto de vendas ------------------------------------------->
+    <div class="qstep">
+      <h4>Copiloto de vendas</h4>
+      <p>
+        <strong>Problema.</strong> O preço fechado com um cliente ficou na transcrição
+        da última call, e seu agente de vendas não tem como lembrar disso na hora.
+      </p>
+      <p>
+        <strong>Como o Galeed resolve.</strong> A call já foi ingerida e virou fato
+        carimbado. O agente pergunta em português e recebe o preço com a fonte citada
+        — qual call, em que momento — sem você indexar nada à mão.
+      </p>
+      <CodeTabs tabs={caso_a} filename="o agente pergunta" />
+      <CodeBlock lang="json" filename="resposta · fato com selo" code={resp_a} />
+      <Admonition type="tip" flush>
+        <b>Resultado.</b> O copiloto responde com o número exato e o atribui à call certa.
+        Se o preço tivesse mudado, o Galeed devolveria o vigente e arquivaria o antigo.
+      </Admonition>
+    </div>
+
+    <!-- (b) Atendimento com memória -------------------------------------->
+    <div class="qstep">
+      <h4>Atendimento com memória</h4>
+      <p>
+        <strong>Problema.</strong> Um bot de atendimento precisa de contexto do cliente,
+        mas não pode vazar margem, custo ou qualquer coisa de outra área.
+      </p>
+      <p>
+        <strong>Como o Galeed resolve.</strong> A chave do bot já carrega o escopo
+        (áreas + nível máximo de sigilo). Toda leitura é filtrada no servidor: o que está
+        fora some da resposta e o campo <code class="ic">withheld</code> avisa quantos fatos
+        ficaram de fora — sem revelar o conteúdo.
+      </p>
+      <CodeTabs tabs={caso_b} filename="o bot pergunta algo fora do escopo" />
+      <CodeBlock lang="json" filename="resposta · fatos retidos pelo escopo" code={resp_b} />
+      <Admonition type="note" flush>
+        <b>Resultado.</b> O bot nunca recebe um fato fora da chave, mesmo que peça.
+        O <code class="ic">withheld.count</code> deixa claro que existe informação — só não
+        para esta chave.
+      </Admonition>
+    </div>
+
+    <!-- (c) Auditoria de decisões ---------------------------------------->
+    <div class="qstep">
+      <h4>Auditoria de decisões</h4>
+      <p>
+        <strong>Problema.</strong> &ldquo;Qual era o preço que a gente praticava em maio?&rdquo;
+        Hoje ele é outro, e a resposta de hoje não serve para auditar a decisão de ontem.
+      </p>
+      <p>
+        <strong>Como o Galeed resolve.</strong> A memória não sobrescreve, ela versiona.
+        Passe <code class="ic">as_of</code> com uma data e receba a memória <em>como era</em>
+        naquele dia — o preço antigo, antes de virar arquivado.
+      </p>
+      <CodeTabs tabs={caso_c} filename="o que era verdade em 01/mai" />
+      <CodeBlock lang="json" filename="resposta · estado da memória na data" code={resp_c} />
+      <Admonition type="tip" flush>
+        <b>Resultado.</b> Você vê exatamente o que era verdade naquela data, com
+        <code class="ic">valid_from</code> e <code class="ic">valid_until</code> provando
+        a janela em que o fato valeu.
+      </Admonition>
+    </div>
+
+    <!-- (d) Integração de novo funcionário ------------------------------------>
+    <div class="qstep">
+      <h4>Integração de novo funcionário</h4>
+      <p>
+        <strong>Problema.</strong> Quem entra precisa do que é relevante para a função —
+        e nada além disso. Dar acesso a tudo é risco; dar acesso a nada trava o trabalho.
+      </p>
+      <p>
+        <strong>Como o Galeed resolve.</strong> Crie uma chave restrita à área da pessoa.
+        O mesmo cérebro, a mesma pergunta — a resposta só traz o que aquele escopo alcança.
+        Conforme a pessoa cresce, você amplia a chave.
+      </p>
+      <CodeTabs tabs={caso_d} filename="chave restrita à área de vendas" />
+      <Principle>
+        <b>Você só joga. Ele organiza.</b> O escopo da chave é o único controle de acesso —
+        a mesma pergunta entrega histórias diferentes para chaves diferentes, sem você
+        montar nada por usuário.
+      </Principle>
+      <Admonition type="note" flush>
+        <b>Resultado.</b> O novato recebe playbooks e contexto da própria área no primeiro
+        dia, e o resto do cérebro permanece invisível até alguém ampliar o acesso de propósito.
+      </Admonition>
+    </div>
+  </div>
+</Section>

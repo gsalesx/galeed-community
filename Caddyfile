@@ -1,0 +1,38 @@
+# Caddyfile — ingress único do Galeed (serve o front + roteia as APIs).
+#
+# Endereço do site via env GALEED_SITE_ADDRESS:
+#   - default ":80"            -> HTTP, ideal pra local/staging
+#   - um domínio (galeed.com)  -> Caddy emite/renova TLS sozinho (HTTPS + HSTS)
+#
+# O Caddy injeta X-Forwarded-For/Proto/Host no upstream; por isso BFF e gateway
+# rodam com TRUST_PROXY=1 (definido no docker-compose) pra ler o IP real.
+{$GALEED_SITE_ADDRESS::80} {
+	encode gzip zstd
+
+	# remove o header que entrega o servidor
+	header -Server
+
+	# API pública /v1 (+ MCP) -> gateway
+	handle /v1/* {
+		reverse_proxy gateway:8790
+	}
+
+	# app: /api e /auth -> BFF (mesma origem do front)
+	@app path /api/* /auth/*
+	handle @app {
+		reverse_proxy bff:8789
+	}
+
+	# docs estáticas (Astro) -> /srv/docs (sem SPA-fallback)
+	handle /docs* {
+		root * /srv
+		file_server
+	}
+
+	# resto -> front estático (SPA: rotas de app caem no index.html)
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -1,0 +1,93 @@
+---
+import Section from "../components/Section.astro";
+import Codes from "../components/Codes.astro";
+import ParamTable from "../components/ParamTable.astro";
+import Admonition from "../components/Admonition.astro";
+import type { CodeRow } from "../components/Codes.astro";
+import type { ParamRow } from "../components/ParamTable.astro";
+
+const codes: CodeRow[] = [
+  {
+    code: "202",
+    level: "ok",
+    title: "Accepted",
+    desc: "Ingestão recebida, organizando. Não é erro: é o fluxo normal de escrita.",
+  },
+  {
+    code: "401",
+    level: "warn",
+    title: "unauthorized",
+    desc: "A chave do bot está ausente, inválida ou revogada.",
+  },
+  {
+    code: "403",
+    level: "warn",
+    title: "out_of_scope",
+    desc: "A chave é válida, mas não alcança a área ou o nível de sigilo que você pediu.",
+  },
+  {
+    code: "402",
+    level: "warn",
+    title: "cost_limit",
+    desc: 'O cérebro atingiu o teto diário de custo de IA. Só o <code class="ic">/v1/ask</code> (que sintetiza) é barrado; a resposta traz <code class="ic">current_usd</code> e <code class="ic">limit_usd</code>. Reseta à meia-noite UTC.',
+  },
+  {
+    code: "404",
+    level: "warn",
+    title: "not_found",
+    desc: "O recurso não existe — ou está fora do seu escopo. O Galeed não revela a diferença, de propósito.",
+  },
+  {
+    code: "422",
+    level: "warn",
+    title: "invalid_recipe",
+    desc: 'A <code class="ic">source</code> que você mandou não tem receita configurada neste cérebro.',
+  },
+  {
+    code: "429",
+    level: "warn",
+    title: "rate_limited",
+    desc: 'Chamadas demais. Espere o tempo do header <code class="ic">Retry-After</code> e tente de novo.',
+  },
+  {
+    code: "500",
+    level: "err",
+    title: "internal",
+    desc: "Erro do nosso lado. A ingestão nunca é perdida: ela fica na fila e reprocessa sozinha.",
+  },
+];
+
+const limites: ParamRow[] = [
+  {
+    name: "/v1/ask",
+    desc: "60 chamadas por minuto. A resposta é sintetizada, então pesa mais — use com calma.",
+  },
+  {
+    name: "/v1/ingest",
+    desc: '600 chamadas por minuto. O campo <code class="ic">content</code> aceita até 256 KB por chamada.',
+  },
+  {
+    name: "/v1/facts",
+    desc: '300 chamadas por minuto. Para listas grandes, pagine com <code class="ic">cursor</code> em vez de subir o <code class="ic">limit</code>.',
+  },
+];
+---
+
+<Section
+  id="erros"
+  ix="14"
+  title="Erros e limites"
+  intro="Códigos HTTP padrão e o que cada um significa no contexto do Galeed, mais os limites de cada chave."
+>
+  <Codes rows={codes} />
+
+  <div class="sub">Limites por endpoint</div>
+  <ParamTable cols={["Endpoint", "Limite"]} rows={limites} />
+
+  <Admonition type="note" flush>
+    Esta é a referência v1. O vocabulário de sigilo na API usa as chaves
+    estáveis <code class="ic">open · internal · confidential · secret</code>,
+    que o produto exibe como <b>Aberto · Interno · Sigiloso · Secreto</b>.
+    São os mesmos quatro níveis, mapeados 1:1.
+  </Admonition>
+</Section>

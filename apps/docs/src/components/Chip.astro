@@ -1,0 +1,22 @@
+---
+// Chip de valor .vchip (status do selo e níveis de sigilo). Variantes:
+//   status:      fact | hypo | arch
+//   sensitivity: s-open | s-int | s-conf | s-secret
+// O texto vem via slot (ex.: <Chip variant="fact">fact</Chip>).
+type ChipVariant =
+  | "fact"
+  | "hypo"
+  | "arch"
+  | "s-open"
+  | "s-int"
+  | "s-conf"
+  | "s-secret";
+
+interface Props {
+  variant: ChipVariant;
+}
+
+const { variant } = Astro.props;
+---
+
+<span class:list={["vchip", variant]}><slot /></span>

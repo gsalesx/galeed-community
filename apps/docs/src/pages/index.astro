@@ -1,0 +1,47 @@
+---
+import Layout from "../components/Layout.astro";
+import Hero from "../components/Hero.astro";
+
+// Seções na ordem do TOC. Cada uma é um stub em src/sections/<id>.astro que os
+// agentes de conteúdo preenchem. A ordem aqui espelha SECTIONS em src/data/toc.ts.
+import Introducao from "../sections/introducao.astro";
+import Inicio from "../sections/inicio.astro";
+import Conceitos from "../sections/conceitos.astro";
+import Arquitetura from "../sections/arquitetura.astro";
+import Casos from "../sections/casos.astro";
+import Fluxos from "../sections/fluxos.astro";
+import Auth from "../sections/auth.astro";
+import Ingestao from "../sections/ingestao.astro";
+import Perguntar from "../sections/perguntar.astro";
+import Fatos from "../sections/fatos.astro";
+import Fontes from "../sections/fontes.astro";
+import Mcp from "../sections/mcp.astro";
+import Integracoes from "../sections/integracoes.astro";
+import Webhooks from "../sections/webhooks.astro";
+import Erros from "../sections/erros.astro";
+---
+
+<Layout title="Galeed — Documentação">
+  <Hero
+    eyebrow="Documentação"
+    title="A memória do seu negócio, via API."
+    subtitle="Galeed recebe conteúdo cru de qualquer fonte, organiza sozinho, e devolve fatos carimbados com a fonte citada. Esta referência cobre a API REST, o protocolo MCP para conectar qualquer agente de IA, e o contrato de extração que mantém os fatos confiáveis."
+    pills={["REST + MCP", "base: api.galeed.com/v1", "auth: chave do bot", "JSON"]}
+  />
+
+  <Introducao />
+  <Inicio />
+  <Conceitos />
+  <Arquitetura />
+  <Casos />
+  <Fluxos />
+  <Auth />
+  <Ingestao />
+  <Perguntar />
+  <Fatos />
+  <Fontes />
+  <Mcp />
+  <Integracoes />
+  <Webhooks />
+  <Erros />
+</Layout>

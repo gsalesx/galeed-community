@@ -1,0 +1,313 @@
+/* Fontes do design: Inter + JetBrains Mono */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg: oklch(98% 0.005 250);
+  --surface: oklch(100% 0 0);
+  --surface-2: oklch(97% 0.006 250);
+  --fg: oklch(22% 0.02 240);
+  --muted: oklch(50% 0.018 240);
+  --faint: oklch(63% 0.014 240);
+  --border: oklch(91% 0.008 240);
+  --border-strong: oklch(85% 0.01 240);
+  --ink: oklch(17% 0.02 250);
+
+  --accent: oklch(56% 0.15 150);
+  --accent-ink: oklch(40% 0.12 150);
+  --accent-soft: oklch(95.5% 0.035 150);
+
+  --st-fact: oklch(52% 0.13 250);   --st-fact-soft: oklch(95.5% 0.03 250);
+  --st-hypo: oklch(64% 0.14 70);    --st-hypo-soft: oklch(96% 0.055 75);
+  --st-arch: oklch(58% 0.008 240);  --st-arch-soft: oklch(95% 0.004 240);
+  --st-reg: oklch(55% 0.16 285);    --st-reg-soft: oklch(95.5% 0.04 285);
+
+  --sn-open: oklch(56% 0.01 240);   --sn-open-soft: oklch(95% 0.004 240);
+  --sn-int: oklch(54% 0.10 235);    --sn-int-soft: oklch(95.5% 0.03 235);
+  --sn-conf: oklch(60% 0.13 55);    --sn-conf-soft: oklch(95% 0.05 60);
+  --sn-secret: oklch(54% 0.16 25);  --sn-secret-soft: oklch(95.5% 0.045 25);
+
+  --ok: oklch(56% 0.14 150);
+  --warn: oklch(70% 0.14 75);
+  --danger: oklch(58% 0.18 25);
+
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono','IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --r: 10px;
+  --shadow: 0 1px 2px oklch(40% 0.02 240 / .05), 0 8px 24px oklch(40% 0.02 240 / .06);
+
+  /* code surface (dark) */
+  --code-bg: oklch(20% 0.018 250);
+  --code-fg: oklch(88% 0.012 240);
+  --code-faint: oklch(60% 0.02 240);
+  --tok-k: oklch(74% 0.13 150);   /* keyword / method */
+  --tok-s: oklch(80% 0.09 70);    /* string */
+  --tok-n: oklch(74% 0.11 250);   /* number / bool */
+  --tok-p: oklch(82% 0.04 240);   /* property */
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:var(--font);color:var(--fg);background:var(--bg);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+code.ic{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:5px;padding:1px 6px;color:var(--accent-ink)}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:262px 1fr;min-height:100vh}
+.toc{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;background:var(--surface);
+  border-right:1px solid var(--border);padding:22px 16px;display:flex;flex-direction:column;gap:2px}
+.toc .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px;font-weight:700;letter-spacing:-.02em;font-size:16px}
+.toc .brand .glyph{width:30px;height:30px;border-radius:8px;background:var(--ink);display:grid;place-items:center;flex-shrink:0}
+.toc .brand .glyph img{width:100%;height:100%;object-fit:contain;padding:16%;filter:brightness(0) invert(1)}
+.toc .brand .sub{display:block;font-size:10.5px;font-weight:500;color:var(--faint);font-family:var(--mono);letter-spacing:0}
+.toc .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);font-weight:600;padding:14px 8px 5px}
+.toc a.lnk{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;color:var(--muted);font-size:13.5px;font-weight:500}
+.toc a.lnk:hover{background:var(--surface-2);color:var(--fg)}
+.toc a.lnk .ix{font-family:var(--mono);font-size:11px;color:var(--faint);width:18px}
+.toc a.lnk .mm{margin-left:auto;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.04em;padding:1px 5px;border-radius:4px}
+.toc a.lnk .mm.get{color:var(--st-fact);background:var(--st-fact-soft)}
+.toc a.lnk .mm.post{color:var(--accent-ink);background:var(--accent-soft)}
+.toc .back{margin-top:auto;padding-top:16px;border-top:1px solid var(--border)}
+.toc .back a{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--accent-ink);font-weight:600;padding:8px}
+.toc .back svg{width:14px;height:14px}
+
+/* ---------- content ---------- */
+.content{padding:0 0 90px;max-width:1080px}
+.hero{padding:60px 56px 38px;border-bottom:1px solid var(--border);
+  background:radial-gradient(640px 280px at 82% -20%, var(--accent-soft), transparent)}
+.hero .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;font-weight:600;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--accent-ink);background:var(--surface);
+  border:1px solid var(--border);border-radius:99px;padding:5px 12px}
+.hero h1{font-size:clamp(32px,4.6vw,48px);font-weight:800;letter-spacing:-.035em;line-height:1.05;margin:22px 0 14px}
+.hero p{font-size:17px;color:var(--muted);max-width:62ch;margin:0}
+.hero .meta{display:flex;flex-wrap:wrap;gap:9px;margin-top:26px}
+.hero .meta .pill{font-family:var(--mono);font-size:11.5px;color:var(--muted);background:var(--surface);
+  border:1px solid var(--border);border-radius:7px;padding:5px 11px;display:inline-flex;align-items:center;gap:7px}
+.hero .meta .pill .d{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+
+section{padding:50px 56px;border-bottom:1px solid var(--border);scroll-margin-top:0}
+.sec-head{margin-bottom:22px}
+.sec-head .ix{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent-ink)}
+.sec-head h2{font-size:26px;font-weight:700;letter-spacing:-.025em;margin:7px 0 7px}
+.sec-head p{margin:0;color:var(--muted);font-size:15px;max-width:70ch}
+.prose p{max-width:72ch;margin:0 0 14px}
+.prose p:last-child{margin-bottom:0}
+.prose strong{font-weight:600}
+.sub{font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--faint);margin:30px 0 13px}
+
+/* principle / philosophy callout */
+.principle{display:flex;gap:14px;align-items:flex-start;background:var(--ink);color:oklch(96% 0.01 240);
+  border-radius:14px;padding:20px 22px;margin:18px 0 6px}
+.principle .q{font-family:var(--mono);font-size:32px;line-height:.7;color:var(--accent);font-weight:600}
+.principle .t b{color:#fff;font-weight:600}
+.principle .t{font-size:15.5px;line-height:1.5;color:oklch(82% 0.015 240)}
+
+/* ---------- code block ---------- */
+.codeblock{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;margin:8px 0 4px;background:var(--code-bg);box-shadow:var(--shadow)}
+.codeblock .cbar{display:flex;align-items:center;gap:9px;padding:8px 10px 8px 14px;border-bottom:1px solid oklch(100% 0 0 / .07);background:oklch(24% 0.018 250)}
+.codeblock .cbar .lang{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--code-faint)}
+.codeblock .cbar .fn{font-family:var(--mono);font-size:11.5px;color:oklch(72% 0.02 240)}
+.codeblock .cbar .copy{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;
+  color:oklch(72% 0.02 240);border:1px solid oklch(100% 0 0 / .12);border-radius:7px;padding:4px 9px;transition:.15s}
+.codeblock .cbar .copy:hover{background:oklch(100% 0 0 / .07);color:#fff}
+.codeblock .cbar .copy svg{width:12px;height:12px}
+.codeblock pre{margin:0;padding:16px 18px;overflow:auto;font-family:var(--mono);font-size:12.7px;line-height:1.75;color:var(--code-fg);background:var(--code-bg) !important}
+.codeblock pre .tok-c{color:var(--code-faint);font-style:italic}
+.codeblock pre .tok-k{color:var(--tok-k)}
+.codeblock pre .tok-s{color:var(--tok-s)}
+.codeblock pre .tok-n{color:var(--tok-n)}
+.codeblock pre .tok-p{color:var(--tok-p)}
+.codeblock pre .tok-m{color:var(--code-faint)}
+
+/* Shiki (css-variables theme) dentro do codeblock: amarra os tokens às cores do design.
+   O tema css-variables emite var(--astro-code-token-*); mapeamos para a paleta tok-*. */
+.codeblock pre.astro-code{
+  --astro-code-foreground: var(--code-fg);
+  --astro-code-background: var(--code-bg);
+  --astro-code-token-constant: var(--tok-n);
+  --astro-code-token-string: var(--tok-s);
+  --astro-code-token-string-expression: var(--tok-s);
+  --astro-code-token-comment: var(--code-faint);
+  --astro-code-token-keyword: var(--tok-k);
+  --astro-code-token-parameter: var(--code-fg);
+  --astro-code-token-function: var(--tok-k);
+  --astro-code-token-punctuation: var(--tok-p);
+  --astro-code-token-link: var(--tok-s);
+}
+
+/* ---------- code tabs (abas de linguagem) ---------- */
+/* A fileira de abas vive na .cbar, à esquerda; .fn e .copy seguem à direita como no CodeBlock. */
+.codeblock[data-codetabs] .cbar{padding:6px 10px 6px 8px}
+.ct-tabs{display:flex;align-items:center;gap:2px}
+.ct-tab{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--code-faint);
+  padding:5px 10px;border-radius:7px;line-height:1;position:relative;transition:.15s;border:1px solid transparent}
+.ct-tab:hover{color:oklch(80% 0.02 240);background:oklch(100% 0 0 / .05)}
+.ct-tab.active{color:var(--accent-ink);background:var(--accent-soft);border-color:oklch(80% 0.06 150 / .35)}
+.ct-tab.active:hover{color:var(--accent-ink);background:var(--accent-soft)}
+.ct-panel{display:none}
+.ct-panel.active{display:block}
+
+/* ---------- endpoint header ---------- */
+.endpoint{display:flex;align-items:center;gap:11px;border:1px solid var(--border-strong);border-radius:10px;
+  background:var(--surface);padding:10px 13px;margin:6px 0 16px;flex-wrap:wrap}
+.method{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.05em;padding:4px 9px;border-radius:6px;flex-shrink:0}
+.method.get{color:var(--st-fact);background:var(--st-fact-soft)}
+.method.post{color:#fff;background:var(--accent)}
+.method.del{color:#fff;background:var(--danger)}
+.endpoint .path{font-family:var(--mono);font-size:13.5px;font-weight:500;color:var(--fg)}
+.endpoint .path .pp{color:var(--faint)}
+.endpoint .path b{color:var(--accent-ink);font-weight:600}
+.endpoint .scope{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;
+  color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:3px 8px}
+.endpoint .scope svg{width:11px;height:11px;color:var(--faint)}
+
+/* ---------- parameter table ---------- */
+.ptable{width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:11px;overflow:hidden;font-size:13.5px;margin:4px 0}
+.ptable thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);
+  font-weight:600;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+.ptable td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+.ptable tr:last-child td{border-bottom:none}
+.ptable .pn{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--fg);white-space:nowrap}
+.ptable .pt{font-family:var(--mono);font-size:11.5px;color:var(--st-reg)}
+.ptable .req{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--danger);background:oklch(95.5% 0.04 25);
+  border-radius:4px;padding:1px 5px;margin-left:6px}
+.ptable .opt{font-family:var(--mono);font-size:10px;color:var(--faint);margin-left:6px}
+.ptable .pd{color:var(--muted);line-height:1.5}
+.ptable .pd b{color:var(--fg);font-weight:600}
+
+/* ---------- admonition ---------- */
+.admon{display:flex;gap:12px;align-items:flex-start;border-radius:12px;padding:14px 16px;margin:18px 0;font-size:14px;line-height:1.55}
+.admon svg{width:18px;height:18px;flex-shrink:0;margin-top:1px}
+.admon b{font-weight:600}
+.admon.note{background:var(--st-fact-soft);border:1px solid oklch(88% 0.04 250)}
+.admon.note svg{color:var(--st-fact)}
+.admon.warn{background:var(--sn-conf-soft);border:1px solid oklch(86% 0.06 60)}
+.admon.warn svg{color:oklch(58% 0.13 55)}
+.admon.tip{background:var(--accent-soft);border:1px solid oklch(88% 0.04 150)}
+.admon.tip svg{color:var(--accent)}
+
+/* ---------- field reference (selo anatomy) ---------- */
+.fields{display:flex;flex-direction:column;gap:8px;margin:6px 0}
+.field{display:flex;gap:13px;align-items:flex-start;border:1px solid var(--border);border-radius:11px;padding:12px 15px;background:var(--surface)}
+.field .key{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--fg);min-width:118px;flex-shrink:0}
+.field .key small{display:block;font-size:10.5px;color:var(--st-reg);font-weight:500;margin-top:2px}
+.field .meaning{color:var(--muted);font-size:13.5px;line-height:1.5}
+.field .meaning b{color:var(--fg);font-weight:600}
+.field .meaning .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.field .meaning .vchip{font-family:var(--mono);font-size:10.5px;font-weight:500;border-radius:5px;padding:2px 7px;border:1px solid var(--border)}
+
+/* sensitivity / status chips reused */
+.vchip.fact{color:var(--st-fact);background:var(--st-fact-soft)}
+.vchip.hypo{color:oklch(48% 0.12 65);background:var(--st-hypo-soft)}
+.vchip.arch{color:var(--muted);background:var(--st-arch-soft)}
+.vchip.s-open{color:var(--sn-open);background:var(--sn-open-soft)}
+.vchip.s-int{color:var(--sn-int);background:var(--sn-int-soft)}
+.vchip.s-conf{color:var(--sn-conf);background:var(--sn-conf-soft)}
+.vchip.s-secret{color:var(--sn-secret);background:var(--sn-secret-soft)}
+
+/* steps (quickstart) */
+.qsteps{counter-reset:qs;display:flex;flex-direction:column;gap:0}
+.qstep{position:relative;padding:0 0 26px 42px;border-left:1.5px solid var(--border);margin-left:13px}
+.qstep:last-child{border-left-color:transparent;padding-bottom:0}
+.qstep::before{counter-increment:qs;content:counter(qs);position:absolute;left:-14px;top:-2px;width:27px;height:27px;
+  border-radius:50%;background:var(--accent);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;
+  display:grid;place-items:center;box-shadow:0 0 0 4px var(--bg)}
+.qstep h4{margin:0 0 8px;font-size:15.5px;font-weight:600;letter-spacing:-.01em;padding-top:2px}
+.qstep p{margin:0 0 10px;color:var(--muted);font-size:14px;max-width:64ch}
+
+/* tool list (MCP) */
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0}
+.tool{border:1px solid var(--border);border-radius:11px;padding:13px 15px;background:var(--surface)}
+.tool .tn{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent-ink)}
+.tool .td{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.45}
+
+/* status grid (errors) */
+.codes{display:flex;flex-direction:column;gap:7px;margin:4px 0}
+.codes .row{display:flex;gap:13px;align-items:baseline;border:1px solid var(--border);border-radius:9px;padding:9px 14px;background:var(--surface)}
+.codes .row .cc{font-family:var(--mono);font-size:13px;font-weight:700;min-width:42px}
+.codes .row .cc.ok{color:var(--ok)} .codes .row .cc.warn{color:var(--warn)} .codes .row .cc.err{color:var(--danger)}
+.codes .row .ct{font-family:var(--mono);font-size:12px;color:var(--fg);min-width:150px}
+.codes .row .cd{color:var(--muted);font-size:13px}
+
+/* copy toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;
+  font-size:13px;font-weight:500;padding:10px 18px;border-radius:99px;box-shadow:var(--shadow);opacity:0;pointer-events:none;
+  transition:.22s;z-index:80;display:flex;align-items:center;gap:9px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast svg{width:15px;height:15px;color:var(--accent)}
+
+/* ---------- arch diagram (SVG bespoke) ---------- */
+.arch-diagram{margin:20px 0 8px;border:1px solid var(--border);border-radius:14px;
+  background:var(--surface-2);box-shadow:var(--shadow);padding:10px 14px}
+.arch-diagram svg{display:block;width:100%;height:auto;max-width:960px;margin:0 auto;font-family:var(--font)}
+/* texto SVG: fill via vars; centralizado salvo override */
+.arch-diagram text{fill:var(--fg)}
+.arch-diagram .ad-mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* rótulos de grupo (zonas) */
+.arch-diagram .ad-grp{fill:var(--faint);font-size:10.5px;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;text-anchor:middle}
+
+/* caixas genéricas (quem consome) */
+.arch-diagram .ad-box{fill:var(--surface);stroke:var(--border-strong);stroke-width:1.2}
+.arch-diagram .ad-title{fill:var(--fg);font-size:14px;font-weight:600;text-anchor:middle}
+.arch-diagram .ad-sub{fill:var(--muted);font-size:11px;text-anchor:middle}
+
+/* rótulos das setas da borda */
+.arch-diagram .ad-edgelabel{fill:var(--surface);stroke:var(--border);stroke-width:1}
+.arch-diagram .ad-edgetext{fill:var(--accent-ink);font-size:10px;font-weight:500;text-anchor:middle}
+.arch-diagram .ad-edgehint{fill:var(--faint);font-size:9px;letter-spacing:.04em;
+  text-transform:uppercase;text-anchor:middle}
+
+/* gateway (caixa destacada) */
+.arch-diagram .ad-gateway{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+.arch-diagram .ad-gw-title{fill:var(--accent-ink);font-size:15px;font-weight:700;text-anchor:middle}
+.arch-diagram .ad-gw-mono{fill:var(--accent-ink);font-size:12px;font-weight:600;text-anchor:middle}
+.arch-diagram .ad-gw-line{fill:var(--muted);font-size:10px;text-anchor:middle}
+.arch-diagram .ad-gw-foot{fill:var(--faint);font-size:9.5px;letter-spacing:.03em;
+  text-transform:uppercase;text-anchor:middle}
+
+/* motor (container) */
+.arch-diagram .ad-engine{fill:var(--surface);stroke:var(--border-strong);stroke-width:1.4}
+.arch-diagram .ad-node{fill:var(--surface-2);stroke:var(--border-strong);stroke-width:1.1}
+.arch-diagram .ad-step{fill:var(--accent-ink);font-family:var(--mono);font-size:11px;font-weight:600}
+.arch-diagram .ad-node-t{fill:var(--fg);font-size:12.5px;font-weight:600}
+.arch-diagram .ad-node-d{fill:var(--muted);font-size:10px}
+.arch-diagram .ad-node-tag{fill:var(--accent-ink);font-size:9.5px;text-anchor:end}
+
+/* faixa de memória */
+.arch-diagram .ad-band{fill:var(--st-fact-soft);stroke:var(--border);stroke-width:1}
+.arch-diagram .ad-band-t{fill:var(--fg);font-size:11.5px;font-weight:500}
+
+/* faixa fina de governança */
+.arch-diagram .ad-gov{fill:var(--code-bg);stroke:none}
+.arch-diagram .ad-gov-t{fill:var(--code-fg);font-size:11px;font-weight:500}
+.arch-diagram .ad-gov-tag{fill:var(--tok-k);font-size:10px;text-anchor:end}
+
+/* fundação */
+.arch-diagram .ad-foundation{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.3}
+.arch-diagram .ad-found-t{fill:var(--accent-ink);font-size:16px;font-weight:700}
+.arch-diagram .ad-found-tag{fill:var(--accent-ink);font-size:13px;font-weight:600}
+.arch-diagram .ad-found-sub{fill:var(--muted);font-size:11px}
+
+/* micro-legenda */
+.arch-diagram .ad-legend{fill:var(--surface);stroke:var(--border);stroke-width:1}
+.arch-diagram .ad-legend-h{fill:var(--faint);font-size:9.5px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase}
+.arch-diagram .ad-legend-t{fill:var(--muted);font-size:11px}
+
+/* ---------- responsive ---------- */
+@media(max-width:920px){
+  .shell{grid-template-columns:1fr}
+  .toc{position:static;height:auto;flex-direction:row;flex-wrap:wrap;gap:4px;align-items:center;border-right:none;border-bottom:1px solid var(--border)}
+  .toc .grp{display:none}
+  .toc .brand{width:100%;padding-bottom:10px}
+  .toc a.lnk{padding:6px 10px;font-size:12.5px} .toc a.lnk .ix,.toc a.lnk .mm{display:none}
+  .toc .back{margin-top:0;border-top:none;padding-top:0;margin-left:auto}
+  .hero{padding:42px 24px 30px}
+  section{padding:38px 24px}
+  .tools{grid-template-columns:1fr}
+  .field{flex-direction:column;gap:6px} .field .key{min-width:0}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto}}

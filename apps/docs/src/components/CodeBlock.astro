@@ -1,0 +1,41 @@
+---
+import { Code } from "astro:components";
+
+// Bloco de código com a chrome do design (.codeblock/.cbar): lang + filename à esquerda,
+// botão Copiar à direita, e o <pre> escuro. O realce é feito pelo Shiki (Code de
+// astro:components) com o tema css-variables, amarrado às cores do design em global.css.
+// O botão Copiar funciona via o script global do Layout (lê o innerText do <pre>).
+interface Props {
+  /** linguagem do realce (bash, json, http, ...) — também exibida no rótulo */
+  lang?: string;
+  /** rótulo de linguagem exibido no canto (default: lang em maiúsculas via CSS) */
+  label?: string;
+  /** nome de arquivo / legenda exibido na barra */
+  filename?: string;
+  /** o código (string). Alternativamente, passe via <slot> texto puro. */
+  code?: string;
+}
+
+const { lang = "bash", label, filename, code } = Astro.props;
+const langLabel = label ?? lang;
+---
+
+<div class="codeblock">
+  <div class="cbar">
+    <span class="lang">{langLabel}</span>
+    {filename && <span class="fn">{filename}</span>}
+    <button class="copy" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        ><rect x="9" y="9" width="13" height="13" rx="2"></rect><path
+          d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg
+      >Copiar
+    </button>
+  </div>
+  {
+    code != null ? (
+      <Code code={code} lang={lang as any} theme="css-variables" />
+    ) : (
+      <pre><slot /></pre>
+    )
+  }
+</div>

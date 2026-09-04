@@ -1,0 +1,44 @@
+{
+  "_fonte": "GmailMessageRecord espelho de users.messages get format=full (https://developers.google.com/gmail/api/reference/rest/v1/users.messages) + RFC 2822 Appendix A.1.1. multipart/mixed( multipart/alternative(text/plain, text/html), application/pdf com filename + body.attachmentId ) — prova DFS + anexo ignorado. base64url.",
+  "id": "msg-m22c-gmail-003",
+  "threadId": "thread-m22c-gmail-A",
+  "historyId": "987750",
+  "internalDate": "1747224000000",
+  "snippet": "Conforme alinhado, a proposta do tier 2.",
+  "labelIds": ["INBOX"],
+  "sizeEstimate": 51200,
+  "payload": {
+    "mimeType": "multipart/mixed",
+    "headers": [
+      { "name": "From", "value": "Maria Silva <maria@exemplo.com.br>" },
+      { "name": "To", "value": "kelvin@kcggroup.com.br" },
+      { "name": "Subject", "value": "Proposta comercial — tier 2 (com anexo)" },
+      { "name": "Date", "value": "Wed, 14 May 2025 09:00:00 -0300" }
+    ],
+    "body": { "size": 0 },
+    "parts": [
+      {
+        "mimeType": "multipart/alternative",
+        "filename": "",
+        "body": { "size": 0 },
+        "parts": [
+          {
+            "mimeType": "text/plain",
+            "filename": "",
+            "body": { "size": 90, "data": "Q29uZm9ybWUgYWxpbmhhZG8sIGEgcHJvcG9zdGEgZG8gdGllciAyIGZpY2EgZW0gUiQgMzAgbWlsIHBvciBhbm8uIERldGFsaGVzIG5vIFBERiBhbmV4by4" }
+          },
+          {
+            "mimeType": "text/html",
+            "filename": "",
+            "body": { "size": 80, "data": "PHA-Q29uZm9ybWUgYWxpbmhhZG8sIGEgcHJvcG9zdGEgZG8gdGllciAyIGZpY2EgZW0gUiQgMzAgbWlsIHBvciBhbm8uPC9wPg" }
+          }
+        ]
+      },
+      {
+        "mimeType": "application/pdf",
+        "filename": "proposta.pdf",
+        "body": { "size": 48000, "attachmentId": "ANGjdJ-attach-m22c-001" }
+      }
+    ]
+  }
+}

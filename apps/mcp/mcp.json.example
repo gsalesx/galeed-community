@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "galeed": {
+      "command": "npx",
+      "args": ["@galeed/mcp"],
+      "env": {
+        "GALEED_API_URL": "https://api.galeed.com/v1",
+        "GALEED_TOKEN": "gld_live_..."
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "empresa": "Distribuidora Vale Verde (alimentos B2B) — Blumenau/SC",
+  "historia": "Distribuidora que atende 80 mercados da região. Tabela de preços com faixa atacado/varejo no Excel, pedidos por WhatsApp e e-mail, negociações por telefone. Conectaram tudo ao Galeed pra parar de perder combinado de preço.",
+  "eventos": [
+    {
+      "ingestor": "planilha",
+      "rotulo": "tabela de preços B2B (atacado × varejo)",
+      "payload": {
+        "titulo": "Tabela Vale Verde — julho 2026",
+        "data": "2026-07-01",
+        "csv": "entidade;atributo;valor;unidade;tier\nAzeite Andorinha 500ml;preço;38,90;BRL;varejo\nAzeite Andorinha 500ml;preço;33,50;BRL;atacado-12un\nArroz Urbano 5kg;preço;24,90;BRL;varejo\nArroz Urbano 5kg;preço;21,40;BRL;atacado-fardo\nCafé Melitta 500g;preço;18,70;BRL;varejo\nCafé Melitta 500g;preço;16,20;BRL;atacado-24un"
+      }
+    },
+    {
+      "ingestor": "evolution-whatsapp",
+      "rotulo": "fornecedor avisa atraso pelo WhatsApp",
+      "payload": {
+        "event": "messages.upsert",
+        "data": {
+          "key": { "remoteJid": "554733330000@s.whatsapp.net", "fromMe": false, "id": "CASO3-WA-001" },
+          "pushName": "Andorinha - Rep. Comercial",
+          "message": { "conversation": "Bom dia! Aviso importante: o lote de azeite 500ml vai atrasar uma semana, chega dia 20/07 em vez de 13/07. Problema no porto. Se precisar, temos o 250ml pra pronta entrega." },
+          "messageTimestamp": 1783591200
+        }
+      }
+    },
+    {
+      "ingestor": "texto",
+      "rotulo": "pedido do cliente por e-mail (via automação)",
+      "payload": {
+        "title": "Pedido — Mercado Bom Preço",
+        "occurred_at": "2026-07-09T08:15:00-03:00",
+        "ref": "pedido-bp-2091",
+        "text": "Pedido nº 2091 — Mercado Bom Preço (Indaial). 24 un Azeite Andorinha 500ml (preço atacado), 10 fardos Arroz Urbano 5kg, 48 un Café Melitta 500g. Entrega até quinta-feira. Pagamento boleto 28 dias, como combinado com o vendedor Marcos."
+      }
+    },
+    {
+      "ingestor": "notetaker",
+      "rotulo": "ligação de negociação transcrita",
+      "payload": {
+        "title": "Negociação — Rede Super União (3 lojas)",
+        "participants": ["Marcos (vendas Vale Verde)", "Sandra (compras Super União)"],
+        "occurred_at": "2026-07-10T15:00:00-03:00",
+        "transcript": "Sandra: Marcos, pra fechar as 3 lojas com vocês eu preciso do café Melitta a R$ 15,50 na faixa de 24 unidades. Marcos: consigo R$ 15,80 se vocês fecharem pedido mensal mínimo de 100 unidades por loja. Sandra: fechado então, 15,80 com mínimo de 100 por loja, começando em agosto. Marcos: combinado, mando o contrato amanhã. Sandra: só não esquece que a loja do centro recebe só às terças."
+      }
+    }
+  ],
+  "perguntas": [
+    "Qual o preço do azeite Andorinha no atacado e no varejo?",
+    "Tem algum atraso de fornecedor pra eu me preocupar?",
+    "O que ficou combinado com a rede Super União?"
+  ]
+}

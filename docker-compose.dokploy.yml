@@ -1,0 +1,151 @@
+# Galeed + Evolution — deploy Dokploy (atrás do Traefik).
+# Sem publicar 80/443 no host (o Traefik do Dokploy roteia pro serviço `web:80`).
+# Sem profiles: sobe app + Evolution juntos.
+# Uso no Dokploy: composePath = ./docker-compose.dokploy.yml
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: apps/server/Dockerfile
+  image: galeed-backend
+  env_file: .env
+  environment: &backend-env
+    NODE_ENV: production
+    DATABASE_URL: postgresql://galeed:galeed@db:5432/galeed?sslmode=disable
+    GALEED_SCHEMA_PACK: /app/apps/server/schema-packs/a360.json
+    GALEED_BLOB_DIR: /data/blobs
+    EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution:8080}
+    EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-galeed-local-evolution-key}
+    EVOLUTION_WEBHOOK_BASE: ${EVOLUTION_WEBHOOK_BASE:-http://gateway:8790}
+  volumes:
+    - galeed-blobs:/data/blobs
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: galeed
+      POSTGRES_PASSWORD: galeed
+      POSTGRES_DB: galeed
+    volumes:
+      - galeed-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U galeed -d galeed"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  bff:
+    <<: *backend
+    command: ["npx", "tsx", "apps/server/src/connectors/web-server.ts"]
+    environment:
+      <<: *backend-env
+      WEB_PORT: "8789"
+      TRUST_PROXY: "1"
+      SECURE_COOKIES: "${GALEED_SECURE_COOKIES:-1}"
+    expose: ["8789"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(8789,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  gateway:
+    <<: *backend
+    command: ["npx", "tsx", "apps/server/src/connectors/gateway-server.ts"]
+    environment:
+      <<: *backend-env
+      GATEWAY_PORT: "8790"
+      TRUST_PROXY: "1"
+    expose: ["8790"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(8790,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  ingest-worker:
+    <<: *backend
+    command: ["npx", "tsx", "apps/server/src/connectors/ingest-worker.ts"]
+
+  webhook-worker:
+    <<: *backend
+    command: ["npx", "tsx", "apps/server/src/connectors/webhook-worker.ts"]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_DOCS_URL: ${VITE_DOCS_URL:-/docs}
+    image: galeed-web
+    environment:
+      # TLS termina no Traefik; Caddy só HTTP interno
+      GALEED_SITE_ADDRESS: ${GALEED_SITE_ADDRESS:-:80}
+    expose: ["80"]
+    depends_on:
+      bff:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+  evolution-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  evolution-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  evolution:
+    image: atendai/evolution-api:v2.2.3
+    restart: unless-stopped
+    depends_on:
+      evolution-db:
+        condition: service_healthy
+      evolution-redis:
+        condition: service_started
+    expose: ["8080"]
+    environment:
+      SERVER_URL: ${EVOLUTION_SERVER_URL:-http://evolution:8080}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-galeed-local-evolution-key}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:evolution@evolution-db:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: galeed_evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/0
+      CACHE_REDIS_PREFIX_KEY: evolution
+      LOG_LEVEL: ERROR,WARN,INFO
+    volumes:
+      - evolution-instances:/evolution/instances
+
+volumes:
+  galeed-pgdata:
+  galeed-blobs:
+  caddy-data:
+  caddy-config:
+  evolution-pgdata:
+  evolution-instances:

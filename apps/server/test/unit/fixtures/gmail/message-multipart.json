@@ -1,0 +1,33 @@
+{
+  "_fonte": "GmailMessageRecord espelho de users.messages get format=full (https://developers.google.com/gmail/api/reference/rest/v1/users.messages) + RFC 2822 Appendix A.1.1. body.data = Buffer.from(texto,'utf8').toString('base64url') — o emoji no plain produz - e _ (alfabeto URL-safe).",
+  "id": "msg-m22c-gmail-001",
+  "threadId": "thread-m22c-gmail-A",
+  "historyId": "987654",
+  "internalDate": "1747224000000",
+  "snippet": "Segue a proposta comercial revisada.",
+  "labelIds": ["INBOX", "IMPORTANT"],
+  "sizeEstimate": 4096,
+  "payload": {
+    "mimeType": "multipart/alternative",
+    "headers": [
+      { "name": "From", "value": "Maria Silva <maria@exemplo.com.br>" },
+      { "name": "To", "value": "kelvin@kcggroup.com.br" },
+      { "name": "Cc", "value": "financeiro@exemplo.com.br" },
+      { "name": "Subject", "value": "Proposta comercial — tier 2" },
+      { "name": "Date", "value": "Wed, 14 May 2025 09:00:00 -0300" }
+    ],
+    "body": { "size": 0 },
+    "parts": [
+      {
+        "mimeType": "text/plain",
+        "filename": "",
+        "body": { "size": 180, "data": "T2zDoSBLZWx2aW4g8J-YgCwKClNlZ3VlIGEgcHJvcG9zdGEgY29tZXJjaWFsIHJldmlzYWRhLgpBIHByb3Bvc3RhIGRvIHRpZXIgMiBmaWNhIGVtIFIkIDMwIG1pbCBwb3IgYW5vLgoKQWJyYcOnbyDigJQgTWFyaWEg8J-RjQ" }
+      },
+      {
+        "mimeType": "text/html",
+        "filename": "",
+        "body": { "size": 110, "data": "PGh0bWw-PGJvZHk-PHA-T2zDoSBLZWx2aW4sPC9wPjxwPkEgcHJvcG9zdGEgZG8gdGllciAyIGZpY2EgZW0gUiQgMzAgbWlsIHBvciBhbm8uPC9wPjwvYm9keT48L2h0bWw-" }
+      }
+    ]
+  }
+}

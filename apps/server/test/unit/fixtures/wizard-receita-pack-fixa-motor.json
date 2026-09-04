@@ -1,0 +1,8 @@
+{
+  "_comment": "FIX-A/§6.2-b: pack-env de fixture p/ provar que realRecipeDims resolve as dims do tipo EFETIVO (notas) — não do nome da fonte. Plugado via GALEED_SCHEMA_PACK_<BRAIN>.",
+  "extractable": {
+    "notas": {
+      "eval_dimensions": ["relacoes", "decisoes"]
+    }
+  }
+}

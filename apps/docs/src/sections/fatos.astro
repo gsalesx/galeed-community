@@ -1,0 +1,117 @@
+---
+import Section from "../components/Section.astro";
+import Endpoint from "../components/Endpoint.astro";
+import ParamTable from "../components/ParamTable.astro";
+import CodeTabs from "../components/CodeTabs.astro";
+import Admonition from "../components/Admonition.astro";
+
+const requestTabs = [
+  {
+    lang: "bash",
+    label: "curl",
+    code: `curl -G https://api.galeed.com/v1/facts \\
+  -H "Authorization: Bearer gld_live_8x2k...e1" \\
+  --data-urlencode "area=vendas" \\
+  --data-urlencode "status=fact" \\
+  --data-urlencode "as_of=2026-05-01" \\
+  --data-urlencode "min_confidence=0.7" \\
+  --data-urlencode "limit=50"`,
+  },
+  {
+    lang: "javascript",
+    label: "Node",
+    code: `const url = new URL("https://api.galeed.com/v1/facts");
+url.search = new URLSearchParams({
+  area: "vendas",
+  status: "fact",
+  as_of: "2026-05-01",
+  min_confidence: "0.7",
+  limit: "50",
+}).toString();
+
+const res = await fetch(url, {
+  headers: { authorization: "Bearer gld_live_8x2k...e1" },
+});
+const data = await res.json();`,
+  },
+  {
+    lang: "python",
+    label: "Python",
+    code: `import requests
+
+res = requests.get(
+    "https://api.galeed.com/v1/facts",
+    headers={"Authorization": "Bearer gld_live_8x2k...e1"},
+    params={
+        "area": "vendas",
+        "status": "fact",
+        "as_of": "2026-05-01",
+        "min_confidence": 0.7,
+        "limit": 50,
+    },
+)
+data = res.json()`,
+  },
+];
+
+const params = [
+  {
+    name: "area",
+    type: "string",
+    required: "opcional",
+    desc: 'Filtra por área (ex.: <code class="ic">?area=vendas</code>).',
+  },
+  {
+    name: "status",
+    type: "enum",
+    required: "opcional",
+    desc: '<code class="ic">fact</code> · <code class="ic">archived</code>. Padrão: <code class="ic">fact</code>. Um fato cujo <code class="ic">valid_until</code> já passou (relativo a <code class="ic">as_of</code>, ou a hoje) vem como <code class="ic">archived</code>. <code class="ic">hypothesis</code> ainda não é exposto por esta rota (roadmap).',
+  },
+  {
+    name: "as_of",
+    type: "date",
+    required: "opcional",
+    desc: "Estado da memória <b>naquela data</b>. Revisita o passado: o que era verdade em 01/mai.",
+  },
+  {
+    name: "min_confidence",
+    type: "number",
+    required: "opcional",
+    desc: "Piso de certeza (0–1). Útil pra filtrar ruído.",
+  },
+  {
+    name: "limit",
+    type: "number",
+    required: "opcional",
+    desc: 'Itens por página. Padrão 50, máx 200. Use <code class="ic">cursor</code> pra paginar — ele só aparece quando há de fato mais itens no seu escopo.',
+  },
+];
+---
+
+<Section
+  id="fatos"
+  ix="09"
+  title="Fatos"
+  intro="Acesso direto aos fatos, sem síntese. Útil pra alimentar interfaces, auditar ou exportar."
+>
+  <Endpoint method="get" path="/facts" scope="filtrado pelo escopo" scopeIcon="search" />
+
+  <div class="sub">Parâmetros de query</div>
+  <ParamTable cols={["Parâmetro", "Descrição"]} rows={params} />
+
+  <CodeTabs tabs={requestTabs} filename="busca · fatos por área e data" />
+
+  <Admonition type="tip" flush>
+    <b><code class="ic">as_of</code> é o &ldquo;mostra o que mudou&rdquo;.</b> Consultar
+    fatos numa data passada devolve o registro como ele era — incluindo o preço antigo,
+    antes de virar arquivado. A memória do Galeed não sobrescreve: ela versiona.
+  </Admonition>
+
+  <Admonition type="note" flush>
+    <b>Teto da fase 1.</b> Esta rota percorre até <b>2000</b> fatos por consulta antes de
+    aplicar o seu escopo e os filtros. Se a sua base ultrapassar esse teto, a resposta vem
+    com <code class="ic">truncated: true</code> — sinal honesto de que pode haver fatos além
+    do que foi varrido. Refine por <code class="ic">area</code>/<code class="ic">as_of</code>
+    pra estreitar o universo.
+  </Admonition>
+</Section>

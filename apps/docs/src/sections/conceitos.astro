@@ -1,0 +1,100 @@
+---
+import Section from "../components/Section.astro";
+import Fields from "../components/Fields.astro";
+import Field from "../components/Field.astro";
+import Chip from "../components/Chip.astro";
+import Admonition from "../components/Admonition.astro";
+---
+
+<Section
+  id="conceitos"
+  ix="02"
+  title="Conceitos"
+  intro="Cinco objetos atravessam a API inteira. Entenda eles uma vez e o resto se explica."
+>
+  <div class="sub">Cérebro</div>
+  <div class="prose">
+    <p>
+      A unidade de isolamento. Toda chave, fato, área e fonte vive dentro de um
+      cérebro. Uma empresa pode ter vários &mdash; um por cliente, um por
+      departamento, como fizer sentido. A <code class="ic">chave do bot</code> de
+      um cérebro nunca enxerga outro: cada cérebro é um mundo fechado.
+    </p>
+  </div>
+
+  <div class="sub">O Selo: fato, hipótese, arquivado</div>
+  <div class="prose">
+    <p>
+      O objeto central. Todo trecho que entra recebe um <strong>selo</strong>, e
+      a API nunca devolve um fato sem ele. É o que impede a alucinação: uma
+      hipótese jamais é apresentada como se fosse fato.
+    </p>
+  </div>
+  <Fields>
+    <Field key="status">
+      O estado do trecho: verdade confirmada, ainda em aberto, ou superado.
+      <div class="chips">
+        <Chip variant="fact">fact</Chip>
+        <Chip variant="hypo">hypothesis</Chip>
+        <Chip variant="arch">archived</Chip>
+      </div>
+    </Field>
+    <Field key="confidence" sub="0.0 – 1.0">
+      O quanto o Galeed confia neste trecho. Abaixo de
+      <code class="ic">0.6</code> normalmente entra como hipótese, não como fato.
+    </Field>
+    <Field key="sensitivity">
+      O nível de sigilo &mdash; o cadeado. Controla quem, pelo escopo da chave,
+      consegue ler o trecho.
+      <div class="chips">
+        <Chip variant="s-open">open</Chip>
+        <Chip variant="s-int">internal</Chip>
+        <Chip variant="s-conf">confidential</Chip>
+        <Chip variant="s-secret">secret</Chip>
+      </div>
+    </Field>
+    <Field key="source">
+      De onde veio: o tipo da fonte, uma referência rastreável e o momento em que
+      aconteceu (<code class="ic">occurred_at</code>). Todo fato é citável.
+    </Field>
+    <Field key="area" sub="string[]">
+      As áreas onde o fato é guardado. Um fato pode estar em mais de uma.
+    </Field>
+    <Field key="valid_until">
+      Quando o fato deixou de valer. <code class="ic">null</code> = ainda vale. Um
+      fato substituído vira <code class="ic">archived</code> e aponta o sucessor
+      em <code class="ic">supersedes</code>.
+    </Field>
+  </Fields>
+
+  <Admonition type="tip">
+    <b>O selo na interface é o mesmo objeto da API.</b> Os chips coloridos que
+    você vê no produto &mdash; fato em azul, hipótese em âmbar, o cadeado de
+    sigilo &mdash; são uma renderização 1:1 deste JSON. Mesmo vocabulário, mesma
+    fonte da verdade.
+  </Admonition>
+
+  <div class="sub">Área</div>
+  <div class="prose">
+    <p>
+      O assunto onde a memória é guardada &mdash; <code class="ic">vendas</code>,
+      <code class="ic">suporte</code>, <code class="ic">financeiro</code>. Um fato
+      pode pertencer a mais de uma. O escopo da chave do bot é definido por área
+      mais nível máximo de sigilo: é assim que você diz o que cada bot pode ler.
+    </p>
+  </div>
+
+  <div class="sub">Fonte e Receita</div>
+  <div class="prose">
+    <p>
+      Uma <strong>fonte</strong> é um canal de entrada &mdash; uma call de
+      vendas, um grupo de WhatsApp, uma planilha. Cada fonte carrega uma
+      <strong>receita</strong>: o contrato que diz o que extrair daquele tipo de
+      conteúdo e o que conta como fato. É a peça que mantém os fatos
+      estruturados, detalhada na seção
+      <a href="#fontes" style="color:var(--accent-ink);font-weight:600"
+        >Fontes e receitas</a
+      >.
+    </p>
+  </div>
+</Section>

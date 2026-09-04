@@ -1,0 +1,17 @@
+---
+// Uma linha .field: a chave (mono, com subtítulo opcional) + o significado (slot).
+// Para os chips coloridos, ponha <Chip> dentro de um <div class="chips"> no slot.
+interface Props {
+  /** nome do campo (ex.: "status", "confidence") */
+  key: string;
+  /** subtítulo pequeno sob a chave (ex.: "0.0 – 1.0") */
+  sub?: string;
+}
+
+const { key, sub } = Astro.props;
+---
+
+<div class="field">
+  <span class="key">{key}{sub && <small>{sub}</small>}</span>
+  <span class="meaning"><slot /></span>
+</div>

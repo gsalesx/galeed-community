@@ -1,0 +1,10 @@
+# build output
+dist/
+
+# deps
+node_modules/
+
+# env / logs (NUNCA commitar uma chave gld_)
+.env
+.env.*
+*.log

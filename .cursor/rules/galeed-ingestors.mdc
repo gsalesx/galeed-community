@@ -1,0 +1,19 @@
+---
+description: Criar/alterar ingestores — normalize puro, boot, testes
+globs: apps/server/src/core/ingestion/ingestors/**/*
+alwaysApply: false
+---
+
+# Ingestores
+
+Receita completa: skill `galeed-criar-ingestor` + guia `INGESTORES.md`.
+
+1. Copie `texto.ts` (ou `chat.ts` se for chat) → `<slug>.ts`.
+2. Ajuste `slug`, `nome`, `descricao`, `exemplo`, `sourceSeed()` (`channel` vira tag `canal:`).
+3. `normalize(body): IngestorItem[]` puro; `externalRef` estável; chat → `janela`.
+4. Registre em `boot.ts` (1 linha).
+5. Teste: `apps/server/test/unit/ingestors-<slug>.test.ts` + `npm test`.
+6. Vivo: `POST /v1/ingestors/<slug>` com Bearer `gld_live_...` (`can_ingest`).
+7. Documente em `INGESTORES.md`.
+
+Antes de criar ingestor novo: canal de chat genérico → use `chat`; n8n/Zapier → skills respectivas.

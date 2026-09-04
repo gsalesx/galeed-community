@@ -1,0 +1,42 @@
+---
+description: WhatsApp via Evolution — rede (webhook) e roadmap do QR no painel Galeed
+alwaysApply: false
+globs: "**/evolution-whatsapp*"
+---
+
+# Evolution ↔ Galeed
+
+## Estado atual do produto
+
+O Galeed **não** sobe/gerencia Evolution nem gera QR. Só recebe `MESSAGES_UPSERT` em:
+
+`POST /v1/ingestors/evolution-whatsapp` (Bearer `gld_live_...` ou `?token=`).
+
+Fontes OAuth em Fontes = só `conta-azul` e `google-mail` (Nango). WhatsApp **não** é conector Nango.
+
+## Local (Docker — mesma rede)
+
+```bash
+cp .env.docker.example .env   # se ainda não tiver
+docker compose --profile app --profile evolution up -d --build
+```
+
+- Galeed: `http://localhost` (ou `:8080` se `GALEED_HTTP_PORT=8080`)
+- Evolution: `http://localhost:8080` · apikey = `EVOLUTION_API_KEY`
+- Webhook interno: `http://gateway:8790/v1/ingestors/evolution-whatsapp?token=gld_live_...`
+- Nunca use `localhost` **de dentro** do container da Evolution pra falar com o Galeed.
+
+## Rede (Evolution chama o Galeed)
+
+1. Chave em Conectar com `can_ingest`.
+2. Webhook `MESSAGES_UPSERT` → URL acima.
+3. Worker do Galeed up (senão fica "na fila").
+
+## Roadmap QR no painel (incremental)
+
+1. ✅ Compose profile `evolution` (db + redis + api)
+2. ✅ Proxy BFF: `/api/evolution/{status,connect,qr}`
+3. ✅ UI Conectar: bloco WhatsApp + QR + poll
+4. ✅ Auto-webhook `MESSAGES_UPSERT` → ingestor (token do bot interno)
+
+`INGESTORES.md` · painel **Conectar → WhatsApp (Evolution)**.

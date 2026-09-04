@@ -1,0 +1,45 @@
+---
+// A barra .endpoint: método colorido + path (com /v1 em .pp) + selo de escopo à direita.
+//   method get  → azul (fato)
+//   method post → verde (accent)
+//   method del  → vermelho (danger)
+// O scope mostra cadeado (ingest/escrita) ou lupa (leitura filtrada).
+type HttpMethod = "get" | "post" | "del";
+
+interface Props {
+  method: HttpMethod;
+  /** caminho SEM o prefixo /v1 (ex.: "/ingest"); o /v1 é renderizado em .pp */
+  path: string;
+  /** texto do selo à direita (ex.: "requer can_ingest", "filtrado pelo escopo") */
+  scope?: string;
+  /** ícone do selo: lock (cadeado) ou search (lupa) */
+  scopeIcon?: "lock" | "search";
+}
+
+const { method, path, scope, scopeIcon = "search" } = Astro.props;
+const label = method === "del" ? "DELETE" : method.toUpperCase();
+const cleanPath = path.startsWith("/") ? path : `/${path}`;
+---
+
+<div class="endpoint">
+  <span class:list={["method", method]}>{label}</span>
+  <span class="path"><span class="pp">/v1</span>{cleanPath}</span>
+  {
+    scope && (
+      <span class="scope">
+        {scopeIcon === "lock" ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+        )}
+        {scope}
+      </span>
+    )
+  }
+</div>

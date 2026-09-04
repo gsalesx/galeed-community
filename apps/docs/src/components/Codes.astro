@@ -1,0 +1,36 @@
+---
+// Lista de códigos de status .codes/.row (erros e limites). Dois modos:
+//   1) data-driven: passe `rows` ({ code, level, title, desc }).
+//   2) slot: monte as <div class="row"> à mão.
+//
+// level controla a cor do código: ok (verde), warn (amarelo), err (vermelho).
+export interface CodeRow {
+  code: string;
+  level?: "ok" | "warn" | "err";
+  title: string;
+  /** descrição — aceita HTML inline (ex.: <code class="ic">) */
+  desc: string;
+}
+
+interface Props {
+  rows?: CodeRow[];
+}
+
+const { rows } = Astro.props;
+---
+
+<div class="codes">
+  {
+    rows ? (
+      rows.map((r) => (
+        <div class="row">
+          <span class:list={["cc", r.level ?? "warn"]}>{r.code}</span>
+          <span class="ct">{r.title}</span>
+          <span class="cd" set:html={r.desc} />
+        </div>
+      ))
+    ) : (
+      <slot />
+    )
+  }
+</div>

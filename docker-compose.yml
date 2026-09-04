@@ -1,0 +1,199 @@
+# Galeed — stack completo em Docker.
+#
+#   DEV (só o banco, pro `npm run dev:web` + servers via tsx na máquina):
+#       docker compose up -d                 # sobe apenas o db (sem profile)
+#
+#   STACK COMPLETO (front + BFF + gateway + workers + db), via profile "app":
+#       cp .env.docker.example .env          # preencha ANTHROPIC/OPENAI key
+#       docker compose --profile app up -d --build
+#       # ingress único: http://localhost  (front + /api + /v1)
+#
+# O Caddy (serviço `web`) é o ÚNICO com portas publicadas; bff/gateway/db/workers
+# só existem na rede interna do compose. db e blobs persistem em volumes.
+
+# ── base compartilhada do backend (mesma imagem; muda só o `command`) ──
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: apps/server/Dockerfile
+  image: galeed-backend
+  env_file: .env
+  environment: &backend-env
+    NODE_ENV: production
+    # dentro do compose o banco é o serviço `db` (sobrescreve o .env de dev).
+    # sslmode=disable: o pgvector da rede interna não tem TLS, e o engine só dispensa
+    # SSL p/ localhost — sem isto ele força "require" e o handshake é resetado.
+    DATABASE_URL: postgresql://galeed:galeed@db:5432/galeed?sslmode=disable
+    # schema-pack e blobs em caminhos do contêiner (o .env aponta pro host)
+    GALEED_SCHEMA_PACK: /app/apps/server/schema-packs/a360.json
+    GALEED_BLOB_DIR: /data/blobs
+    # Evolution na mesma rede (profile evolution). Webhook interno → gateway.
+    EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution:8080}
+    EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-galeed-local-evolution-key}
+    EVOLUTION_WEBHOOK_BASE: ${EVOLUTION_WEBHOOK_BASE:-http://gateway:8790}
+  volumes:
+    - galeed-blobs:/data/blobs
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+  profiles: ["app"]
+
+services:
+  # ── banco (Postgres + pgvector). Sem profile = sobe sempre, inclusive no dev. ──
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: galeed-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: galeed
+      POSTGRES_PASSWORD: galeed
+      POSTGRES_DB: galeed
+    ports:
+      # SÓ no loopback: publicar "5434:5432" numa VPS deixaria o Postgres (senha default)
+      # aberto pra internet — e porta publicada pelo Docker NÃO passa pelo ufw.
+      # Dev local continua igual (localhost:5434). 5432/5433/5544 já em uso → 5434.
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - galeed-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U galeed -d galeed"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── BFF (app: /api + /auth). Interno; o Caddy faz o proxy. ──
+  bff:
+    <<: *backend
+    container_name: galeed-bff
+    command: ["npx", "tsx", "apps/server/src/connectors/web-server.ts"]
+    environment:
+      <<: *backend-env
+      WEB_PORT: "8789"
+      TRUST_PROXY: "1"
+      # 0 local (HTTP: browser não guarda cookie Secure); 1 em prod (HTTPS via domínio)
+      SECURE_COOKIES: "${GALEED_SECURE_COOKIES:-0}"
+    expose: ["8789"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(8789,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ── Gateway público /v1 (+ MCP). Interno; o Caddy expõe via /v1. ──
+  gateway:
+    <<: *backend
+    container_name: galeed-gateway
+    command: ["npx", "tsx", "apps/server/src/connectors/gateway-server.ts"]
+    environment:
+      <<: *backend-env
+      GATEWAY_PORT: "8790"
+      TRUST_PROXY: "1"
+    expose: ["8790"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(8790,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ── Worker da fila de ingestão (daemon, sem porta). ──
+  ingest-worker:
+    <<: *backend
+    container_name: galeed-ingest-worker
+    command: ["npx", "tsx", "apps/server/src/connectors/ingest-worker.ts"]
+
+  # ── Worker de entrega de webhooks (daemon, sem porta). ──
+  webhook-worker:
+    <<: *backend
+    container_name: galeed-webhook-worker
+    command: ["npx", "tsx", "apps/server/src/connectors/webhook-worker.ts"]
+
+  # ── Ingress: Caddy serve o front + roteia /api,/auth->bff e /v1->gateway. ──
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_DOCS_URL: ${VITE_DOCS_URL:-/docs}
+    image: galeed-web
+    container_name: galeed-web
+    environment:
+      # ":80" = HTTP local; um domínio liga HTTPS automático no Caddy
+      GALEED_SITE_ADDRESS: ${GALEED_SITE_ADDRESS:-:80}
+    ports:
+      - "${GALEED_HTTP_PORT:-80}:80"
+      - "${GALEED_HTTPS_PORT:-443}:443"
+    depends_on:
+      bff:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    volumes:
+      - caddy-data:/data     # certificados TLS (persistem entre reinícios)
+      - caddy-config:/config
+    restart: unless-stopped
+    profiles: ["app"]
+
+  # ── WhatsApp (Evolution API) — profile "evolution", mesma rede do Galeed.
+  #    Local: docker compose --profile app --profile evolution up -d --build
+  #    Webhook interno Evolution → Galeed:
+  #      http://gateway:8790/v1/ingestors/evolution-whatsapp?token=gld_live_...
+  #    Manager/API no host: http://localhost:${EVOLUTION_HTTP_PORT:-8080}
+  evolution-db:
+    image: postgres:16-alpine
+    container_name: galeed-evolution-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    profiles: ["evolution"]
+
+  evolution-redis:
+    image: redis:7-alpine
+    container_name: galeed-evolution-redis
+    restart: unless-stopped
+    profiles: ["evolution"]
+
+  evolution:
+    image: atendai/evolution-api:v2.2.3
+    container_name: galeed-evolution
+    restart: unless-stopped
+    depends_on:
+      evolution-db:
+        condition: service_healthy
+      evolution-redis:
+        condition: service_started
+    ports:
+      - "${EVOLUTION_HTTP_PORT:-8080}:8080"
+    environment:
+      SERVER_URL: ${EVOLUTION_SERVER_URL:-http://localhost:8080}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-galeed-local-evolution-key}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:evolution@evolution-db:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: galeed_evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/0
+      CACHE_REDIS_PREFIX_KEY: evolution
+      LOG_LEVEL: ERROR,WARN,INFO
+    volumes:
+      - evolution-instances:/evolution/instances
+    profiles: ["evolution"]
+
+volumes:
+  galeed-pgdata:
+  galeed-blobs:
+  caddy-data:
+  caddy-config:
+  evolution-pgdata:
+  evolution-instances:

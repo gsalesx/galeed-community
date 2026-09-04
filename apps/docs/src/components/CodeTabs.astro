@@ -1,0 +1,61 @@
+---
+import { Code } from "astro:components";
+
+// Bloco de código com ABAS de linguagem, reusando a chrome do design (.codeblock/.cbar).
+// À esquerda da barra: uma fileira de botões de aba (.ct-tab), um por linguagem; o ativo
+// destacado com --accent. À direita: o filename (.fn) e o botão Copiar (.copy), iguais ao
+// CodeBlock. Cada aba renderiza um <Code> (Shiki, tema css-variables) num painel empilhado
+// (.ct-panel); só o painel .active fica visível. O script global do Layout cuida da troca
+// de abas e de copiar o <pre> do painel ATIVO (via [data-codetabs]).
+interface Tab {
+  /** linguagem do realce (bash, javascript, python, ...) */
+  lang: string;
+  /** rótulo exibido no botão da aba (ex.: "curl", "Node", "Python") */
+  label: string;
+  /** o código (string) desta aba */
+  code: string;
+}
+
+interface Props {
+  /** as abas, na ordem; a 1ª é a ativa por default */
+  tabs: Tab[];
+  /** nome de arquivo / legenda exibido à direita da barra */
+  filename?: string;
+}
+
+const { tabs, filename } = Astro.props;
+---
+
+<div class="codeblock" data-codetabs>
+  <div class="cbar">
+    <div class="ct-tabs" role="tablist">
+      {
+        tabs.map((t, i) => (
+          <button
+            class={`ct-tab${i === 0 ? " active" : ""}`}
+            type="button"
+            role="tab"
+            data-idx={i}
+            aria-selected={i === 0 ? "true" : "false"}
+          >
+            {t.label}
+          </button>
+        ))
+      }
+    </div>
+    {filename && <span class="fn">{filename}</span>}
+    <button class="copy" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        ><rect x="9" y="9" width="13" height="13" rx="2"></rect><path
+          d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg
+      >Copiar
+    </button>
+  </div>
+  {
+    tabs.map((t, i) => (
+      <div class={`ct-panel${i === 0 ? " active" : ""}`} data-idx={i}>
+        <Code code={t.code} lang={t.lang as any} theme="css-variables" />
+      </div>
+    ))
+  }
+</div>

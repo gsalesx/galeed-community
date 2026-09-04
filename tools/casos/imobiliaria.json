@@ -1,0 +1,75 @@
+{
+  "empresa": "Imobiliária Horizonte — Balneário Camboriú/SC",
+  "historia": "Corretora com 6 corretores. Carteira de imóveis numa planilha, negociação toda no WhatsApp, visitas anotadas em papel. Conectaram a carteira (planilha), o WhatsApp e as visitas gravadas (notetaker) ao Galeed.",
+  "eventos": [
+    {
+      "ingestor": "planilha",
+      "rotulo": "carteira de imóveis (da planilha do escritório)",
+      "payload": {
+        "titulo": "Carteira de imóveis — julho 2026",
+        "data": "2026-07-01",
+        "linhas": [
+          { "entidade": "Apto 302 Edifício Solar", "atributo": "preço", "valor": 890000, "unidade": "BRL" },
+          { "entidade": "Apto 302 Edifício Solar", "atributo": "status", "valor": "disponível" },
+          { "entidade": "Casa Jardim Europa 45", "atributo": "preço", "valor": 1250000, "unidade": "BRL" },
+          { "entidade": "Casa Jardim Europa 45", "atributo": "status", "valor": "em negociação" },
+          { "entidade": "Sala 1204 Business Center", "atributo": "preço", "valor": 4200, "unidade": "BRL", "periodo": "monthly" },
+          { "entidade": "Sala 1204 Business Center", "atributo": "status", "valor": "locação" }
+        ]
+      }
+    },
+    {
+      "ingestor": "evolution-whatsapp",
+      "rotulo": "interessado pergunta sobre o apto pelo WhatsApp",
+      "payload": {
+        "event": "messages.upsert",
+        "data": {
+          "key": { "remoteJid": "554797770000@s.whatsapp.net", "fromMe": false, "id": "CASO2-WA-001" },
+          "pushName": "Roberto Lima",
+          "message": { "conversation": "Boa tarde! Vi o anúncio do apartamento no Edifício Solar. Ainda está disponível? Aceita financiamento? Posso visitar sábado de manhã?" },
+          "messageTimestamp": 1783522800
+        }
+      }
+    },
+    {
+      "ingestor": "notetaker",
+      "rotulo": "visita ao imóvel gravada e transcrita",
+      "payload": {
+        "title": "Visita — Roberto Lima no Apto 302 Edifício Solar",
+        "participants": ["Roberto Lima", "Corretor Diego"],
+        "occurred_at": "2026-07-11T10:00:00-03:00",
+        "transcript": "Diego: essa é a suíte principal, 28 metros, com vista pro mar. Roberto: a esposa vai amar, mas achei o condomínio salgado, quanto era mesmo? Diego: R$ 1.400 com água quente inclusa. Roberto: entendi. Olha, gostei muito do apartamento. Se o proprietário aceitar 850 mil eu fecho essa semana, à vista com recursos da venda da minha casa. Diego: levo a proposta hoje ainda. Roberto: fechado, me avisa. Prefiro conversar por WhatsApp depois das 18h."
+      }
+    },
+    {
+      "ingestor": "formulario",
+      "rotulo": "lead do portal (via Zapier)",
+      "payload": {
+        "formulario": "Lead — Portal Imovelweb",
+        "ref": "imovelweb-88412",
+        "occurred_at": "2026-07-12T14:40:00-03:00",
+        "campos": {
+          "Nome": "Fernanda Castro",
+          "Telefone": "(47) 96666-5555",
+          "Imóvel": "Sala 1204 Business Center",
+          "Mensagem": "Procuro sala comercial pra locação imediata, meu escritório de advocacia está crescendo. Qual o valor do condomínio e IPTU?"
+        }
+      }
+    },
+    {
+      "ingestor": "texto",
+      "rotulo": "e-mail do proprietário com contraproposta (encaminhado via automação)",
+      "payload": {
+        "title": "E-mail — proprietário do Apto 302 responde proposta",
+        "occurred_at": "2026-07-12T17:20:00-03:00",
+        "ref": "email-prop-302-01",
+        "text": "De: Sr. Almeida (proprietário do Apto 302 Edifício Solar). Diego, recebi a proposta do Roberto Lima de R$ 850.000 à vista. Não desço de R$ 870.000 — o imóvel foi reformado ano passado. Se ele aceitar 870 à vista, fecho e pago a comissão integral de 6%. Aguardo retorno até sexta."
+      }
+    }
+  ],
+  "perguntas": [
+    "Qual o preço do Apto 302 do Edifício Solar e qual o status da negociação com o Roberto Lima?",
+    "O que o proprietário respondeu sobre a proposta do Roberto?",
+    "Quais leads chegaram pelo portal e o que procuram?"
+  ]
+}

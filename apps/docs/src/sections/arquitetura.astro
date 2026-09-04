@@ -1,0 +1,466 @@
+---
+import Section from "../components/Section.astro";
+import Principle from "../components/Principle.astro";
+import ArchDiagram from "../components/ArchDiagram.astro";
+import Admonition from "../components/Admonition.astro";
+import Fields from "../components/Fields.astro";
+import Field from "../components/Field.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import Chip from "../components/Chip.astro";
+import { SECTIONS } from "../data/toc";
+
+// índice e título vêm da fonte única (toc.ts) — sem hardcode que descole da nav.
+const meta = SECTIONS.find((s) => s.id === "arquitetura")!;
+
+// o selo epistêmico é uma PROJEÇÃO determinística dos campos que o fato já tem —
+// montado sem LLM, sem custo, sem latência. Este é o objeto que volta com cada trecho.
+const selo = `{
+  "trecho": "Fechamos o plano em R$ 2.500/mês.",
+  "selo": {
+    "status": "fact",
+    "confidence": 0.92,
+    "valid_from": "2026-06-01",
+    "source": { "tipo": "call_vendas", "cite": "call_2026-06-01#12" },
+    "via": "vec"
+  }
+}`;
+---
+
+<Section
+  id={meta.id}
+  ix={meta.ix}
+  title={meta.title}
+  intro="Por dentro do cérebro: a esteira que transforma texto cru em fatos datados, e por que o caminho de ler é barato enquanto o de aprender mora nos bastidores."
+>
+  <!-- ============ A TESE ============ -->
+  <div class="prose">
+    <p>
+      O Galeed <strong>não é um RAG genérico</strong>. Um RAG comum joga tudo num
+      balde de vetores e devolve "o trecho mais parecido". O Galeed
+      <strong>entende</strong> o conteúdo: ele destila <strong>fatos
+      estruturados</strong> &mdash; com número, unidade, período, validade no
+      tempo e a entidade dona &mdash;, versiona a verdade sem nunca sobrescrever,
+      e devolve cada trecho com um <strong>selo</strong> que diz o que aquilo é,
+      de onde veio, quando valeu e quanto confiar.
+    </p>
+  </div>
+
+  <Principle>
+    <b>Memória bitemporal por extração.</b> O Galeed transforma texto cru em
+    fatos tipados, datados e ancorados no dono certo &mdash; e nunca chuta.
+    Você só joga. Ele organiza.
+  </Principle>
+
+  <!-- ============ DIAGRAMA DE ARQUITETURA DO SISTEMA ============ -->
+  <ArchDiagram />
+
+  <!-- ============ O PIPELINE — 5 etapas em duas faixas ============ -->
+  <div class="sub">A esteira, em cinco etapas</div>
+  <div class="prose">
+    <p>
+      Por trás do verbo <strong>organiza</strong> roda uma esteira. Ela vive em
+      duas faixas: o que é <strong>barato e instantâneo</strong> acontece na
+      hora, enquanto você espera; o que é <strong>caro</strong> &mdash; a única
+      IA do caminho de escrita &mdash; roda em segundo plano e te avisa quando
+      termina. Você nunca fica travado esperando o cérebro pensar.
+    </p>
+  </div>
+
+  <!-- faixa 1: barato & instantâneo -->
+  <div class="lane">
+    <span class="lane-tag fast"
+      ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        ><path d="M13 2 3 14h8l-1 8 10-12h-8z"></path></svg
+      >barato & instantâneo · você espera</span
+    >
+    <div class="flow">
+      <div class="node">
+        <span class="ntag">1 · engolir</span>
+        <span class="nt">Recebe e guarda</span>
+        <span class="nd">O conteúdo cru entra, o original é guardado intocável, um trabalho vai pra fila e a resposta volta na hora.</span>
+      </div>
+      <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"
+        ><path d="M2 12h32M28 6l8 6-8 6" fill="none" stroke="currentColor" stroke-width="2"></path></svg
+      >
+      <div class="node">
+        <span class="ntag">2 · fatiar</span>
+        <span class="nt">Corta em páginas</span>
+        <span class="nd">Um trabalhador de bastidor pega o trabalho e corta o documento em pedaços. Nada se trunca, nada se perde.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="lane-link" aria-hidden="true">
+    <svg viewBox="0 0 24 40" preserveAspectRatio="none"
+      ><path d="M12 2v30M6 26l6 8 6-8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="4 4"></path></svg
+    >
+    <span>vira trabalho de fila</span>
+  </div>
+
+  <!-- faixa 2: caro & em segundo plano -->
+  <div class="lane">
+    <span class="lane-tag slow"
+      ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        ><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg
+      >caro & em segundo plano · a fila te avisa</span
+    >
+    <div class="flow">
+      <div class="node accent">
+        <span class="ntag">3 · extrair</span>
+        <span class="nt">Preenche o formulário</span>
+        <span class="nd">A única IA do caminho de escrita. Ela não escreve prosa — preenche um formulário tipado: dono, predicado, valor, unidade, período, <code class="ic">valid_from</code> e o trecho literal de onde tirou.</span>
+      </div>
+      <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"
+        ><path d="M2 12h32M28 6l8 6-8 6" fill="none" stroke="currentColor" stroke-width="2"></path></svg
+      >
+      <div class="node">
+        <span class="ntag">4 · indexar</span>
+        <span class="nt">Vetores e texto</span>
+        <span class="nd">Gera os vetores de significado e o índice de palavra (sem IA, barato). A busca semântica e a por palavra ficam prontas.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="lane-link back" aria-hidden="true">
+    <svg viewBox="0 0 24 40" preserveAspectRatio="none"
+      ><path d="M12 2v30M6 26l6 8 6-8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="4 4"></path></svg
+    >
+    <span>memória pronta para consulta</span>
+  </div>
+
+  <!-- a leitura: rápida, sem LLM pra achar -->
+  <div class="lane">
+    <span class="lane-tag fast"
+      ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        ><path d="M13 2 3 14h8l-1 8 10-12h-8z"></path></svg
+      >barato & instantâneo · você pergunta</span
+    >
+    <div class="flow">
+      <div class="node lembrar">
+        <span class="ntag">5 · lembrar</span>
+        <span class="nt">Recupera e responde</span>
+        <span class="nd">A pergunta dispara a recuperação híbrida — tudo determinístico, em milissegundos, <b>sem gastar IA pra achar</b>. Só a redação final passa pela IA, e ela só pode falar sobre o que foi recuperado.</span>
+      </div>
+    </div>
+  </div>
+
+  <Admonition type="tip">
+    <b>O princípio que justifica tudo.</b> Ler é o que mais acontece &mdash; e ler
+    é <b>livre de IA</b>: rápido e barato. Aprender é onde mora a IA cara, e ela
+    fica nos bastidores. É por isso que o Galeed é barato de chamar a cada turno
+    de uma conversa.
+  </Admonition>
+
+  <!-- ============ AS PEÇAS ============ -->
+  <div class="sub">As peças da arquitetura</div>
+  <div class="prose">
+    <p>
+      Cada etapa da esteira se apoia em peças nomeadas. Juntas, elas são o que
+      separa um motor de memória de uma busca genérica.
+    </p>
+  </div>
+
+  <Fields>
+    <Field key="ingestão com contexto">
+      Antes de entender, o cérebro já sabe <b>quem é você</b> e os <b>papéis</b> em
+      jogo. Assim o fato ancora no dono certo &mdash; o seu preço não se mistura
+      com o faturamento do cliente.
+    </Field>
+    <Field key="receita de extração">
+      Cada fonte declara um contrato: o que extrair e o que conta como fato. O que
+      casa vira <Chip variant="fact">fact</Chip>; o resto vira
+      <Chip variant="hypo">hypothesis</Chip> e espera revisão.
+    </Field>
+    <Field key="bitemporalidade">
+      Cada fato carrega <b>quando é verdade no mundo</b> (<code class="ic">valid_from</code> /
+      <code class="ic">valid_to</code>) e <b>quando o cérebro soube</b>. É o que
+      permite a pergunta <code class="ic">as_of</code>: "o que era verdade naquela
+      data?".
+    </Field>
+    <Field key="supersede">
+      Fato novo contradiz o antigo? O antigo vira <Chip variant="arch">archived</Chip>,
+      ganha um <code class="ic">valid_until</code>, e o novo aponta
+      <code class="ic">supersedes</code>. <b>Nada se apaga.</b>
+    </Field>
+    <Field key="selo epistêmico">
+      Todo trecho volta com um cabeçalho determinístico &mdash; status, confiança,
+      validade, proveniência, citação e por qual sinal foi achado. É projeção de
+      campos que já existem: <b>zero IA, zero latência</b>.
+    </Field>
+    <Field key="recuperação híbrida">
+      Significado (vetor), palavra exata (full-text em português) e vizinhança no
+      grafo de entidades, fundidos por uma regra determinística e depois
+      reordenados por um <b>reranker</b> de precisão.
+    </Field>
+    <Field key="síntese ancorada">
+      A IA redige só sobre o que foi recuperado. <b>Cada afirmação carrega o
+      trecho literal mínimo</b> da fonte que a sustenta, mais a citação. E a
+      resposta inclui uma seção do que ficou em aberto.
+    </Field>
+    <Field key="governança por escopo">
+      A chave do bot carrega áreas + teto de sigilo. Dupla trava: no banco <b>e</b>
+      no servidor. Sem permissão, não vê nada. O recém-chegado nasce
+      <Chip variant="s-secret">secret</Chip>, e a resposta conta quantos fatos
+      ficaram de fora.
+    </Field>
+    <Field key="reflexão / sono">
+      Em segundo plano o cérebro consolida: deduplica, versiona, promove por
+      confiança e, onde habilitado, gera percepções. <b>O detector acha, a IA
+      explica</b> &mdash; o ciclo é quase todo determinístico, com teto de custo.
+    </Field>
+    <Field key="triagem / juiz da fila">
+      A hipótese cai numa fila de revisão. Um juiz <b>recomenda</b> aprovar ou
+      descartar, com motivo e confiança, em lote &mdash; mas <b>nunca decide</b>.
+      A aprovação é humana.
+    </Field>
+  </Fields>
+
+  <Admonition type="note">
+    <b>Tudo é linha no banco.</b> A fundação é um banco de dados multi-tenant
+    isolado, com busca vetorial para os vetores de significado. Blobs,
+    páginas, fatos tipados, vetores, arestas do grafo, contexto e fila &mdash;
+    cada coisa é uma linha. Uma fonte de verdade única.
+  </Admonition>
+
+  <!-- ============ O SELO COMO PROJEÇÃO ============ -->
+  <div class="sub">O selo é uma projeção, não uma opinião</div>
+  <div class="prose">
+    <p>
+      Vale insistir num ponto, porque é o coração do "nunca chuta": o selo não é
+      gerado pela IA. Ele é <strong>montado por código</strong> a partir dos
+      campos que o fato já tem. Por isso custa zero, não adiciona latência e nunca
+      contradiz o dado &mdash; é uma janela fiel sobre a memória, não um palpite
+      sobre ela.
+    </p>
+  </div>
+
+  <CodeBlock lang="json" filename="resposta · cada trecho volta selado" code={selo} />
+
+  <!-- ============ POR QUE É FERA ============ -->
+  <div class="sub">Por que isso é fera</div>
+  <div class="prose">
+    <p>
+      Quatro diferenciais saem de graça desse desenho &mdash; e nenhum deles é
+      enfeite de marketing.
+    </p>
+    <ol class="why">
+      <li>
+        <b>Versiona, não sobrescreve.</b> A verdade muda (um preço vai de 3k a
+        30k) e o Galeed guarda a evolução inteira, com a data de cada versão.
+        Pergunte "o que era verdade em abril?" e ele responde. Um RAG comum só
+        conhece o agora e perde o passado.
+      </li>
+      <li>
+        <b>Anti-alucinação por construção.</b> Só vira fato o que casa com o
+        contrato da fonte e tem prova (o trecho literal). Toda resposta carrega
+        fonte, data e confiança; uma hipótese jamais aparece como fato. E o selo
+        que carimba isso é determinístico &mdash; não sai do caminho rápido.
+      </li>
+      <li>
+        <b>Governança por construção, não por política.</b> O sigilo é
+        estrutural: dupla trava, falha fechado, default secreto pro recém-chegado,
+        e a resposta conta o que escondeu em vez de fingir completude. Não é um
+        filtro de tela que dá pra burlar.
+      </li>
+      <li>
+        <b>Recuperação híbrida de verdade.</b> Não é "só busca vetorial". São três
+        sinais &mdash; significado, palavra exata e vizinhança no grafo &mdash;
+        fundidos e reordenados por precisão, tudo determinístico, em milissegundos.
+      </li>
+    </ol>
+  </div>
+
+  <div class="prose">
+    <p>
+      E porque a leitura é livre de IA e barata, o cérebro pluga em qualquer
+      agente &mdash; via MCP ou pela <code class="ic">api.galeed.com/v1</code>
+      (<code class="ic">Bearer gld_</code>) &mdash; como uma camada de memória que
+      dá pra consultar a cada turno sem pesar na conta.
+    </p>
+  </div>
+
+  <Principle>
+    <b>O cérebro nunca chuta.</b> Ele extrai, data, ancora no dono certo e
+    versiona &mdash; e carimba cada resposta com a prova. Não é busca que parece
+    inteligente. É memória que sabe o que sabe.
+  </Principle>
+</Section>
+
+<style>
+  /* ---------- faixas da esteira (mesma linguagem de diagrama da seção Fluxos) ---------- */
+  .lane {
+    margin: 12px 0 0;
+  }
+  .lane-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    border-radius: 7px;
+    padding: 4px 10px;
+    margin-bottom: 10px;
+  }
+  .lane-tag svg {
+    width: 13px;
+    height: 13px;
+  }
+  .lane-tag.fast {
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border: 1px solid oklch(88% 0.04 150);
+  }
+  .lane-tag.slow {
+    color: var(--st-hypo);
+    background: var(--st-hypo-soft);
+    border: 1px solid oklch(86% 0.06 75);
+  }
+
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .node {
+    flex: 1 1 0;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 14px 15px;
+    box-shadow: var(--shadow);
+  }
+  .node.accent {
+    border-color: oklch(86% 0.06 75);
+    background: linear-gradient(180deg, var(--st-hypo-soft), var(--surface) 72%);
+  }
+  .node.lembrar {
+    border-color: oklch(85% 0.05 150);
+    background: linear-gradient(180deg, var(--accent-soft), var(--surface) 72%);
+    flex: 1 1 100%;
+  }
+  .node .ntag {
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+  .node.accent .ntag {
+    color: var(--st-hypo);
+    background: var(--surface);
+    border-color: oklch(88% 0.05 75);
+  }
+  .node.lembrar .ntag {
+    color: var(--accent-ink);
+    background: var(--surface);
+    border-color: oklch(88% 0.04 150);
+  }
+  .node .nt {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+  .node .nd {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .node .nd code.ic {
+    font-size: 0.82em;
+  }
+
+  .arrow {
+    width: 38px;
+    flex-shrink: 0;
+    align-self: center;
+    color: var(--border-strong);
+  }
+
+  /* o elo tracejado vertical entre as faixas */
+  .lane-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    margin: 2px 0;
+    color: var(--st-hypo);
+  }
+  .lane-link.back {
+    color: var(--accent);
+  }
+  .lane-link svg {
+    width: 22px;
+    height: 30px;
+    opacity: 0.7;
+  }
+  .lane-link span {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--faint);
+  }
+
+  /* "por que é fera" — lista numerada com punch */
+  ol.why {
+    list-style: none;
+    counter-reset: why;
+    margin: 4px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  ol.why li {
+    counter-increment: why;
+    position: relative;
+    padding-left: 38px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+  ol.why li b {
+    color: var(--fg);
+  }
+  ol.why li::before {
+    content: counter(why);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border: 1px solid oklch(88% 0.04 150);
+    border-radius: 7px;
+  }
+
+  @media (max-width: 720px) {
+    .flow {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .flow .arrow {
+      transform: rotate(90deg);
+      width: 26px;
+      margin: 0 auto;
+    }
+  }
+</style>

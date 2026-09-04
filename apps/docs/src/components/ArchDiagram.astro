@@ -1,0 +1,180 @@
+---
+// Diagrama de arquitetura do sistema — SVG bespoke, inline, herdando as CSS vars
+// do :root (oklch). Três zonas (Quem consome → Borda pública → Motor) apoiadas
+// numa fundação (banco de dados). Setas rotuladas, acessível (role/title/desc).
+// Sem dado interno: só a superfície pública (api.galeed.com/v1, Bearer gld_, MCP).
+---
+
+<figure class="arch-diagram" aria-labelledby="arch-t" aria-describedby="arch-d">
+  <svg
+    viewBox="0 0 960 560"
+    role="img"
+    width="100%"
+    preserveAspectRatio="xMidYMid meet"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <title id="arch-t">Arquitetura do Galeed</title>
+    <desc id="arch-d">
+      Da esquerda para a direita: quem consome (app, painel e agentes de IA) fala
+      com uma borda pública fina (gateway versão 1 mais MCP, autenticada só por
+      Bearer gld) que protege o motor — uma trilha de quatro etapas (ingestão,
+      extração por receita, recuperação híbrida e síntese ancorada), com memória
+      bitemporal e governança por escopo. Tudo se apoia numa fundação única:
+      um banco de dados multi-tenant isolado.
+    </desc>
+
+    <defs>
+      <marker
+        id="ah-faint"
+        viewBox="0 0 10 10"
+        refX="8.5"
+        refY="5"
+        markerWidth="7"
+        markerHeight="7"
+        orient="auto-start-reverse"
+      >
+        <path d="M1 1 L9 5 L1 9" fill="none" stroke="var(--faint)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+      </marker>
+      <marker
+        id="ah-accent"
+        viewBox="0 0 10 10"
+        refX="8.5"
+        refY="5"
+        markerWidth="7"
+        markerHeight="7"
+        orient="auto-start-reverse"
+      >
+        <path d="M1 1 L9 5 L1 9" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+      </marker>
+    </defs>
+
+    <!-- =================== ZONA 1 · QUEM CONSOME =================== -->
+    <text class="ad-grp" x="118" y="34">Quem consome</text>
+
+    <!-- App · Painel -->
+    <g>
+      <rect class="ad-box" x="28" y="56" width="180" height="74" rx="10" />
+      <text class="ad-title" x="118" y="88">App · Painel</text>
+      <text class="ad-sub" x="118" y="108">a interface do produto</text>
+    </g>
+
+    <!-- Agentes de IA -->
+    <g>
+      <rect class="ad-box" x="28" y="150" width="180" height="74" rx="10" />
+      <text class="ad-title" x="118" y="182">Agentes de IA</text>
+      <text class="ad-sub" x="118" y="202">Claude · seu agente</text>
+    </g>
+
+    <!-- setas → borda -->
+    <line x1="216" y1="93" x2="300" y2="118" stroke="var(--faint)" stroke-width="1.5" marker-end="url(#ah-faint)" />
+    <line x1="216" y1="187" x2="300" y2="162" stroke="var(--faint)" stroke-width="1.5" marker-end="url(#ah-faint)" />
+
+    <rect class="ad-edgelabel" x="222" y="78" width="78" height="17" rx="5" />
+    <text class="ad-mono ad-edgetext" x="261" y="90">Bearer gld_</text>
+    <text class="ad-edgehint" x="261" y="73">HTTPS</text>
+
+    <rect class="ad-edgelabel" x="240" y="183" width="44" height="17" rx="5" />
+    <text class="ad-mono ad-edgetext" x="262" y="195">MCP</text>
+
+    <!-- =================== ZONA 2 · BORDA PÚBLICA =================== -->
+    <text class="ad-grp" x="385" y="34">Borda pública</text>
+
+    <g>
+      <rect class="ad-gateway" x="308" y="60" width="154" height="160" rx="10" />
+      <text class="ad-gw-title" x="385" y="104">Gateway</text>
+      <text class="ad-mono ad-gw-mono" x="385" y="126">/v1 + MCP</text>
+
+      <line x1="330" y1="142" x2="440" y2="142" stroke="var(--accent)" stroke-width="0.75" stroke-opacity="0.4" />
+
+      <text class="ad-gw-line" x="385" y="160">só Bearer · escopo na chave</text>
+      <text class="ad-gw-line" x="385" y="178">rate-limit · webhooks</text>
+
+      <text class="ad-gw-foot" x="385" y="204">a casca fina pública</text>
+    </g>
+
+    <!-- seta borda → motor -->
+    <line x1="462" y1="140" x2="510" y2="140" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#ah-accent)" />
+
+    <!-- =================== ZONA 3 · MOTOR =================== -->
+    <text class="ad-grp" x="722" y="34">Motor</text>
+
+    <rect class="ad-engine" x="512" y="48" width="420" height="280" rx="14" />
+
+    <!-- trilha de 4 nós: 2 × 2 grade dentro do motor -->
+    <!-- linha de conexão da trilha -->
+    <path
+      d="M608 124 H812 M608 124 V196 M608 196 H812"
+      fill="none"
+      stroke="var(--border-strong)"
+      stroke-width="1.4"
+    />
+    <line x1="700" y1="124" x2="724" y2="124" stroke="var(--faint)" stroke-width="1.4" marker-end="url(#ah-faint)" />
+    <line x1="700" y1="196" x2="676" y2="196" stroke="var(--faint)" stroke-width="1.4" marker-end="url(#ah-faint)" />
+
+    <!-- nó 1 · Ingestão -->
+    <g>
+      <rect class="ad-node" x="532" y="100" width="152" height="48" rx="9" />
+      <text class="ad-step" x="546" y="118">1</text>
+      <text class="ad-node-t" x="566" y="118">Ingestão</text>
+      <text class="ad-node-d" x="546" y="136">recebe o texto cru</text>
+    </g>
+    <!-- nó 2 · Extração -->
+    <g>
+      <rect class="ad-node" x="736" y="100" width="178" height="48" rx="9" />
+      <text class="ad-step" x="750" y="118">2</text>
+      <text class="ad-node-t" x="770" y="118">Extração</text>
+      <text class="ad-mono ad-node-tag" x="900" y="118">receita</text>
+      <text class="ad-node-d" x="750" y="136">vira fato tipado e datado</text>
+    </g>
+    <!-- nó 3 · Recuperação (alinhado à direita, abaixo do 2) -->
+    <g>
+      <rect class="ad-node" x="736" y="172" width="178" height="48" rx="9" />
+      <text class="ad-step" x="750" y="190">3</text>
+      <text class="ad-node-t" x="770" y="190">Recuperação</text>
+      <text class="ad-node-d" x="750" y="208">híbrida · determinística</text>
+    </g>
+    <!-- nó 4 · Síntese (abaixo do 1) -->
+    <g>
+      <rect class="ad-node" x="532" y="172" width="152" height="48" rx="9" />
+      <text class="ad-step" x="546" y="190">4</text>
+      <text class="ad-node-t" x="566" y="190">Síntese</text>
+      <text class="ad-node-d" x="546" y="208">ancorada na prova</text>
+    </g>
+
+    <!-- faixa · memória bitemporal -->
+    <rect class="ad-band" x="532" y="236" width="382" height="32" rx="8" />
+    <circle cx="550" cy="252" r="3.2" fill="var(--st-fact)" />
+    <text class="ad-band-t" x="566" y="256">Memória bitemporal · selo · reflexão</text>
+
+    <!-- faixa fina · governança (atravessa) -->
+    <rect class="ad-gov" x="532" y="278" width="382" height="28" rx="8" />
+    <text class="ad-gov-t" x="556" y="296">Governança por escopo</text>
+    <text class="ad-mono ad-gov-tag" x="890" y="296">falha-fechado</text>
+
+    <!-- =================== APOIO VERTICAL MOTOR → FUNDAÇÃO =================== -->
+    <line x1="722" y1="328" x2="722" y2="372" stroke="var(--faint)" stroke-width="1.6" marker-end="url(#ah-faint)" />
+
+    <!-- =================== FUNDAÇÃO =================== -->
+    <rect class="ad-foundation" x="308" y="378" width="624" height="76" rx="12" />
+    <g>
+      <!-- glifo de banco -->
+      <ellipse cx="358" cy="406" rx="16" ry="6" fill="none" stroke="var(--accent-ink)" stroke-width="1.5" />
+      <path d="M342 406 V428 a16 6 0 0 0 32 0 V406" fill="none" stroke="var(--accent-ink)" stroke-width="1.5" />
+      <path d="M342 417 a16 6 0 0 0 32 0" fill="none" stroke="var(--accent-ink)" stroke-width="1.5" stroke-opacity="0.6" />
+    </g>
+    <text class="ad-found-t" x="392" y="410">Banco de Dados</text>
+    <text class="ad-found-sub" x="392" y="432">fonte única da verdade · multi-tenant isolado</text>
+
+    <!-- =================== MICRO-LEGENDA · OS DOIS RITMOS =================== -->
+    <g>
+      <rect class="ad-legend" x="28" y="378" width="252" height="76" rx="12" />
+      <text class="ad-legend-h" x="44" y="400">Dois ritmos</text>
+
+      <circle cx="50" cy="418" r="3.4" fill="var(--accent)" />
+      <text class="ad-legend-t" x="62" y="422">leitura sem IA · instantânea</text>
+
+      <circle cx="50" cy="438" r="3.4" fill="var(--st-hypo)" />
+      <text class="ad-legend-t" x="62" y="442">aprendizado em 2º plano</text>
+    </g>
+  </svg>
+</figure>

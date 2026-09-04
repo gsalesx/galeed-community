@@ -1,0 +1,40 @@
+{
+  "name": "@galeed/mcp",
+  "version": "0.1.0",
+  "description": "Servidor MCP público do Galeed (HTTP-only) — dá à sua IA a memória do Galeed via /v1. Sem DB, sem core: só a chave gld_ e o gateway.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://galeed.com",
+  "bin": {
+    "galeed-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "mcp.json.example",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --format=esm --packages=external --outfile=dist/index.js --banner:js=\"#!/usr/bin/env node\" && node -e \"require('fs').chmodSync('dist/index.js', 0o755)\"",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "galeed",
+    "mcp",
+    "model-context-protocol",
+    "memory",
+    "ai",
+    "llm"
+  ]
+}

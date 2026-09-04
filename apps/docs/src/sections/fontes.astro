@@ -1,0 +1,95 @@
+---
+import Section from "../components/Section.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import Fields from "../components/Fields.astro";
+import Field from "../components/Field.astro";
+import Principle from "../components/Principle.astro";
+import ParamTable from "../components/ParamTable.astro";
+
+const recipe = `{
+  "source": "call_vendas",
+  "area": ["vendas"],
+  "default_sensitivity": "confidential",
+  "extract": [
+    { "field": "preco_falado", "as": "fact", "require": ["value", "date"] },
+    { "field": "proximo_passo", "as": "fact" },
+    { "field": "objecao",       "as": "hypothesis" }
+  ],
+  "fallback": "hypothesis"
+}`;
+
+const sources = [
+  {
+    name: "call_vendas",
+    desc: "Transcrições de call de vendas. Extrai preço, decisão e próximo passo.",
+  },
+  {
+    name: "whatsapp_grupo",
+    desc: "Conversas de grupo. Resolve <b>quem disse o quê</b> por participante.",
+  },
+  {
+    name: "email_comercial",
+    desc: "Threads de e-mail. Extrai compromissos, prazos e valores citados.",
+  },
+  {
+    name: "planilha_xls",
+    desc: "Planilhas financeiras. Extrai valores e datas como fatos estruturados.",
+  },
+  {
+    name: "teams_call · slack",
+    desc: "Reuniões e canais. Mesma receita de call, adaptada ao formato.",
+  },
+  {
+    name: "documento",
+    desc: "PDFs e contratos. Extrai cláusulas, partes e datas de vigência.",
+  },
+];
+---
+
+<Section
+  id="fontes"
+  ix="10"
+  title="Fontes e receitas"
+  intro="A peça que mantém os fatos confiáveis. Cada fonte declara o que extrair; o que não casa não vira fato."
+>
+  <div class="prose">
+    <p>
+      Jogar texto cru num balde genérico é exatamente o que causa alucinação: o
+      modelo inventa estrutura onde não há. A <strong>receita</strong> resolve isso
+      virando um contrato. Uma call de vendas extrai preço, decisão e próximo passo;
+      uma planilha financeira extrai valores e datas. O que a receita reconhece vira
+      <strong>fato</strong>; o resto vira <strong>hipótese</strong> e espera revisão.
+    </p>
+  </div>
+
+  <CodeBlock lang="json" filename="receita · call de vendas" code={recipe} />
+
+  <div class="sub">Como ler a receita</div>
+  <Fields>
+    <Field key="extract[].field">
+      O que procurar no conteúdo. O Galeed reconhece o padrão; você só nomeia.
+    </Field>
+    <Field key="extract[].as">
+      O status de saída se o campo for encontrado: <b>fact</b> (alta confiança) ou
+      <b>hypothesis</b> (precisa confirmar).
+    </Field>
+    <Field key="extract[].require">
+      Condições pra virar fato. <code class="ic">["value","date"]</code> = só vira
+      fato se tiver valor <i>e</i> data; senão cai pra hipótese.
+    </Field>
+    <Field key="fallback">
+      O destino do que não casou com nenhum campo. Quase sempre
+      <code class="ic">hypothesis</code>, nunca <code class="ic">fact</code>.
+    </Field>
+  </Fields>
+
+  <Principle>
+    <b>O cérebro nunca chuta.</b> Só vira fato o que casa com a receita da fonte e
+    cumpre os <code style="color:#fff;font-family:var(--mono)">require</code>. Todo o
+    resto entra como hipótese e fica na fila de revisão. É o contrato que separa o
+    Galeed de uma busca genérica.
+  </Principle>
+
+  <div class="sub">Fontes disponíveis</div>
+  <ParamTable cols={["Slug", "O que ingere"]} rows={sources} />
+</Section>

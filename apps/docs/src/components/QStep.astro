@@ -1,0 +1,14 @@
+---
+// Um passo .qstep: título (h4) + corpo (slot — parágrafos, CodeBlock, etc.).
+// O número é gerado automaticamente pelo counter do .qsteps.
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<div class="qstep">
+  <h4>{title}</h4>
+  <slot />
+</div>

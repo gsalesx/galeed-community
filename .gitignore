@@ -1,0 +1,18 @@
+# dependências e build
+node_modules/
+dist/
+*.local
+
+# lixo do macOS
+.DS_Store
+
+# segredos — NUNCA commitar
+.env
+.env.local
+*.key
+
+# dados locais
+/tmp/
+.galeed-blobs/
+.vscode/
+.gstack/

@@ -1,0 +1,16 @@
+{
+  "_comment": "Schema-pack OPCIONAL por brain (PT, domínio negócios/vendas). NÃO faz parte do core — é um atalho determinístico que um tenant pluga via env GALEED_SCHEMA_PACK ou GALEED_SCHEMA_PACK_<BRAIN>. Sem pack, o reconcile é estrutural+LLM (neutro a idioma/domínio). Ver docs/adr/ADR-002-tenant-neutralidade.md.",
+  "synonymClasses": [
+    ["preco", "valor", "mensalidade", "ticket", "fee"],
+    ["status", "situacao", "estagio", "fase", "etapa"],
+    ["decisao", "definicao", "resolucao"],
+    ["responsavel", "decisor", "owner", "dono", "contato"],
+    ["prazo", "deadline", "data_limite", "vencimento"],
+    ["objetivo", "meta", "goal", "alvo"]
+  ],
+  "roleTokens": {
+    "spend": ["investimento", "gasto", "custo", "ads", "trafego", "cac", "despesa", "aporte"],
+    "revenue": ["ticket", "faturamento", "receita", "mrr", "venda", "lucro", "margem"],
+    "count": ["quantidade", "qtd", "numero", "contratos", "leads", "conversas", "clientes"]
+  }
+}

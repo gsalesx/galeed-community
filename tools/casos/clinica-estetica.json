@@ -1,0 +1,78 @@
+{
+  "empresa": "Clínica Belle Vie (estética) — Joinville/SC",
+  "historia": "Clínica com 2 salas e 4 profissionais. O conhecimento vivia no WhatsApp da dona, num caderno de preços e na cabeça da recepcionista. Conectaram o WhatsApp (Evolution), a tabela de preços e as reuniões de equipe ao Galeed.",
+  "eventos": [
+    {
+      "ingestor": "planilha",
+      "rotulo": "tabela de preços de agosto (do Excel da recepção)",
+      "payload": {
+        "titulo": "Tabela de preços — agosto 2026",
+        "data": "2026-08-01",
+        "linhas": [
+          { "entidade": "Limpeza de pele", "atributo": "preço", "valor": 180, "unidade": "BRL" },
+          { "entidade": "Limpeza de pele", "atributo": "preço", "valor": 1500, "unidade": "BRL", "tier": "pacote-10-sessoes" },
+          { "entidade": "Drenagem linfática", "atributo": "preço", "valor": 140, "unidade": "BRL" },
+          { "entidade": "Peeling de diamante", "atributo": "preço", "valor": 220, "unidade": "BRL" },
+          { "entidade": "Skinceuticals", "atributo": "prazo de entrega", "valor": "7 dias úteis" }
+        ]
+      }
+    },
+    {
+      "ingestor": "evolution-whatsapp",
+      "rotulo": "cliente remarca sessão pelo WhatsApp",
+      "payload": {
+        "event": "messages.upsert",
+        "data": {
+          "key": { "remoteJid": "554799991111@s.whatsapp.net", "fromMe": false, "id": "CASO1-WA-001" },
+          "pushName": "Mariana Souza",
+          "message": { "conversation": "Oi! Não vou conseguir na quinta. Consegue remarcar minha limpeza de pele pra sexta às 15h? E queria saber se o pacote de 10 ainda tá no preço antigo" },
+          "messageTimestamp": 1785585600
+        }
+      }
+    },
+    {
+      "ingestor": "evolution-whatsapp",
+      "rotulo": "lead novo pergunta preço no WhatsApp",
+      "payload": {
+        "event": "messages.upsert",
+        "data": {
+          "key": { "remoteJid": "554799992222@s.whatsapp.net", "fromMe": false, "id": "CASO1-WA-002" },
+          "pushName": "Carla Mendes",
+          "message": { "conversation": "Boa tarde! Vi no Instagram de vocês. Quanto custa a drenagem? Vocês atendem sábado?" },
+          "messageTimestamp": 1785589200
+        }
+      }
+    },
+    {
+      "ingestor": "notetaker",
+      "rotulo": "reunião semanal da equipe (transcrita pelo notetaker)",
+      "payload": {
+        "title": "Reunião de equipe — semana 1 de agosto",
+        "participants": ["Dra. Paula", "Recepção (Júlia)", "Fernanda (esteticista)"],
+        "occurred_at": "2026-08-03T18:30:00-03:00",
+        "transcript": "Dra. Paula: gente, o fornecedor Adcos subiu o prazo pra 15 dias, vamos manter a Skinceuticals como principal. Júlia: as terças à tarde estão lotadas, a Mariana Souza pediu pra ser atendida sempre nas terças, vou tentar encaixar. Fernanda: o aparelho de peeling tá fazendo barulho, precisa de manutenção antes de sexta. Dra. Paula: ok, agenda o técnico. Pendência minha: fechar o orçamento da maca elétrica nova, teto de R$ 4.500."
+      }
+    },
+    {
+      "ingestor": "formulario",
+      "rotulo": "lead do formulário do site",
+      "payload": {
+        "formulario": "Orçamento pelo site",
+        "ref": "site-2026-08-04-017",
+        "occurred_at": "2026-08-04T09:12:00-03:00",
+        "campos": {
+          "Nome": "João Pereira",
+          "Telefone": "(47) 98888-7777",
+          "Serviço de interesse": "Pacote de limpeza de pele",
+          "Mensagem": "Minha esposa fez e gostou muito. Queria saber valores do pacote de 10 sessões e se dá pra parcelar."
+        }
+      }
+    }
+  ],
+  "perguntas": [
+    "Quanto custa a drenagem linfática?",
+    "Qual o preço do pacote de 10 sessões de limpeza de pele?",
+    "Quais pendências ficaram da última reunião de equipe?",
+    "Quais leads novos chegaram e o que eles querem?"
+  ]
+}

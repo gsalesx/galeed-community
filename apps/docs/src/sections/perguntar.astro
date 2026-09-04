@@ -1,0 +1,118 @@
+---
+import Section from "../components/Section.astro";
+import Endpoint from "../components/Endpoint.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import CodeTabs from "../components/CodeTabs.astro";
+import Admonition from "../components/Admonition.astro";
+
+const requestTabs = [
+  {
+    lang: "bash",
+    label: "curl",
+    code: `curl https://api.galeed.com/v1/ask \\
+  -H "Authorization: Bearer gld_live_8x2k...e1" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "question": "Qual o preço fechado com a Acme?"
+  }'`,
+  },
+  {
+    lang: "javascript",
+    label: "Node",
+    code: `const res = await fetch("https://api.galeed.com/v1/ask", {
+  method: "POST",
+  headers: {
+    authorization: "Bearer gld_live_8x2k...e1",
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({
+    question: "Qual o preço fechado com a Acme?",
+  }),
+});
+const data = await res.json();`,
+  },
+  {
+    lang: "python",
+    label: "Python",
+    code: `import requests
+
+res = requests.post(
+    "https://api.galeed.com/v1/ask",
+    headers={
+        "Authorization": "Bearer gld_live_8x2k...e1",
+        "Content-Type": "application/json",
+    },
+    json={
+        "question": "Qual o preço fechado com a Acme?",
+    },
+)
+data = res.json()`,
+  },
+];
+
+const response = `{
+  "answer": "O preço fechado com a Acme é R$ 2.500/mês, aprovado pela Maria em 12/jun.",
+  "facts": [
+    {
+      "id": "fact_8x2k01",
+      "status": "fact",
+      "text": "Preço fechado com a Acme: R$ 2.500/mês.",
+      "confidence": 0.92,
+      "sensitivity": "confidential",
+      "area": ["vendas"],
+      "source": {
+        "type": "call_vendas",
+        "ref": "call_2026-06-12",
+        "occurred_at": "2026-06-12T14:03:00Z"
+      },
+      "valid_from": "2026-06-12",
+      "valid_until": null,
+      "supersedes": "fact_7a1j04"
+    }
+  ],
+  "withheld": { "count": 3, "reason": "fora do seu acesso" }
+}`;
+---
+
+<Section
+  id="perguntar"
+  ix="08"
+  title="Perguntar"
+  intro="A leitura principal. Você pergunta em português e recebe uma síntese mais os fatos que a sustentam, cada um carimbado com a fonte."
+>
+  <Endpoint method="post" path="/ask" scope="filtrado pelo escopo" scopeIcon="search" />
+
+  <div class="prose">
+    <p>
+      Mande a pergunta em linguagem natural no campo <code class="ic">question</code>. A leitura
+      sempre passa pelo escopo da sua chave &mdash; áreas e nível de sigilo &mdash; antes de
+      voltar. Você nunca vê o que a chave não pode ver.
+    </p>
+  </div>
+
+  <CodeTabs tabs={requestTabs} filename="pergunta · linguagem natural" />
+
+  <div class="prose">
+    <p>
+      A resposta traz três coisas: a <code class="ic">answer</code> (a síntese pronta pra ler),
+      a lista <code class="ic">facts</code> (cada fato com o selo completo que o sustenta) e
+      <code class="ic">withheld</code> (quantos fatos ficaram de fora do seu acesso).
+    </p>
+  </div>
+
+  <CodeBlock lang="json" filename="resposta · síntese + selos" code={response} />
+
+  <Admonition type="note" flush>
+    <b>O campo <code class="ic">withheld</code> é honestidade, não erro.</b> Quando o escopo da
+    chave deixa fatos de fora, a API conta quantos e por quê, em vez de fingir que a resposta é
+    completa. É o mesmo &ldquo;3 fontes ficaram de fora&rdquo; que aparece no produto.
+  </Admonition>
+
+  <Admonition type="warn" flush>
+    <b>Teto de custo diário.</b> A síntese consome IA, então cada cérebro tem um teto de custo por
+    dia. Se ele for atingido, o <code class="ic">/v1/ask</code> responde <code class="ic">402</code>
+    com <code class="ic">current_usd</code> e <code class="ic">limit_usd</code> &mdash; e volta ao
+    normal à meia-noite UTC. As leituras de <code class="ic">/v1/facts</code> não gastam IA e seguem
+    livres.
+  </Admonition>
+</Section>

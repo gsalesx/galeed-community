@@ -1,0 +1,159 @@
+---
+import Section from "../components/Section.astro";
+import Endpoint from "../components/Endpoint.astro";
+import ParamTable from "../components/ParamTable.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import CodeTabs from "../components/CodeTabs.astro";
+
+const requestTabs = [
+  {
+    lang: "bash",
+    label: "curl",
+    code: `curl https://api.galeed.com/v1/ingest \\
+  -H "Authorization: Bearer gld_live_8x2k...e1" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "source": "call_vendas",
+    "content": "Fechamos com a Acme por R$ 2.500/mês. A Maria aprovou.",
+    "occurred_at": "2026-06-12T14:03:00Z",
+    "sensitivity": "confidential"
+  }'`,
+  },
+  {
+    lang: "javascript",
+    label: "Node",
+    code: `const res = await fetch("https://api.galeed.com/v1/ingest", {
+  method: "POST",
+  headers: {
+    authorization: "Bearer gld_live_8x2k...e1",
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({
+    source: "call_vendas",
+    content: "Fechamos com a Acme por R$ 2.500/mês. A Maria aprovou.",
+    occurred_at: "2026-06-12T14:03:00Z",
+    sensitivity: "confidential",
+  }),
+});
+const data = await res.json();`,
+  },
+  {
+    lang: "python",
+    label: "Python",
+    code: `import requests
+
+res = requests.post(
+    "https://api.galeed.com/v1/ingest",
+    headers={
+        "Authorization": "Bearer gld_live_8x2k...e1",
+        "Content-Type": "application/json",
+    },
+    json={
+        "source": "call_vendas",
+        "content": "Fechamos com a Acme por R$ 2.500/mês. A Maria aprovou.",
+        "occurred_at": "2026-06-12T14:03:00Z",
+        "sensitivity": "confidential",
+    },
+)
+data = res.json()`,
+  },
+];
+
+const rows = [
+  {
+    name: "source",
+    type: "string",
+    required: "obrigatório" as const,
+    desc: 'O slug da fonte que define a receita de extração (ex.: <code class="ic">call_vendas</code>). É ele que decide o que vira fato.',
+  },
+  {
+    name: "content",
+    type: "string",
+    required: "obrigatório" as const,
+    desc: "O conteúdo cru: texto, transcrição, corpo de e-mail. Joga do jeito que está, sem formatar nada.",
+  },
+  {
+    name: "occurred_at",
+    type: "datetime",
+    required: "opcional" as const,
+    desc: "Quando o conteúdo aconteceu (ISO 8601). Define a posição na linha do tempo. Padrão: agora.",
+  },
+  {
+    name: "participants",
+    type: "string[]",
+    required: "opcional" as const,
+    desc: "Quem estava envolvido, pra ajudar a ligar os fatos. O Galeed também infere do próprio conteúdo.",
+  },
+  {
+    name: "sensitivity",
+    type: "enum",
+    required: "opcional" as const,
+    desc: 'Força um nível de sigilo de entrada. Se omitir, a receita decide; sem receita, entra como <code class="ic">secret</code>.',
+  },
+];
+
+const response = `{
+  "batch_id": "ing_2026q2_7a1j9",
+  "status": "organizing",
+  "source": "call_vendas",
+  "received_at": "2026-06-12T14:03:11Z"
+}`;
+
+const statusResponse = `{
+  "batch_id": "ing_2026q2_7a1j9",
+  "status": "organized",
+  "progress": 1,
+  "result": { "facts": 3 }
+}`;
+---
+
+<Section
+  id="ingestao"
+  ix="07"
+  title="Ingestão"
+  intro="Manda conteúdo cru pro cérebro. Você não estrutura nada: a receita da fonte cuida disso."
+>
+  <Endpoint method="post" path="/ingest" scope="requer can_ingest" scopeIcon="lock" />
+
+  <div class="sub">Corpo da requisição</div>
+  <ParamTable rows={rows} />
+
+  <CodeTabs tabs={requestTabs} filename="ingestão · conteúdo cru" />
+
+  <div class="sub">Resposta</div>
+  <div class="prose">
+    <p>
+      A ingestão é assíncrona. A API confirma o recebimento na hora com um <code
+        class="ic">202</code
+      > e um <code class="ic">batch_id</code>; a organização acontece logo depois e dispara o
+      webhook <code class="ic">ingest.organized</code>.
+    </p>
+  </div>
+
+  <CodeBlock lang="json" filename="202 Accepted" code={response} />
+
+  <div class="sub">Acompanhar o batch</div>
+  <Endpoint method="get" path="/ingest/:batch_id" scope="requer can_ingest" scopeIcon="lock" />
+  <div class="prose">
+    <p>
+      Se você não usa webhook, consulte o estado do batch com o <code class="ic">batch_id</code> que
+      veio no <code class="ic">202</code>. O <code class="ic">status</code> caminha por <code
+        class="ic">organizing</code
+      > → <code class="ic">indexed</code> (já dá pra buscar) → <code class="ic">organized</code> (terminal),
+      ou <code class="ic">failed</code>. Em <code class="ic">organized</code>, <code class="ic">result.facts</code>
+      traz quantas partes entraram. O batch só é visível pra quem é do mesmo cérebro da chave.
+    </p>
+  </div>
+
+  <CodeBlock lang="json" filename="200 OK · status do batch" code={statusResponse} />
+
+  <div class="sub">Vindo de uma ferramenta (WhatsApp, Chatwoot, formulário, planilha…)?</div>
+  <div class="prose">
+    <p>
+      O <code class="ic">/ingest</code> é a porta crua. Pra canais conhecidos existe a família
+      <code class="ic">POST /v1/ingestors/&lt;slug&gt;</code> — webhooks que entendem o formato da
+      ferramenta e preparam o conteúdo antes do funil (com janela de conversa pra chats e
+      fatos determinísticos pra planilhas). Veja <a href="#integracoes">Integrações prontas</a>.
+    </p>
+  </div>
+</Section>

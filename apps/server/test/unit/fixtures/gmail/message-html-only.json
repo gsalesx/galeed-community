@@ -1,0 +1,21 @@
+{
+  "_fonte": "GmailMessageRecord espelho de users.messages get format=full (https://developers.google.com/gmail/api/reference/rest/v1/users.messages) + RFC 2822 Appendix A.1.1. payload.mimeType=text/html direto (sem parts); body.data com <p>/<br>/&nbsp;/&amp;/tabela/<style> — prova htmlParaTexto. base64url.",
+  "id": "msg-m22c-gmail-002",
+  "threadId": "thread-m22c-gmail-B",
+  "historyId": "987700",
+  "internalDate": "1747224000000",
+  "snippet": "Olá Kelvin & equipe, a proposta do tier 2 fica em R$ 30 mil.",
+  "labelIds": ["INBOX"],
+  "sizeEstimate": 2048,
+  "payload": {
+    "mimeType": "text/html",
+    "headers": [
+      { "name": "From", "value": "Maria Silva <maria@exemplo.com.br>" },
+      { "name": "To", "value": "kelvin@kcggroup.com.br" },
+      { "name": "Subject", "value": "Proposta comercial — tier 2 (html)" },
+      { "name": "Date", "value": "Wed, 14 May 2025 09:00:00 -0300" }
+    ],
+    "filename": "",
+    "body": { "size": 260, "data": "PGh0bWw-PGhlYWQ-PHN0eWxlPmJvZHl7Y29sb3I6IzMzM308L3N0eWxlPjwvaGVhZD48Ym9keT48cD5PbMOhJm5ic3A7S2VsdmluICZhbXA7IGVxdWlwZSw8L3A-PHA-QSBwcm9wb3N0YSBkbyB0aWVyIDIgZmljYSBlbSBSJCAzMCBtaWwgcG9yIGFuby48L3A-PHRhYmxlPjx0cj48dGQ-VGllciAyPC90ZD48dGQ-UiQgMzAgbWlsPC90ZD48L3RyPjwvdGFibGU-PGJyPkFicmHDp28sPGJyPk1hcmlhPC9ib2R5PjwvaHRtbD4" }
+  }
+}

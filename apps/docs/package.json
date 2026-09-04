@@ -1,0 +1,24 @@
+{
+  "name": "@galeed/docs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Documentação pública do Galeed — site estático em Astro puro, fiel ao design system.",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^5.6.0",
+    "sharp": "^0.34.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

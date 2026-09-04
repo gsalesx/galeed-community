@@ -1,0 +1,49 @@
+{
+  "name": "n8n-nodes-galeed",
+  "version": "0.1.0",
+  "description": "Nós do n8n pro Galeed — a memória do seu negócio: ingira texto, chats, planilhas, reuniões e formulários, e pergunte com fonte.",
+  "keywords": [
+    "n8n-community-node-package",
+    "galeed",
+    "memoria",
+    "whatsapp",
+    "chatwoot",
+    "rag"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/a360-business/galeed-community",
+  "author": "Accelera 360 Company LTDA",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/a360-business/galeed-community.git",
+    "directory": "apps/n8n-nodes-galeed"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "index.js",
+  "files": [
+    "dist",
+    "index.js"
+  ],
+  "scripts": {
+    "build": "tsc && mkdir -p dist/nodes/Galeed && cp nodes/Galeed/galeed.svg dist/nodes/Galeed/",
+    "dev": "tsc --watch"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/GaleedApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Galeed/Galeed.node.js"
+    ]
+  },
+  "devDependencies": {
+    "n8n-workflow": "^1.82.0",
+    "typescript": "~5.7.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}

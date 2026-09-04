@@ -1,0 +1,41 @@
+---
+description: Contexto do monorepo Galeed — mapa, funil de dados e convenções que pegam desprevenido
+alwaysApply: true
+---
+
+# Galeed — memória do negócio
+
+Conteúdo cru entra por UM funil (dedupe + fila + extração), vira fatos bitemporais com fonte, e sai por painel, API `/v1`, MCP e webhooks.
+
+## Monorepo
+
+| Pasta | Quando mexer |
+| --- | --- |
+| `apps/server/src/core/` | como o cérebro pensa (ingestão, extração, retrieval, acesso) |
+| `apps/server/src/connectors/web-server.ts` | BFF `/api` (painel, cookie) |
+| `apps/server/src/connectors/gateway-server.ts` | API pública `/v1` (Bearer `gld_`) |
+| `apps/server/src/connectors/ingest-worker.ts` | fila, janelas de chat, sync GitHub |
+| `apps/web/src/screens/` | UI do painel |
+| `apps/docs/`, `apps/mcp/`, `apps/n8n-nodes-galeed/`, `apps/zapier-galeed/` | docs e integrações |
+
+## Funil
+
+```
+canal → ingestor.normalize() → galeed_ingest_jobs → worker extrai
+     → receita/gate → fatos → painel / /v1 / MCP / espelho GitHub
+```
+
+## Convenções críticas
+
+- Sensibilidade default: `restrito` (fail-closed). Bot sem **acesso total** não vê modo livre.
+- Ingestão é **sempre assíncrona** — sem worker, tudo fica "na fila".
+- jsonb com `postgres`: use `sql.json(...)` (interpolar string dupla-serializa).
+- Testes: `npm test` na raiz (sem banco); `npm run test:all` precisa de Postgres (`docker compose up -d`, porta **5434**).
+- God-token (`API_TOKEN`) **não** autentica em `/v1`.
+- Responda em português; mudanças mínimas e pontuais.
+
+## Skills do projeto
+
+Antes de explorar às cegas, use a skill certa em `.cursor/skills/` (mapa, rodar, diagnosticar, criar-ingestor, deploy, conectar-ia, n8n, zapier, caso-de-uso).
+
+Guias: `README.md` · `INGESTORES.md` · `CASOS.md` · `ZAPIER.md`.

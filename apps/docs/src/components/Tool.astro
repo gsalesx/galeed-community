@@ -1,0 +1,13 @@
+---
+// Um card .tool: nome (mono) + descrição (slot — aceita HTML inline como <code class="ic">).
+interface Props {
+  name: string;
+}
+
+const { name } = Astro.props;
+---
+
+<div class="tool">
+  <div class="tn">{name}</div>
+  <div class="td"><slot /></div>
+</div>

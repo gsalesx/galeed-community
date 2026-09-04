@@ -1,0 +1,40 @@
+{
+  "_doc": "Shape oficial GET /v1/venda/busca — https://developers.contaazul.com/docs/sales-apis-openapi/v1/searchvendas.md (wrapper {itens, total_itens}; itens.id uuid, itens.numero, itens.total, itens.data data do EVENTO, itens.data_alteracao ISO SP/GMT-3, itens.id_legado int compat NUNCA chave, itens.situacao {nome,descricao}, itens.cliente {id,nome})",
+  "_nota": "campos cliente.email/situacao.descricao usados como exemplo mínimo do shape oficial; confirmar shape interno completo no HTC com resposta real",
+  "total_itens": 3,
+  "itens": [
+    {
+      "id": "123e4567-e89b-12d3-a456-426614174000",
+      "numero": 1001,
+      "total": 1250,
+      "data": "2026-03-10",
+      "criado_em": "2026-03-10T09:12:00.000",
+      "data_alteracao": "2026-03-10T09:12:00.000",
+      "id_legado": 555001,
+      "situacao": { "nome": "APROVADO", "descricao": "Venda aprovada" },
+      "cliente": { "id": "cli-acme-0001", "nome": "Acme Ltda", "email": "contato@acme.com" }
+    },
+    {
+      "id": "223e4567-e89b-12d3-a456-426614174111",
+      "numero": 1002,
+      "total": 9800,
+      "data": "2026-04-02",
+      "criado_em": "2026-04-02T14:30:00.000",
+      "data_alteracao": "2026-04-02T14:30:00.000",
+      "id_legado": 555002,
+      "situacao": { "nome": "APROVADO", "descricao": "Venda aprovada" },
+      "cliente": { "id": "cli-acme-0001", "nome": "Acme Ltda", "email": "contato@acme.com" }
+    },
+    {
+      "id": "123e4567-e89b-12d3-a456-426614174000",
+      "numero": 1001,
+      "total": 1500,
+      "data": "2026-03-10",
+      "criado_em": "2026-03-10T09:12:00.000",
+      "data_alteracao": "2026-03-15T11:00:00.000",
+      "id_legado": 555001,
+      "situacao": { "nome": "APROVADO", "descricao": "Venda aprovada com ajuste de valor" },
+      "cliente": { "id": "cli-acme-0001", "nome": "Acme Ltda", "email": "contato@acme.com" }
+    }
+  ]
+}

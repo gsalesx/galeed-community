@@ -1,0 +1,4019 @@
+openapi: 3.1.0
+info:
+  title: Galeed API
+  version: "0"
+  description: >-
+    Galeed é uma camada de memória para IA sobre Postgres+pgvector — captura, organiza e lembra,
+    multi-tenant (isolamento pela coluna `brain` em toda tabela). Este documento é a FONTE-DA-VERDADE
+    do contrato HTTP, derivada diretamente do código (web-server.ts, api-server.ts, ingest-server.ts e
+    os handlers puros em src/connectors/bff/*.ts). NÃO HÁ VERSIONAMENTO: não existe `/api/v1`; o contrato
+    é implícito no roteamento dos servidores e é VALIDADO contra o código por um teste de drift que parseia
+    este YAML com o pacote `yaml`. Quando o código e este documento divergirem, o código vence — corrija o
+    YAML. Limitações honestas do estado atual: a listagem de tokens por principal é STUB (o endpoint
+    `/api/rbac/principals` devolve o principal+grant, não os hashes de tokens individuais); NÃO há refresh
+    token (a sessão é um cookie httpOnly de 30 dias); NÃO há MFA/SSO; NÃO há rate limit; o RBAC fino só
+    se aplica às telas de gestão (`/api/rbac/*`) e à API read-only com token de principal — as leituras do
+    DONO logado no BFF rodam como admin, sem escopo.
+  contact:
+    name: Galeed
+servers:
+  - url: http://localhost:8789
+    description: >-
+      BFF (web-server.ts, WEB_PORT default 8789). App completo do console; auth por cookie de sessão
+      httpOnly `galeed_sess`. Superset de /api/*. Hospeda também auth, wizard, onboarding, ingestão,
+      contexto, fontes, hipóteses, juiz, conectores e RBAC.
+  - url: http://localhost:8788
+    description: >-
+      API read-only (api-server.ts, API_PORT default 8788). Consumo de devs/agentes via header
+      `x-galeed-principal-token` (leitura escopada) ou `x-galeed-token` (admin, exige API_TOKEN no
+      ambiente). Fail-closed: sem API_TOKEN e sem token de principal → 503. Só expõe um subconjunto GET:
+      /api/graph, /api/retrieve, /api/search, /api/facts, /api/timeline, /api/stats, /api/health.
+
+tags:
+  - name: Auth
+    description: Contas (galeed_accounts) e sessão por cookie httpOnly. Cross-brain.
+  - name: Health
+    description: Liveness — não toca o banco.
+  - name: Brains
+    description: Brains (tenants) da conta logada. Criar e listar.
+  - name: Wizard
+    description: Wizard "Criar um cérebro" — chat bounded de 4 passos que monta a estrutura antes do 1º doc.
+  - name: Onboarding
+    description: Onboarding de contexto — chat bounded que entrevista o dono e grava o BrainContext.
+  - name: Ingestão
+    description: Import assíncrono (enfileira job) + status da fila de ingestão.
+  - name: Contexto
+    description: Editar o contexto do brain + preview de extração + re-extração sob comando.
+  - name: Fontes
+    description: Fontes com receita (galeed_sources) + conexão de conectores por fonte.
+  - name: Hipóteses
+    description: Fila de revisão (regra de ouro) — itens, contagem, grupos e decisões em lote.
+  - name: Juiz
+    description: Juiz triador — RECOMENDA, nunca decide. Calibração e estimativa de custo.
+  - name: Conectores
+    description: Conectores (seam + Nango) — webhook m2m (HMAC) e status derivado das conexões.
+  - name: RBAC
+    description: Gestão de principais, grants, tokens, áreas, preview de acesso e trilha de auditoria.
+  - name: Leitura
+    description: Consumo principal — leituras de dados do brain (também na API read-only :8788).
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness (ingest e API)
+      description: >-
+        Atalho de liveness. No ingest-server devolve `{ ok, brain }`; no BFF e na API read-only devolve
+        `{ ok: true }`. Não toca o banco. Sem auth.
+      security: []
+      responses:
+        "200":
+          description: Vivo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /ingest:
+    post:
+      tags: [Ingestão]
+      summary: Webhook de ingestão (ingest-server :8787)
+      description: >-
+        Endpoint do conector universal de ingestão (ingest-server.ts, porta PORT=8787). Captura SÍNCRONA
+        (não confundir com /api/ingest do BFF, que é assíncrono). Auth fail-closed por header
+        `x-galeed-token` == INGEST_TOKEN; sem INGEST_TOKEN configurado → 503; token errado → 401.
+        Body: `{ text }` OU `{ doc_base64 }` (+ opcionais type/title/date/people/source/external_id/area/sensitivity).
+        `doc_url`/`audio_url` estão DESLIGADOS (risco SSRF) → 410. Teto de transporte 60 MB.
+      security:
+        - ingestToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: >-
+                Payload mínimo é `{ text }` ou `{ doc_base64 }`. Demais campos são pistas opcionais pro
+                classificador (TEMPO 1). external_id dá idempotência; area/sensitivity sobrescrevem a
+                política do canal (M7/R16). content_type/filename ajudam o parser de documento.
+              properties:
+                text:
+                  type: string
+                  description: Texto cru a capturar (alternativa a doc_base64).
+                doc_base64:
+                  type: string
+                  description: Documento (PDF/CSV/TSV/MD/TXT) em base64 — extraído, fatiado e capturado.
+                content_type:
+                  type: string
+                filename:
+                  type: string
+                type:
+                  type: string
+                title:
+                  type: string
+                date:
+                  type: string
+                people:
+                  type: array
+                  items:
+                    type: string
+                source:
+                  type: string
+                  description: Pista do canal (whatsapp, notetaker, email…) pro classificador.
+                external_id:
+                  type: string
+                  description: Idempotência — re-post com o mesmo id não duplica.
+                area:
+                  type: string
+                sensitivity:
+                  type: string
+                  enum: [publico, interno, sensivel, restrito]
+      responses:
+        "200":
+          description: Capturado (ou pulado por idempotência)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Faltou text ou doc_base64
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Token de ingestão inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: doc_url/audio_url desligados (SSRF) — envie doc_base64
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/ServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Liveness (BFF / API)
+      description: Liveness do BFF e da API read-only. Devolve ok=true no corpo. Não toca o banco. Sem auth.
+      security: []
+      responses:
+        "200":
+          description: Vivo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /api/ingestors:
+    get:
+      tags: [Health]
+      summary: Lista os ingestores registrados (metadados)
+      description: >
+        Metadados do registry de ingestores (slug, nome, descrição, exemplo) — o painel Conectar
+        lista os webhooks prontos com eles. A EXECUÇÃO fica no gateway público
+        (POST /v1/ingestors/{slug}, Bearer com can_ingest) — ver INGESTORES.md na raiz.
+        Não toca o banco. Sem auth.
+      security: []
+      responses:
+        "200":
+          description: Ingestores disponíveis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ingestors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        slug: { type: string, example: evolution-whatsapp }
+                        nome: { type: string, example: WhatsApp (Evolution API) }
+                        descricao: { type: string }
+                        exemplo: { type: string }
+
+  /api/github/config:
+    get:
+      tags: [Health]
+      summary: Config da sync com GitHub do cérebro (sem o PAT)
+      description: >-
+        Espelho organizado pra pessoas (README painel + conhecimento/ + reunioes|conversas|documentos|anotacoes/<ano>/)
+        + entrada por diff (entrada/, arquivo removido quando o job de ingestão conclui) — ver github-sync.ts.
+        Nunca devolve o PAT (só temPat). Inclui `retidas` (memórias fora do espelho pelo filtro de sigilo).
+      responses:
+        "200":
+          description: Config atual (ou enabled=false) + retidas
+        "401":
+          description: Sem sessão
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      tags: [Health]
+      summary: Salva a config da sync com GitHub (owner, repo, branch, PAT, o que espelhar, ligada)
+      description: >-
+        PAT vazio mantém o atual. sigiloMax default 'restrito' (espelha tudo — o repo é do próprio dono;
+        use repositório PRIVADO). Devolve a config com `retidas`.
+      responses:
+        "200":
+          description: Config salva
+        "400":
+          description: Falta owner/repo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/github/sync:
+    post:
+      tags: [Health]
+      summary: Roda a sync com GitHub agora (entrada primeiro, depois o espelho)
+      responses:
+        "200":
+          description: Resumo da rodada (entradaIngeridos, entradaRemovidos, espelhoEnviados, espelhoRemovidos, retidas, commit)
+        "502":
+          description: Erro do GitHub (fica em lastError do config)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Criar conta + sessão
+      description: >-
+        Cria a conta (email único, senha scrypt). Se `brainName` for enviado, cria também a membership
+        owner desse brain (com guard anti-takeover de nome). Devolve a Session e seta o cookie `galeed_sess`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupBody"
+      responses:
+        "200":
+          description: Conta criada; cookie de sessão setado
+          headers:
+            Set-Cookie:
+              description: "galeed_sess=<token>; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000"
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Email já cadastrado OU nome de cérebro já existe (takeover bloqueado)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Autentica email+senha (verificação scrypt em tempo constante) e abre sessão (cookie).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Autenticado; cookie de sessão setado
+          headers:
+            Set-Cookie:
+              description: Cookie de sessão galeed_sess
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Email ou senha inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: Destrói a sessão atual (se houver) e limpa o cookie. Idempotente.
+      responses:
+        "200":
+          description: Sessão encerrada; cookie limpo
+          headers:
+            Set-Cookie:
+              description: Cookie galeed_sess expirado (Max-Age=0)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Sessão atual
+      description: >-
+        Devolve a Session da conta logada, ou `null` se não houver cookie / cookie inválido (sempre 200 —
+        não é erro estar deslogado). `?brain=` opcional escolhe o currentBrain preferido.
+      parameters:
+        - $ref: "#/components/parameters/BrainOptional"
+      responses:
+        "200":
+          description: Session ou null
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Session"
+                  - type: "null"
+
+  /api/brains:
+    get:
+      tags: [Brains]
+      summary: Listar brains da conta
+      description: Brains aos quais a conta logada pertence. Exige sessão; NÃO exige `?brain=`.
+      responses:
+        "200":
+          description: Lista de brains
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Brain"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Brains]
+      summary: Criar brain
+      description: >-
+        Cria um brain (id = nome) com membership owner. Guard anti-colisão de nome (409). Não passa pelo
+        wizard — criação direta por nome.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: Nome do cérebro (vira o id).
+      responses:
+        "200":
+          description: Brain criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brain"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "409":
+          description: Nome de cérebro já existe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/wizard/start:
+    post:
+      tags: [Wizard]
+      summary: Iniciar wizard de criação
+      description: Bolha inicial + 1ª pergunta + estado vazio. O brain ainda não existe. Exige sessão.
+      responses:
+        "200":
+          description: Primeiro turno do wizard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardTurn"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/wizard/reply:
+    post:
+      tags: [Wizard]
+      summary: Responder um passo do wizard
+      description: >-
+        Processa a mensagem no passo atual: normaliza (IA bounded, ≤1 chamada), preenche o draft e avança
+        o passo (determinístico). O passo `sources` é coleção multi-seleção (action `toggle`/`go`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WizardReplyBody"
+      responses:
+        "200":
+          description: Próximo turno do wizard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardTurn"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/wizard/confirm:
+    post:
+      tags: [Wizard]
+      summary: Confirmar e nascer o cérebro
+      description: >-
+        Cria o brain (posse atômica do slug), grava contexto (M11) + schema-pack (M13) + fontes (S1).
+        Devolve o cartão-resumo legível e a identidade do brain criado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state:
+                  $ref: "#/components/schemas/WizardState"
+      responses:
+        "200":
+          description: Cérebro criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card:
+                    type: string
+                  brain:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Nome de cérebro já existe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/onboarding/start:
+    post:
+      tags: [Onboarding]
+      summary: Iniciar onboarding de contexto
+      description: 1ª pergunta do roteiro bounded + estado vazio. Exige sessão + membership (`?brain=`).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Primeiro turno do onboarding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingTurn"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/onboarding/reply:
+    post:
+      tags: [Onboarding]
+      summary: Responder um passo do onboarding
+      description: Normaliza a resposta (IA bounded), preenche o draft e avança o passo (determinístico).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingReplyBody"
+      responses:
+        "200":
+          description: Próximo turno do onboarding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingTurn"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/onboarding/confirm:
+    post:
+      tags: [Onboarding]
+      summary: Confirmar o contexto do onboarding
+      description: Persiste o BrainContext confirmado (a versão sobe) e devolve o cartão final + version.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [context]
+              properties:
+                context:
+                  $ref: "#/components/schemas/BrainContextInput"
+      responses:
+        "200":
+          description: Contexto persistido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card:
+                    type: string
+                  version:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/ingest:
+    post:
+      tags: [Ingestão]
+      summary: Enfileirar import (assíncrono)
+      description: >-
+        Persiste o blob (file) ou o texto (paste) e ENFILEIRA um job; devolve rápido `{ jobId, status }`
+        (sempre `queued`). O worker processa depois. 202 Accepted. Body limite ~25 MiB (base64 infla ~33%).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestInput"
+      responses:
+        "202":
+          description: Job enfileirado (ticket)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnqueueResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Fonte (sourceId) não existe mais
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Fonte pausada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "415":
+          description: Formato de arquivo não suportado (use PDF, Markdown, TXT, CSV ou cole o texto)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/ingest/jobs:
+    get:
+      tags: [Ingestão]
+      summary: Listar jobs da fila
+      description: Jobs de ingestão do brain, mais recentes primeiro.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Lista de jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IngestJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/ingest/jobs/{jobId}:
+    get:
+      tags: [Ingestão]
+      summary: Status de um job
+      description: Status de 1 job do brain. 404 se não existe ou não é do brain (não vaza cross-tenant).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: jobId
+          in: path
+          required: true
+          description: Id do job de ingestão.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/context:
+    get:
+      tags: [Contexto]
+      summary: Ler o contexto do brain
+      description: Devolve o contexto editável + version + cartão legível. Nunca expõe prompt_template.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Contexto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContextView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Contexto]
+      summary: Salvar o contexto do brain
+      description: Grava o contexto editado (a version sobe e invalida a re-extração). NÃO re-extrai.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [context]
+              properties:
+                context:
+                  $ref: "#/components/schemas/BrainContextInput"
+      responses:
+        "200":
+          description: Contexto salvo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContextView"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/context/preview:
+    post:
+      tags: [Contexto]
+      summary: Prever o que seria extraído
+      description: >-
+        "Com este contexto, de um doc-exemplo eu extrairia ISTO" — em linguagem natural. Roda a extração
+        context-aware sobre um exemplo EFÊMERO (não persiste nada) e descreve os fatos em prosa.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sampleText]
+              properties:
+                sampleText:
+                  type: string
+                  description: Trecho de exemplo.
+                type:
+                  type: string
+                  description: Tipo de página do exemplo (default "reunioes").
+      responses:
+        "200":
+          description: Resumo em prosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/context/reextract:
+    get:
+      tags: [Contexto]
+      summary: Estimar a re-extração
+      description: Quantos docs ficaram desatualizados (contexto mudou) + custo estimado. Não re-extrai.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Estimativa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReextractEstimate"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Contexto]
+      summary: Rodar a re-extração (sob comando)
+      description: >-
+        Re-extrai só os docs stale e organiza os fatos. Custa LLM — chamado no clique de confirmação,
+        nunca no save. Página bloqueada (fonte pausada/removida) não aborta o lote.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Resultado da re-extração
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReextractResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          description: Re-extração ok mas a organização dos fatos falhou (extrações estão salvas)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sources:
+    get:
+      tags: [Fontes]
+      summary: Listar fontes
+      description: Fontes do brain (com pages_count/facts_count computados na leitura).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Lista de fontes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SourceRow"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Fontes]
+      summary: Criar fonte
+      description: >-
+        Cria uma fonte com receita (channel `upload`|`paste` no v1). A dim da receita que o pack não cobre
+        entra no extractable[type] (merge idempotente). Sensibilidade default `restrito` (falha-fechado).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSourceBody"
+      responses:
+        "200":
+          description: Fonte criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceRow"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/sources/connector:
+    post:
+      tags: [Fontes]
+      summary: Criar fonte-conector
+      description: >-
+        Cria (idempotente) a fonte de um conector a partir do seed do handler. Fail-closed: sem
+        NANGO_SECRET_KEY → 503 (não cria fonte órfã). 400 sem handler registrado pro providerConfigKey.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [providerConfigKey]
+              properties:
+                providerConfigKey:
+                  type: string
+                  description: Integration-id escolhido no Nango (ex. "conta-azul").
+      responses:
+        "200":
+          description: Fonte-conector criada (ou a existente, idempotente)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorCreateResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/sources/{id}:
+    post:
+      tags: [Fontes]
+      summary: Atualizar fonte (PATCH semântico)
+      description: Atualiza só os campos presentes (name/type/recipe/defaultSensitivity). Merge receita→pack.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - $ref: "#/components/parameters/SourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSourceBody"
+      responses:
+        "200":
+          description: Fonte atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceRow"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/sources/{id}/status:
+    post:
+      tags: [Fontes]
+      summary: Pausar/retomar fonte
+      description: Muda o status da fonte (`ativa` | `pausada`). 400 se status inválido, 404 se não existe.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - $ref: "#/components/parameters/SourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [ativa, pausada]
+      responses:
+        "200":
+          description: Status atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceRow"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/sources/{id}/connect:
+    post:
+      tags: [Fontes]
+      summary: Abrir sessão de conexão (Nango)
+      description: >-
+        Cria a connect session do Nango pra fonte (o front abre o Nango Connect com o token). Re-auth
+        permitido. 400 sem conector associado; 503 sem NANGO_SECRET_KEY; 502 se o Nango recusar.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - $ref: "#/components/parameters/SourceId"
+      responses:
+        "200":
+          description: Sessão de conexão
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectSessionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          description: O Nango recusou abrir a sessão / devolveu sessão sem connect_link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/hypotheses:
+    get:
+      tags: [Hipóteses]
+      summary: Listar itens da fila de revisão
+      description: >-
+        Itens da fila + nome da fonte + recomendação do juiz por item (read-only, ausente se o juiz não
+        passou). Filtra por `status` e limita por `k`.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: status
+          in: query
+          required: false
+          description: Filtro de status (pendente | aprovada | descartada).
+          schema:
+            type: string
+            enum: [pendente, aprovada, descartada]
+        - name: k
+          in: query
+          required: false
+          description: Limite de itens.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Itens da fila
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HypothesisView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/hypotheses/count:
+    get:
+      tags: [Hipóteses]
+      summary: Contagem por status
+      description: Contadores da fila { pendente, aprovada, descartada }.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Contagem
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pendente:
+                    type: integer
+                  aprovada:
+                    type: integer
+                  descartada:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/hypotheses/groups:
+    get:
+      tags: [Hipóteses]
+      summary: Fila agrupada por decisão
+      description: >-
+        Pendentes agrupados por (reason, dimension, source_id) — o grupão primeiro. Inclui rollup das
+        recomendações do juiz (ausente se nenhum item foi adjudicado).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Grupos de decisão
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HypothesisGroupView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/hypotheses/groups/approve:
+    post:
+      tags: [Hipóteses]
+      summary: Aprovar grupo (gateado por ancoragem)
+      description: Aprova todos os pendentes do grupo, GATEADOS por ancoragem determinística (zero LLM).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupKeyBody"
+      responses:
+        "200":
+          description: Resultado do lote
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      ok:
+                        type: boolean
+                  - $ref: "#/components/schemas/LoteAprovacao"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/hypotheses/groups/discard:
+    post:
+      tags: [Hipóteses]
+      summary: Descartar grupo (registrado)
+      description: Descarta todos os pendentes do grupo; decided_by gravado item a item (nunca silencioso).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupKeyBody"
+      responses:
+        "200":
+          description: Resultado do descarte
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  descartados:
+                    type: integer
+                  ja_decididos:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/hypotheses/groups/add-dimension:
+    post:
+      tags: [Hipóteses]
+      summary: Adicionar dimensão à receita e re-gatear
+      description: >-
+        A receita da fonte ganha a dimensão (merge receita→pack) e os pendentes fora_da_receita do grupo
+        são re-gateados sem LLM. Idempotente: dim já na receita ⇒ receita_atualizada=false.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddDimensionBody"
+      responses:
+        "200":
+          description: Resultado (receita atualizada + lote)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      ok:
+                        type: boolean
+                      receita_atualizada:
+                        type: boolean
+                  - $ref: "#/components/schemas/LoteAprovacao"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/hypotheses/{id}/approve:
+    post:
+      tags: [Hipóteses]
+      summary: Aprovar item (unitário)
+      description: Aprova um item da fila. 409 se o gate de ancoragem reter o claim.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - $ref: "#/components/parameters/HypothesisId"
+      responses:
+        "200":
+          description: Item aprovado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  status:
+                    type: string
+                    enum: [aprovada]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/hypotheses/{id}/discard:
+    post:
+      tags: [Hipóteses]
+      summary: Descartar item (unitário)
+      description: Descarta um item da fila (muda status, nunca deleta). 409 em conflito de decisão.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - $ref: "#/components/parameters/HypothesisId"
+      responses:
+        "200":
+          description: Item descartado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  status:
+                    type: string
+                    enum: [descartada]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/hypotheses/judge:
+    post:
+      tags: [Juiz]
+      summary: Rodar uma fase do juiz
+      description: >-
+        Roda uma fase do juiz triador sobre os pendentes sem recomendação. RECOMENDA, nunca decide
+        (invariante #5). Body `{ force? }`. Fail-closed: sem ANTHROPIC_API_KEY → 503.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+      responses:
+        "200":
+          description: Resultado do run do juiz
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JudgeRunResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/hypotheses/judge/calibration:
+    get:
+      tags: [Juiz]
+      summary: Calibração do juiz
+      description: Taxa de acerto do juiz contra as decisões humanas, total e por segmento (com nome da fonte).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Calibração
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JudgeCalibration"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/hypotheses/judge/estimate:
+    get:
+      tags: [Juiz]
+      summary: Estimar custo do juiz
+      description: Estimativa read-only (zero LLM) de custo pra julgar a fila pendente sem recomendação.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Estimativa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JudgeEstimate"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/billing/checkout:
+    post:
+      tags: [Billing]
+      summary: Cria Checkout de assinatura (tier)
+      description: >-
+        Cria uma Stripe Checkout Session (mode subscription) para o tier informado. Requer sessão.
+        O price_id é resolvido server-side por lookup_key — o cliente só informa o nome do tier
+        (starter/pro/business) e o cohort (standard/founder). Retorna a URL do Checkout. 503 se billing off.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tier:
+                  type: string
+                  enum: [starter, pro, business]
+                cohort:
+                  type: string
+                  enum: [standard, founder]
+      responses:
+        "200":
+          description: URL do Checkout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/billing/portal:
+    post:
+      tags: [Billing]
+      summary: Abre o Customer Portal
+      description: >-
+        Cria uma sessão do Stripe Customer Portal (trocar cartão, cancelar, ver faturas). Requer
+        sessão. Retorna a URL do portal. 503 se billing off.
+      responses:
+        "200":
+          description: URL do portal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string }
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/billing/topup:
+    post:
+      tags: [Billing]
+      summary: Compra avulsa de créditos (top-up)
+      description: >-
+        Cria um Checkout (mode payment) para comprar um pacote de créditos. O webhook
+        checkout.session.completed credita o saldo (bucket topup). Requer sessão. 503 se billing off.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                package:
+                  type: string
+                  enum: [cr2500, cr10000, cr50000]
+      responses:
+        "200":
+          description: URL do Checkout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/billing/founder:
+    get:
+      tags: [Billing]
+      summary: Vagas da Turma Fundadora (público)
+      description: Quantas vagas do preço fundador ainda há (público — a landing mostra "X restantes").
+      responses:
+        "200":
+          description: Vagas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer, nullable: true }
+                  used: { type: integer, nullable: true }
+                  remaining: { type: integer, nullable: true }
+
+  /api/billing/credits:
+    get:
+      tags: [Billing]
+      summary: Saldo de créditos da conta
+      description: >-
+        Saldo de créditos da conta (M-PAY-C). `balance` null = conta sem carteira (não-billada).
+        Requer sessão.
+      responses:
+        "200":
+          description: Saldo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance: { type: integer, nullable: true }
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/billing/subscription:
+    get:
+      tags: [Billing]
+      summary: Estado da assinatura da conta
+      description: >-
+        Projeção local do estado da assinatura (tier, cohort, status, período, grace_until),
+        alimentada por webhooks do Stripe. grace_until = janela de graça de inadimplência (past_due);
+        após vencer, as ações pagas bloqueiam (402 reason=entitlement). Requer sessão.
+      responses:
+        "200":
+          description: Estado da assinatura
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/billing/ledger:
+    get:
+      tags: [Billing]
+      summary: Razão de créditos (saldo, consumo, histórico)
+      description: >-
+        Visão do ledger para a tela Plano (M-PAY front): saldo + denominador do anel (bolo do tier
+        ou trial), consumo do ciclo por operação, série diária e histórico recente. Os números são
+        computados no servidor (fonte canônica); a tela só renderiza. Requer sessão.
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer }
+          description: Nº de lançamentos recentes no histórico.
+        - in: query
+          name: days
+          schema: { type: integer }
+          description: Janela (dias) da série diária de consumo.
+      responses:
+        "200":
+          description: Visão do ledger
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/billing/cap:
+    get:
+      tags: [Billing]
+      summary: Teto de gasto da conta
+      description: >-
+        Lê o teto de gasto mensal da conta (limite em créditos; a UI mostra R$ = créditos × R$0,02),
+        se está ativo, o kill-switch e o gasto do ciclo corrente. Requer sessão.
+      responses:
+        "200":
+          description: Teto de gasto
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+                  killSwitch: { type: boolean }
+                  limitCredits: { type: integer }
+                  cycleSpentCredits: { type: integer }
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    put:
+      tags: [Billing]
+      summary: Define o teto de gasto da conta
+      description: >-
+        Define/atualiza o teto de gasto mensal (limite em créditos), se está ativo e se o kill-switch
+        pausa jogar/perguntar ao bater o teto no ciclo. Requer sessão.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                killSwitch: { type: boolean }
+                limitCredits: { type: integer }
+      responses:
+        "200":
+          description: Teto atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+                  killSwitch: { type: boolean }
+                  limitCredits: { type: integer }
+                  cycleSpentCredits: { type: integer }
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/billing/prefs:
+    get:
+      tags: [Billing]
+      summary: Preferências de billing da conta (auto-recarga + dunning)
+      description: >-
+        Lê as preferências de billing da conta (M-PAY-H Onda 4): auto-recarga opt-in (ligada,
+        limiar em créditos, pacote de top-up), se há método de pagamento salvo (`hasPaymentMethod`,
+        nunca o id do método) e os sinais de dunning (`needsAction` = 3DS/SCA pendente,
+        `disputeOpen` = chargeback aberto). Requer sessão.
+      responses:
+        "200":
+          description: Preferências de billing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  autorechargeEnabled: { type: boolean }
+                  autorechargeThresholdCredits: { type: integer }
+                  autorechargePackage: { type: string, nullable: true }
+                  hasPaymentMethod: { type: boolean }
+                  needsAction: { type: boolean }
+                  disputeOpen: { type: boolean }
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    put:
+      tags: [Billing]
+      summary: Define a auto-recarga da conta (opt-in)
+      description: >-
+        Liga/desliga a auto-recarga off_session (M-PAY-H Onda 4): quando o saldo cai abaixo de
+        `thresholdCredits`, o Galeed cobra o `package` de top-up no método salvo. Ligar exige um
+        pacote válido E um método de pagamento já salvo (capturado numa compra de créditos anterior);
+        senão 400. O cliente nunca informa price/PM cru. Requer sessão.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                thresholdCredits: { type: integer }
+                package: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Preferências atualizadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  autorechargeEnabled: { type: boolean }
+                  autorechargeThresholdCredits: { type: integer }
+                  autorechargePackage: { type: string, nullable: true }
+                  hasPaymentMethod: { type: boolean }
+                  needsAction: { type: boolean }
+                  disputeOpen: { type: boolean }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/webhooks/stripe:
+    post:
+      tags: [Billing]
+      summary: Webhook do Stripe (m2m)
+      description: >-
+        Webhook machine-to-machine — SEM sessão; a auth é a assinatura do Stripe (header
+        `stripe-signature`, HMAC sobre o corpo RAW, janela de 5 min). Fail-soft: sem
+        STRIPE_SECRET_KEY → 503; assinatura inválida → 400. Idempotente por `event.id`
+        (reentrega do Stripe vira no-op). Nunca lança — acka rápido. M-PAY-A: só registra/verifica
+        (roteamento por tipo de evento entra no M-PAY-B/C).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Recebido (received / duplicate)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          description: Billing desabilitado (sem STRIPE_SECRET_KEY)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/connectors/nango/webhook:
+    post:
+      tags: [Conectores]
+      summary: Webhook do Nango (m2m)
+      description: >-
+        Webhook machine-to-machine — SEM sessão; a auth é a assinatura HMAC do header
+        `x-nango-signature`. Fail-closed: sem NANGO_WEBHOOK_SECRET → 503; assinatura inválida → 401.
+        Trata eventos `auth` (criação de conexão) e `sync` (ingestão do delta). Nunca lança — sempre acka.
+        Body limite 10 MB → 413.
+      security:
+        - nangoSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NangoWebhookBody"
+      responses:
+        "200":
+          description: Acked (ok / ignorado)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Assinatura do webhook inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Fonte pausada — material não ingerido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/ServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/connectors/status:
+    get:
+      tags: [Conectores]
+      summary: Status das conexões do brain
+      description: Estado derivado das conexões do brain (pro front mesclar client-side).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Conexões
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SourceConnectionView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/rbac/invite:
+    post:
+      tags: [RBAC]
+      summary: Convidar principal (criar + grant)
+      description: Cria um principal (human|agent) + grant inicial. Devolve o Principal (shape do front).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteBody"
+      responses:
+        "200":
+          description: Principal criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Principal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/rbac/grant:
+    post:
+      tags: [RBAC]
+      summary: Substituir o grant de um principal
+      description: Substitui o grant (areas + sensitivityMax + denyTypes). 404 se o principal não existe.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantBody"
+      responses:
+        "200":
+          description: Principal atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Principal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/rbac/token:
+    post:
+      tags: [RBAC]
+      summary: Emitir token de principal
+      description: >-
+        Emite um token CRU (formato `gal_<hex>`) e devolve UMA VEZ (só o SHA256 é persistido). 404 se o
+        principal não existe.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [principalId]
+              properties:
+                principalId:
+                  type: string
+                label:
+                  type: string
+      responses:
+        "200":
+          description: Token emitido (cru, 1×)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Token cru gal_… — aparece UMA VEZ.
+                  principal:
+                    $ref: "#/components/schemas/Principal"
+                  warning:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [RBAC]
+      summary: Revogar token
+      description: >-
+        Revoga um token. Tolera o token cru (gal_…) OU o hash já pronto. Parâmetros via query string
+        (`principal`, `hash`).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: principal
+          in: query
+          required: true
+          description: Id do principal dono do token.
+          schema:
+            type: string
+        - name: hash
+          in: query
+          required: true
+          description: Token cru (gal_…) ou o SHA256 do token.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Token revogado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  principalId:
+                    type: string
+                  revoked:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/rbac/principals:
+    get:
+      tags: [RBAC]
+      summary: Listar principais (com grant)
+      description: >-
+        Cada principal do brain + seu grant (shape do front). NOTA: a listagem de TOKENS por principal é
+        stub — este endpoint devolve principal+grant, não os hashes individuais dos tokens.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Principais
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Principal"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/rbac/areas:
+    get:
+      tags: [RBAC]
+      summary: Listar áreas do brain
+      description: >-
+        Áreas derivadas das tags `area:<slug>` distintas das páginas do brain, com contagem real. Campos
+        cosméticos (origin/dot) são neutros (sem fonte real no M7).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Áreas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Area"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/rbac/preview:
+    get:
+      tags: [RBAC]
+      summary: Preview de acesso de um principal
+      description: O que um principal VÊ — scope + páginas visíveis + bloqueadas + slugs de amostra.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: principal
+          in: query
+          required: true
+          description: Id do principal a inspecionar.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Preview de acesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessPreview"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/rbac/log:
+    get:
+      tags: [RBAC]
+      summary: Trilha de auditoria de acesso
+      description: Últimas entradas do access-log do brain (quem consultou o quê, áreas tocadas, n_returned).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: limit
+          in: query
+          required: false
+          description: Quantas entradas (default 50).
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+      responses:
+        "200":
+          description: Entradas de auditoria
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccessLogEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/rbac/principal:
+    delete:
+      tags: [RBAC]
+      summary: Remover principal de vez
+      description: >-
+        Remove o principal e todos os seus grants e tokens do brain; a pessoa perde a membership.
+        O dono (owner) não pode ser removido. Parâmetro `id` via query string.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: id
+          in: query
+          required: true
+          description: Id do principal a remover.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Principal removido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/rbac/token/rotate:
+    post:
+      tags: [RBAC]
+      summary: Rotacionar token de principal
+      description: >-
+        Revoga o token ativo do principal e emite um novo token CRU (formato `gal_<hex>`), devolvido
+        UMA VEZ (apenas o SHA256 é persistido). Body `{ principalId }`. 404 se o principal não existe.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [principalId]
+              properties:
+                principalId:
+                  type: string
+      responses:
+        "200":
+          description: Token rotacionado (novo token cru, 1×)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Novo token cru gal_… — aparece UMA VEZ.
+                  principal:
+                    $ref: "#/components/schemas/Principal"
+                  warning:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/stats:
+    get:
+      tags: [Leitura]
+      summary: Estatísticas do brain
+      description: >-
+        Contagens do brain. No BFF (dono): pages/facts/edges/vectors. Na API read-only com token de
+        principal: stats sob escopo (pages/facts/edges + scoped:true; vectors omitido).
+      security:
+        - cookieAuth: []
+        - principalToken: []
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/BrainRequiredTenant"
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Stats"
+                  - $ref: "#/components/schemas/ScopedStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/graph:
+    get:
+      tags: [Leitura]
+      summary: Grafo do brain
+      description: >-
+        Grafo de entidades (nós + arestas). No BFF é o entityGraph (`?asOf=` ecoa no payload; o recorte
+        temporal é feito no cliente). Na API read-only é graphAll, escopado quando há token de principal.
+      security:
+        - cookieAuth: []
+        - principalToken: []
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/BrainRequiredTenant"
+        - name: asOf
+          in: query
+          required: false
+          description: Data de recorte (ISO). No BFF ecoa em `asOf`; o filtro temporal é client-side.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Grafo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphData"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/entity:
+    get:
+      tags: [Leitura]
+      summary: Fatos de uma entidade
+      description: Fatos ligados a UMA entidade — alimenta o inspetor do Mapa ao clicar num nó. Só no BFF.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: entity
+          in: query
+          required: true
+          description: Nome/slug da entidade.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Fatos da entidade
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FactHit"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/retrieve:
+    get:
+      tags: [Leitura]
+      summary: Recuperar contexto (com selo)
+      description: Contexto recuperado (fusão RRF híbrida, determinístico) com selo epistêmico por hit.
+      security:
+        - cookieAuth: []
+        - principalToken: []
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/BrainRequiredTenant"
+        - name: q
+          in: query
+          required: true
+          description: A pergunta/consulta.
+          schema:
+            type: string
+        - name: k
+          in: query
+          required: false
+          description: Top-k de hits (default 6).
+          schema:
+            type: integer
+            minimum: 1
+            default: 6
+        - $ref: "#/components/parameters/PrincipalQuery"
+      responses:
+        "200":
+          description: Hits com selo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HitWithSelo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/search:
+    get:
+      tags: [Leitura]
+      summary: Busca (FTS)
+      description: Busca full-text por termo, opcionalmente filtrada por `type`. Devolve hits com selo.
+      security:
+        - cookieAuth: []
+        - principalToken: []
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/BrainRequiredTenant"
+        - name: q
+          in: query
+          required: true
+          description: Termo de busca.
+          schema:
+            type: string
+        - name: k
+          in: query
+          required: false
+          description: Top-k (default 8).
+          schema:
+            type: integer
+            minimum: 1
+            default: 8
+        - name: type
+          in: query
+          required: false
+          description: Filtra por tipo de página.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/PrincipalQuery"
+      responses:
+        "200":
+          description: Hits com selo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HitWithSelo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/facts:
+    get:
+      tags: [Leitura]
+      summary: Fatos por dimensão (bitemporal)
+      description: >-
+        Fatos tipados (FactItem) por dimensão, com recorte bitemporal opcional (`asOf`, `current`).
+        Na API read-only com token de principal os fatos são filtrados pelo escopo da página-fonte.
+      security:
+        - cookieAuth: []
+        - principalToken: []
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/BrainRequiredTenant"
+        - name: dim
+          in: query
+          required: false
+          description: Dimensão (default "decisions").
+          schema:
+            type: string
+            default: decisions
+        - name: type
+          in: query
+          required: false
+          description: Filtra por tipo de página.
+          schema:
+            type: string
+        - name: asOf
+          in: query
+          required: false
+          description: Vigentes em DATA (valid_from ≤ DATA < valid_to).
+          schema:
+            type: string
+        - name: current
+          in: query
+          required: false
+          description: "1 = só fatos vigentes hoje (valid_to vazio)."
+          schema:
+            type: string
+            enum: ["0", "1"]
+        - name: k
+          in: query
+          required: false
+          description: Limite de fatos.
+          schema:
+            type: integer
+            minimum: 1
+        - $ref: "#/components/parameters/PrincipalQuery"
+      responses:
+        "200":
+          description: Fatos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FactItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/timeline:
+    get:
+      tags: [Leitura]
+      summary: Linha do tempo de uma entidade
+      description: >-
+        Linha do tempo bitemporal de uma entidade (evolução por degrau), opcionalmente por predicado.
+        Na API read-only com token de principal é filtrada pelo escopo da página-fonte.
+      security:
+        - cookieAuth: []
+        - principalToken: []
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/BrainRequiredTenant"
+        - name: entity
+          in: query
+          required: false
+          description: Entidade.
+          schema:
+            type: string
+        - name: pred
+          in: query
+          required: false
+          description: Predicado a filtrar.
+          schema:
+            type: string
+        - name: k
+          in: query
+          required: false
+          description: Limite.
+          schema:
+            type: integer
+            minimum: 1
+        - $ref: "#/components/parameters/PrincipalQuery"
+      responses:
+        "200":
+          description: Fatos da timeline
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FactHit"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/ask:
+    get:
+      tags: [Leitura]
+      summary: Perguntar (síntese LLM ancorada)
+      description: >-
+        Síntese LLM enriquecida — devolve resposta + citations (com selo) + facts (série bitemporal) +
+        gaps opcionais. Único endpoint caro do BFF. Só no BFF (não está na API read-only).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: q
+          in: query
+          required: true
+          description: A pergunta.
+          schema:
+            type: string
+        - name: k
+          in: query
+          required: false
+          description: Top-k de evidência (default 8).
+          schema:
+            type: integer
+            minimum: 1
+            default: 8
+      responses:
+        "200":
+          description: Resposta ancorada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AskResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/ask/stream:
+    get:
+      tags: [Leitura]
+      summary: Perguntar (streaming SSE)
+      description: >-
+        Síntese streamada token-a-token via Server-Sent Events (`text/event-stream`). A auth/validação
+        (401/403/400) vai como JSON ANTES de abrir o stream. Eventos: `data: { t }` (token),
+        `event: done` (carga ancorada { citations, facts }), `event: error` ({ error }). Só no BFF.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: q
+          in: query
+          required: true
+          description: A pergunta.
+          schema:
+            type: string
+        - name: k
+          in: query
+          required: false
+          description: Top-k (default 8).
+          schema:
+            type: integer
+            minimum: 1
+            default: 8
+      responses:
+        "200":
+          description: Stream SSE
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: >-
+                  Fluxo SSE. data com {"t":"<token>"} por token; event done com { citations, facts };
+                  event error com { error }.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/source:
+    get:
+      tags: [Leitura]
+      summary: Baixar o original verbatim (blob)
+      description: >-
+        Download binário do original verbatim de uma página, gateado pelo RBAC (M7). Sem `principal` =
+        dono logado (admin do próprio brain). Com `principal` = agente escopado (só baixa o que vê → 403
+        fora do escopo). Content-Type é o mime do blob; Content-Disposition inline. Só no BFF.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: slug
+          in: query
+          required: true
+          description: Slug da página-fonte.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/PrincipalQuery"
+      responses:
+        "200":
+          description: Binário do original
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/percepcoes:
+    get:
+      tags: [Leitura]
+      summary: Percepções do cérebro (saída do sono)
+      description: Percepções derivadas do sono (M24). Filtra por estado, paginação simples. Só no BFF.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+        - name: estado
+          in: query
+          required: false
+          description: "viva (default) | stale | arquivada | todas."
+          schema:
+            type: string
+            enum: [viva, stale, arquivada, todas]
+            default: viva
+        - name: k
+          in: query
+          required: false
+          description: Limite (clampado 1..200, default 50).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          description: Deslocamento (≥0).
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Página de percepções
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PercepcoesPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/saude:
+    get:
+      tags: [Leitura]
+      summary: Saúde interna do cérebro (sono, armazenamento, fila)
+      description: >
+        Estado REAL por dentro: último sono (rastro auditável de galeed_sono_state.last_trace —
+        status, fases, falhas, candidatas à poda), contadores de armazenamento (páginas
+        ativas/frias/arquivadas, vetores, fatos) e a fila de ingestão por status (inclui
+        batch_*/error/dead). Leitura pura, zero LLM. Só no BFF.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: "Saúde interna: { sono, storage, jobs }"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sono: { type: object, nullable: true }
+                  storage: { type: object, nullable: true }
+                  jobs: { type: object, additionalProperties: { type: integer } }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/lixeira:
+    get:
+      tags: [Leitura]
+      summary: Lixeira de páginas (arquivadas, reversível)
+      description: >
+        Páginas que o cérebro decidiu esquecer (archived=true). Nada é apagado — cada item pode
+        ser restaurado via POST /api/lixeira/restaurar. Só no BFF.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: "Página da lixeira: { items[], total }"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        slug: { type: string }
+                        type: { type: string }
+                        title: { type: string }
+                        date: { type: string }
+                        tier: { type: string }
+                  total: { type: integer }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/lixeira/restaurar:
+    post:
+      tags: [Leitura]
+      summary: Restaura uma página da lixeira
+      description: >
+        Desarquiva/reaquece a página (cobre cold pós-shed E archived+hot pós-prune) e re-embeda
+        o que faltar. restored=false quando o slug não existe ou a página já está ativa.
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug]
+              properties:
+                slug: { type: string }
+      responses:
+        "200":
+          description: "{ slug, restored, vectorsRebuilt }"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  slug: { type: string }
+                  restored: { type: boolean }
+                  vectorsRebuilt: { type: integer }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/cost:
+    get:
+      tags: [Leitura]
+      summary: Rollup de custo de IA
+      description: Custo real de IA do brain, com quebra por operação e por modelo. SÓ OWNER (403 senão).
+      parameters:
+        - $ref: "#/components/parameters/BrainRequired"
+      responses:
+        "200":
+          description: Rollup de custo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostRollup"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Custo é visível só pro dono do brain
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: galeed_sess
+      description: Cookie de sessão httpOnly (30 dias) do BFF. Setado por /auth/signup e /auth/login.
+    principalToken:
+      type: apiKey
+      in: header
+      name: x-galeed-principal-token
+      description: >-
+        Token de principal (formato gal_…) pra consumo via API read-only :8788. Alternativa por query:
+        `?ptoken=`. Resolve o escopo (read) e escopa as leituras. Token inválido/revogado → 401.
+    adminToken:
+      type: apiKey
+      in: header
+      name: x-galeed-token
+      description: >-
+        Token admin da API read-only (== API_TOKEN do ambiente). Alternativa por query: `?token=`. Sem
+        API_TOKEN configurado e sem token de principal → 503 (fail-closed).
+    nangoSignature:
+      type: apiKey
+      in: header
+      name: x-nango-signature
+      description: Assinatura HMAC do webhook do Nango (m2m). Verificada contra NANGO_WEBHOOK_SECRET.
+    ingestToken:
+      type: apiKey
+      in: header
+      name: x-galeed-token
+      description: >-
+        Token do webhook de ingestão (== INGEST_TOKEN do ambiente) no ingest-server :8787.
+        Sem INGEST_TOKEN configurado → 503 (fail-closed); token ausente/errado → 401. Mesmo nome de
+        header do adminToken, mas serviço e segredo distintos (escrita vs. leitura).
+
+  parameters:
+    BrainRequired:
+      name: brain
+      in: query
+      required: true
+      description: >-
+        Tenant (brain). Obrigatório nas rotas de tenant do BFF — ou vem em `?brain=` ou cai no
+        currentBrain da sessão; valida membership (403 se não for membro).
+      schema:
+        type: string
+    BrainRequiredTenant:
+      name: brain
+      in: query
+      required: true
+      description: >-
+        Tenant (brain). No BFF resolve por `?brain=`/currentBrain (membership obrigatória). Na API
+        read-only :8788, ausência cai no default GALEED_BRAIN.
+      schema:
+        type: string
+    BrainOptional:
+      name: brain
+      in: query
+      required: false
+      description: Brain preferido pro currentBrain da sessão.
+      schema:
+        type: string
+    SourceId:
+      name: id
+      in: path
+      required: true
+      description: Id (uuid) da fonte.
+      schema:
+        type: string
+    HypothesisId:
+      name: id
+      in: path
+      required: true
+      description: Id (uuid) do item da fila de revisão.
+      schema:
+        type: string
+    PrincipalQuery:
+      name: principal
+      in: query
+      required: false
+      description: Id de um principal escopado (opcional) — gateia a leitura/download pelo escopo dele.
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Requisição inválida
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Sem sessão/token válidos
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Sem membership do brain ou bloqueado pelo RBAC
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    MethodNotAllowed:
+      description: Método não permitido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflito (ex. gate de ancoragem reteve o claim, decisão concorrente)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PayloadTooLarge:
+      description: Body acima do limite (25 MiB no BFF / 10 MB no webhook)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServerError:
+      description: Erro inesperado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServiceUnavailable:
+      description: Config ausente (fail-closed) — sem chave/secret/API_TOKEN
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      description: Erro padrão — sempre um objeto com a chave error (mensagem legível).
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    Ok:
+      type: object
+      properties:
+        ok:
+          type: boolean
+
+    Health:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        brain:
+          type: string
+          description: Presente só no /health do ingest-server.
+
+    Account:
+      type: object
+      description: Conta (galeed_accounts). Cross-brain. Sem senha no shape de saída.
+      required: [id, name, email]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+
+    Brain:
+      type: object
+      description: Brain (tenant) + papel da conta logada nele.
+      required: [id, name, role]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [owner, member]
+
+    Session:
+      type: object
+      description: Sessão do front — conta + brains + brain atual.
+      required: [account, brains, currentBrain]
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+        brains:
+          type: array
+          items:
+            $ref: "#/components/schemas/Brain"
+        currentBrain:
+          type: string
+
+    SignupBody:
+      type: object
+      required: [email, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        brainName:
+          type: string
+          description: Se presente, cria a membership owner desse brain (guard anti-takeover).
+
+    LoginBody:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    Selo:
+      type: object
+      description: >-
+        Selo epistêmico de um hit. O core emite `natureza`; o BFF preenche `tipo` (espelho de `natureza`)
+        pro componente Seal do front.
+      properties:
+        status:
+          type: string
+          enum: [registrado, fato, hipotese, arquivado]
+        natureza:
+          type: string
+        tipo:
+          type: string
+          description: Espelho de `natureza` adicionado pelo BFF (normHits). Pode estar ausente no core cru.
+        fonte:
+          type: string
+        valid_from:
+          type: string
+        via:
+          type: string
+          enum: [vec, fts, grafo]
+        cite:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    HitWithSelo:
+      type: object
+      description: Hit de recuperação (retrieve/search) com selo epistêmico.
+      properties:
+        slug:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        date:
+          type: string
+        excerpt:
+          type: string
+        citation:
+          type: string
+        via:
+          type: string
+          enum: [vec, fts, grafo]
+        score:
+          type: number
+        selo:
+          $ref: "#/components/schemas/Selo"
+        stage:
+          type: object
+          description: Só quando explain=true.
+          properties:
+            base:
+              type: number
+            recency:
+              type: number
+            salience:
+              type: number
+            final:
+              type: number
+
+    FactItem:
+      type: object
+      description: Fato tipado exposto pelo BFF (/api/facts e o `facts` do /api/ask). Não achata os tipados.
+      properties:
+        source_slug:
+          type: string
+        text:
+          type: string
+        entity:
+          type: string
+        predicate:
+          type: string
+        value:
+          type: string
+        value_num:
+          type: [number, "null"]
+        unit:
+          type: string
+        period:
+          type: string
+        tier:
+          type: string
+        valid_from:
+          type: string
+        valid_to:
+          type: string
+        status:
+          type: string
+        confidence:
+          type: number
+
+    FactHit:
+      type: object
+      description: Fato cru do engine (entity/timeline). Espelha FactHit.
+      properties:
+        source_slug:
+          type: string
+        type:
+          type: string
+        dimension:
+          type: string
+        text:
+          type: string
+        quote:
+          type: string
+        entity:
+          type: string
+        predicate:
+          type: string
+        value:
+          type: string
+        value_num:
+          type: [number, "null"]
+        unit:
+          type: string
+        period:
+          type: string
+        tier:
+          type: string
+        valid_from:
+          type: string
+        valid_to:
+          type: string
+        confidence:
+          type: number
+        status:
+          type: string
+        source_id:
+          type: string
+
+    AskResult:
+      type: object
+      description: Resposta do /api/ask — síntese + citations + facts + gaps.
+      properties:
+        answer:
+          type: string
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/HitWithSelo"
+        facts:
+          type: array
+          items:
+            $ref: "#/components/schemas/FactItem"
+        gaps:
+          type: array
+          items:
+            type: string
+
+    Stats:
+      type: object
+      description: Stats completas (BFF / API admin).
+      properties:
+        pages:
+          type: integer
+        facts:
+          type: integer
+        edges:
+          type: integer
+        vectors:
+          type: integer
+
+    ScopedStats:
+      type: object
+      description: Stats sob escopo (API read-only com token de principal). vectors omitido.
+      properties:
+        pages:
+          type: integer
+        facts:
+          type: integer
+        edges:
+          type: integer
+        scoped:
+          type: boolean
+          enum: [true]
+
+    GraphNode:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        date:
+          type: string
+        exists:
+          type: boolean
+        factCount:
+          type: integer
+        salience:
+          type: number
+        tier:
+          type: string
+        role:
+          type: string
+
+    GraphEdge:
+      type: object
+      properties:
+        src:
+          type: string
+        dst:
+          type: string
+        kind:
+          type: string
+        weight:
+          type: number
+
+    GraphData:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphNode"
+        edges:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphEdge"
+        asOf:
+          type: string
+          description: Ecoado pelo BFF quando `?asOf=` é passado.
+
+    IngestInput:
+      type: object
+      description: Entrada do import via front. `kind` decide o caminho.
+      required: [kind, type]
+      properties:
+        kind:
+          type: string
+          enum: [file, text]
+        type:
+          type: string
+          description: Tipo declarado da página (ex. "call de venda").
+        base64:
+          type: string
+          description: Conteúdo do arquivo (kind=file).
+        filename:
+          type: string
+        contentType:
+          type: string
+        text:
+          type: string
+          description: Texto colado (kind=text).
+        title:
+          type: string
+        date:
+          type: string
+          description: YYYY-MM-DD.
+        sourceId:
+          type: string
+          description: Fonte (galeed_sources.id) sob cujo contrato o doc entra.
+
+    EnqueueResult:
+      type: object
+      description: Ticket do enqueue (não é o resultado da ingestão).
+      required: [jobId, status]
+      properties:
+        jobId:
+          type: string
+        status:
+          $ref: "#/components/schemas/IngestJobStatus"
+
+    IngestJobStatus:
+      type: string
+      enum:
+        - queued
+        - processing
+        - findable
+        - digesting
+        - digested
+        - batch_submitted
+        - batch_harvesting
+        - done
+        - error
+        - dead
+
+    IngestJob:
+      type: object
+      description: Uma linha da fila de ingestão (galeed_ingest_jobs).
+      properties:
+        id:
+          type: string
+        brain:
+          type: string
+        kind:
+          type: string
+          enum: [file, text]
+        status:
+          $ref: "#/components/schemas/IngestJobStatus"
+        type:
+          type: string
+        contentHash:
+          type: [string, "null"]
+        filename:
+          type: [string, "null"]
+        mime:
+          type: [string, "null"]
+        title:
+          type: [string, "null"]
+        jobDate:
+          type: [string, "null"]
+        textBody:
+          type: [string, "null"]
+        progress:
+          type: number
+        message:
+          type: [string, "null"]
+        resultJson:
+          type: object
+          additionalProperties: true
+        errorMessage:
+          type: [string, "null"]
+        createdAt:
+          type: string
+        startedAt:
+          type: [string, "null"]
+        finishedAt:
+          type: [string, "null"]
+        batchId:
+          type: [string, "null"]
+
+    BrainContextInput:
+      type: object
+      description: Contexto editável do brain (sem version). Persistido por onboarding/context save.
+      properties:
+        self:
+          type: object
+          properties:
+            slug:
+              type: string
+            label:
+              type: string
+            aliases:
+              type: array
+              items:
+                type: string
+        purpose:
+          type: string
+        roles:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [self, client, host, participant, other]
+              speakers:
+                type: array
+                items:
+                  type: string
+              label:
+                type: string
+        sourceTypes:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              label:
+                type: string
+              otherRole:
+                type: string
+
+    ContextView:
+      type: object
+      description: Contexto traduzido pro front + version + cartão legível.
+      properties:
+        context:
+          $ref: "#/components/schemas/BrainContextInput"
+        version:
+          type: integer
+        card:
+          type: string
+
+    ReextractEstimate:
+      type: object
+      properties:
+        staleDocs:
+          type: integer
+        totalDocs:
+          type: integer
+        costUsdEstimate:
+          type: number
+
+    ReextractResult:
+      type: object
+      properties:
+        reextracted:
+          type: integer
+        blocked:
+          type: integer
+        derivedFacts:
+          type: integer
+        message:
+          type: string
+
+    SourceRecipeField:
+      type: object
+      required: [dimension, label, area]
+      properties:
+        dimension:
+          type: string
+          description: Chave da dimensão de extração (subconjunto das dims do extractable do tipo).
+        label:
+          type: string
+        area:
+          type: string
+          description: Slug da área destino ("" = sem área).
+
+    SourceRecipe:
+      type: object
+      required: [fields]
+      properties:
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceRecipeField"
+        guidance:
+          type: string
+        triage_profile:
+          type: string
+
+    SourceRow:
+      type: object
+      description: Uma fonte do brain. pages_count/facts_count são computados na leitura.
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        channel:
+          type: string
+          description: "v1: upload | paste."
+        type:
+          type: string
+        recipe:
+          $ref: "#/components/schemas/SourceRecipe"
+        default_sensitivity:
+          $ref: "#/components/schemas/SensitivityLevel"
+        status:
+          type: string
+          enum: [ativa, pausada]
+        last_read_at:
+          type: [string, "null"]
+        created_at:
+          type: string
+        pages_count:
+          type: integer
+        facts_count:
+          type: integer
+
+    CreateSourceBody:
+      type: object
+      required: [name, channel, type]
+      properties:
+        name:
+          type: string
+        channel:
+          type: string
+          enum: [upload, paste]
+        type:
+          type: string
+        recipe:
+          $ref: "#/components/schemas/SourceRecipe"
+        defaultSensitivity:
+          $ref: "#/components/schemas/SensitivityLevel"
+
+    UpdateSourceBody:
+      type: object
+      description: PATCH semântico — só os campos presentes mudam.
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        recipe:
+          $ref: "#/components/schemas/SourceRecipe"
+        defaultSensitivity:
+          $ref: "#/components/schemas/SensitivityLevel"
+
+    ConnectorCreateResult:
+      type: object
+      properties:
+        sourceId:
+          type: string
+        providerConfigKey:
+          type: string
+        name:
+          type: string
+
+    ConnectSessionResult:
+      type: object
+      properties:
+        provider:
+          type: string
+        token:
+          type: string
+        connect_link:
+          type: string
+        expires_at:
+          type: string
+
+    SourceConnectionView:
+      type: object
+      properties:
+        sourceId:
+          type: string
+        name:
+          type: string
+        channel:
+          type: string
+        providerConfigKey:
+          type: string
+        connectionId:
+          type: string
+        status:
+          type: string
+          enum: [desconectado, conectado, erro]
+        cursor:
+          type: string
+        lastSyncAt:
+          type: string
+        lastError:
+          type: string
+
+    NangoWebhookBody:
+      type: object
+      description: Payload do webhook do Nango (auth | sync). Campos variam por tipo.
+      properties:
+        type:
+          type: string
+          enum: [auth, sync]
+        operation:
+          type: string
+        success:
+          type: boolean
+        connectionId:
+          type: string
+        providerConfigKey:
+          type: string
+        syncName:
+          type: string
+        model:
+          type: string
+        modifiedAfter:
+          type: string
+        tags:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+
+    ReviewReason:
+      type: string
+      enum: [fora_da_receita, nao_ancorado, entidade_vaga, conexao_sugerida]
+
+    ReviewStatus:
+      type: string
+      enum: [pendente, aprovada, descartada]
+
+    HypothesisView:
+      type: object
+      description: Item da fila de revisão + nome da fonte + recomendação do juiz (opcional).
+      properties:
+        id:
+          type: string
+        source_id:
+          type: string
+        source_slug:
+          type: string
+        dimension:
+          type: string
+        text:
+          type: string
+        quote:
+          type: string
+        claim:
+          description: Item cru da extração (jsonb).
+        reason:
+          $ref: "#/components/schemas/ReviewReason"
+        status:
+          $ref: "#/components/schemas/ReviewStatus"
+        decided_by:
+          type: string
+        created_at:
+          type: string
+        decided_at:
+          type: [string, "null"]
+        source_name:
+          type: string
+        recomendacao:
+          type: string
+        recomendacao_motivo:
+          type: string
+        recomendacao_confianca:
+          type: [number, "null"]
+        recomendado_em:
+          type: [string, "null"]
+
+    HypothesisGroupView:
+      type: object
+      description: Grupo-decisão da fila (todos os pendentes que a mesma frase decide).
+      properties:
+        reason:
+          $ref: "#/components/schemas/ReviewReason"
+        dimension:
+          type: string
+        source_id:
+          type: string
+        source_name:
+          type: string
+        count:
+          type: integer
+        paginas:
+          type: integer
+        amostra:
+          type: array
+          items:
+            $ref: "#/components/schemas/HypothesisView"
+        decisao:
+          type: string
+        dimensao_na_receita:
+          type: boolean
+        recomendacoes:
+          type: object
+          description: Rollup das recomendações do juiz (ausente se o juiz não passou).
+          properties:
+            aprovar:
+              type: integer
+            descartar:
+              type: integer
+            humano:
+              type: integer
+            sem_recomendacao:
+              type: integer
+
+    GroupKeyBody:
+      type: object
+      required: [reason, dimension, source_id]
+      properties:
+        reason:
+          $ref: "#/components/schemas/ReviewReason"
+        dimension:
+          type: string
+        source_id:
+          type: string
+
+    AddDimensionBody:
+      type: object
+      required: [source_id, dimension]
+      properties:
+        source_id:
+          type: string
+        dimension:
+          type: string
+        label:
+          type: string
+        area:
+          type: string
+
+    LoteAprovacao:
+      type: object
+      properties:
+        aprovados:
+          type: integer
+        retidos:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        ja_decididos:
+          type: integer
+        paginas_derivadas:
+          type: integer
+
+    JudgeRunResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [concluido, batch_submetido, batch_em_andamento, nada_a_julgar]
+        julgados:
+          type: integer
+        distribuicao:
+          type: object
+          properties:
+            aprovar:
+              type: integer
+            descartar:
+              type: integer
+            humano:
+              type: integer
+        pendentes_sem_recomendacao:
+          type: integer
+        erros:
+          type: integer
+        pulados:
+          type: integer
+        batch_id:
+          type: string
+        request_counts:
+          type: object
+          properties:
+            processing:
+              type: integer
+            succeeded:
+              type: integer
+            errored:
+              type: integer
+            canceled:
+              type: integer
+            expired:
+              type: integer
+        custo_usd:
+          type: number
+        mensagem:
+          type: string
+
+    CalibrationSegment:
+      type: object
+      properties:
+        dimension:
+          type: string
+        source_id:
+          type: string
+        reason:
+          type: string
+        decididos:
+          type: integer
+        acertos:
+          type: integer
+        acerto:
+          type: number
+        abstencoes:
+          type: integer
+        source_name:
+          type: string
+          description: Resolvido no handler (join em memória).
+
+    JudgeCalibration:
+      type: object
+      properties:
+        total:
+          type: object
+          properties:
+            decididos:
+              type: integer
+            acertos:
+              type: integer
+            acerto:
+              type: number
+            abstencoes:
+              type: integer
+            sem_recomendacao:
+              type: integer
+        segmentos:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalibrationSegment"
+
+    JudgeEstimate:
+      type: object
+      properties:
+        itens:
+          type: integer
+        custo_usd_estimado:
+          type: number
+        batch:
+          type: boolean
+
+    SensitivityLevel:
+      type: string
+      enum: [publico, interno, sensivel, restrito]
+      description: Nível de sensibilidade. Default/falha-fechado = restrito.
+
+    PrincipalKind:
+      type: string
+      enum: [human, agent]
+
+    Principal:
+      type: object
+      description: >-
+        Shape de leitura do principal pro front (toPrincipalShape) — principal + grant achatado. Campos
+        exatos derivados de bff-rbac-shape.ts; estrutura aberta (additionalProperties) porque o shape do
+        front agrega rótulos cosméticos além do PrincipalRow/GrantRow crus.
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/PrincipalKind"
+        label:
+          type: string
+        email:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled]
+      additionalProperties: true
+
+    Grant:
+      type: object
+      description: Grant de um principal (1:1). v1 scope = read.
+      properties:
+        principal_id:
+          type: string
+        areas:
+          type: array
+          items:
+            type: string
+        sensitivity_max:
+          $ref: "#/components/schemas/SensitivityLevel"
+        deny_types:
+          type: array
+          items:
+            type: string
+        scope:
+          type: string
+          enum: [read]
+
+    InviteBody:
+      type: object
+      required: [kind, label, areas, sensitivityMax]
+      properties:
+        kind:
+          $ref: "#/components/schemas/PrincipalKind"
+        label:
+          type: string
+        email:
+          type: string
+        areas:
+          type: array
+          items:
+            type: string
+        sensitivityMax:
+          $ref: "#/components/schemas/SensitivityLevel"
+        denyTypes:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+          description: Opcional; default = slug(label).
+
+    GrantBody:
+      type: object
+      required: [principalId, areas, sensitivityMax]
+      properties:
+        principalId:
+          type: string
+        areas:
+          type: array
+          items:
+            type: string
+        sensitivityMax:
+          $ref: "#/components/schemas/SensitivityLevel"
+        denyTypes:
+          type: array
+          items:
+            type: string
+
+    Area:
+      type: object
+      description: Área derivada das tags area:<slug> das páginas, com contagem.
+      properties:
+        slug:
+          type: string
+        label:
+          type: string
+        count:
+          type: integer
+        origin:
+          type: string
+          description: Cosmético — sem fonte real no M7 (vazio).
+        dot:
+          type: string
+          description: Cor neutra (cosmético).
+
+    Scope:
+      type: object
+      properties:
+        principalId:
+          type: string
+        areas:
+          type: array
+          items:
+            type: string
+        sensitivityMax:
+          $ref: "#/components/schemas/SensitivityLevel"
+
+    AccessPreview:
+      type: object
+      description: O que um principal vê (preview de escopo).
+      properties:
+        scope:
+          $ref: "#/components/schemas/Scope"
+        visiblePages:
+          type: integer
+        visibleFacts:
+          type: integer
+          description: Não calculado por página — sempre 0 (não fabrica número).
+        blocked:
+          type: integer
+        sampleSlugs:
+          type: array
+          items:
+            type: string
+        results:
+          type: array
+          description: Vazio — não fabrica conteúdo de exemplo.
+          items:
+            type: object
+
+    AccessLogEntry:
+      type: object
+      properties:
+        principal_id:
+          type: string
+        ts:
+          type: string
+        query:
+          type: string
+        areas_touched:
+          type: array
+          items:
+            type: string
+        n_returned:
+          type: integer
+
+    CostBreakdown:
+      type: object
+      properties:
+        op:
+          type: string
+        model:
+          type: string
+        calls:
+          type: integer
+        cost_usd:
+          type: number
+        tokens_in:
+          type: integer
+        tokens_out:
+          type: integer
+
+    CostRollup:
+      type: object
+      properties:
+        calls:
+          type: integer
+        cost_usd_total:
+          type: number
+        tokens_in_total:
+          type: integer
+        tokens_out_total:
+          type: integer
+        by_op:
+          type: array
+          items:
+            $ref: "#/components/schemas/CostBreakdown"
+        by_model:
+          type: array
+          items:
+            $ref: "#/components/schemas/CostBreakdown"
+
+    PercepcaoView:
+      type: object
+      properties:
+        id:
+          type: string
+        classe:
+          type: string
+        severidade:
+          type: string
+          enum: [alta, media, baixa, info]
+        entity:
+          type: string
+        predicate:
+          type: string
+        tier:
+          type: string
+        texto:
+          type: string
+        numbers:
+          type: object
+          additionalProperties: true
+        cites:
+          type: object
+          properties:
+            source_slugs:
+              type: array
+              items:
+                type: string
+        estado:
+          type: string
+          enum: [viva, stale, arquivada]
+        created_at:
+          type: string
+        validated_at:
+          type: string
+
+    PercepcoesPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PercepcaoView"
+        counts:
+          type: object
+          properties:
+            viva:
+              type: integer
+            stale:
+              type: integer
+            arquivada:
+              type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    WizardState:
+      type: object
+      description: Estado do wizard (stateless — viaja pro front e volta).
+      properties:
+        step:
+          type: string
+          enum: [purpose, areas, sources, sensitivity, review, done]
+        draft:
+          type: object
+          additionalProperties: true
+        asked:
+          type: array
+          items:
+            type: string
+
+    WizardChip:
+      type: object
+      properties:
+        label:
+          type: string
+        kind:
+          type: string
+          enum: [toggle, go]
+        selected:
+          type: boolean
+
+    WizardPanel:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+        purpose:
+          type: string
+        areas:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              fields:
+                type: array
+                items:
+                  type: string
+              areas:
+                type: array
+                items:
+                  type: string
+        rules:
+          type: array
+          items:
+            type: string
+
+    WizardTurn:
+      type: object
+      properties:
+        state:
+          $ref: "#/components/schemas/WizardState"
+        question:
+          type: string
+        card:
+          type: string
+        suggestions:
+          type: array
+          items:
+            type: string
+        chips:
+          type: array
+          items:
+            $ref: "#/components/schemas/WizardChip"
+        panel:
+          $ref: "#/components/schemas/WizardPanel"
+        done:
+          type: boolean
+
+    WizardReplyBody:
+      type: object
+      required: [state, message]
+      properties:
+        state:
+          $ref: "#/components/schemas/WizardState"
+        message:
+          type: string
+        action:
+          type: string
+          enum: [toggle, go]
+          description: Só no passo sources (coleção multi-seleção).
+
+    OnboardingState:
+      type: object
+      properties:
+        step:
+          type: string
+          enum: [self, purpose, roles, sourceTypes, review, done]
+        draft:
+          $ref: "#/components/schemas/BrainContextInput"
+        asked:
+          type: array
+          items:
+            type: string
+
+    OnboardingTurn:
+      type: object
+      properties:
+        state:
+          $ref: "#/components/schemas/OnboardingState"
+        question:
+          type: string
+        card:
+          type: string
+        done:
+          type: boolean
+
+    OnboardingReplyBody:
+      type: object
+      required: [state, message]
+      properties:
+        state:
+          $ref: "#/components/schemas/OnboardingState"
+        message:
+          type: string
+
+security:
+  - cookieAuth: []

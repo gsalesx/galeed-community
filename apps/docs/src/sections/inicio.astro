@@ -1,0 +1,138 @@
+---
+import Section from "../components/Section.astro";
+import QSteps from "../components/QSteps.astro";
+import QStep from "../components/QStep.astro";
+import CodeTabs from "../components/CodeTabs.astro";
+
+const ingestTabs = [
+  {
+    lang: "bash",
+    label: "curl",
+    code: `curl https://api.galeed.com/v1/ingest \\
+  -H "Authorization: Bearer gld_live_8x2k...e1" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "source": "call_vendas",
+    "content": "Fechamos com a Acme por R$ 2.500/mês. A Maria aprovou.",
+    "occurred_at": "2026-06-12T14:03:00Z"
+  }'`,
+  },
+  {
+    lang: "javascript",
+    label: "Node",
+    code: `const res = await fetch("https://api.galeed.com/v1/ingest", {
+  method: "POST",
+  headers: {
+    authorization: "Bearer gld_live_8x2k...e1",
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({
+    source: "call_vendas",
+    content: "Fechamos com a Acme por R$ 2.500/mês. A Maria aprovou.",
+    occurred_at: "2026-06-12T14:03:00Z",
+  }),
+});
+const data = await res.json();`,
+  },
+  {
+    lang: "python",
+    label: "Python",
+    code: `import requests
+
+res = requests.post(
+    "https://api.galeed.com/v1/ingest",
+    headers={
+        "Authorization": "Bearer gld_live_8x2k...e1",
+        "Content-Type": "application/json",
+    },
+    json={
+        "source": "call_vendas",
+        "content": "Fechamos com a Acme por R$ 2.500/mês. A Maria aprovou.",
+        "occurred_at": "2026-06-12T14:03:00Z",
+    },
+)
+data = res.json()`,
+  },
+];
+
+const askTabs = [
+  {
+    lang: "bash",
+    label: "curl",
+    code: `curl https://api.galeed.com/v1/ask \\
+  -H "Authorization: Bearer gld_live_8x2k...e1" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "question": "Qual o preço fechado com a Acme?" }'`,
+  },
+  {
+    lang: "javascript",
+    label: "Node",
+    code: `const res = await fetch("https://api.galeed.com/v1/ask", {
+  method: "POST",
+  headers: {
+    authorization: "Bearer gld_live_8x2k...e1",
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({ question: "Qual o preço fechado com a Acme?" }),
+});
+const data = await res.json();`,
+  },
+  {
+    lang: "python",
+    label: "Python",
+    code: `import requests
+
+res = requests.post(
+    "https://api.galeed.com/v1/ask",
+    headers={
+        "Authorization": "Bearer gld_live_8x2k...e1",
+        "Content-Type": "application/json",
+    },
+    json={"question": "Qual o preço fechado com a Acme?"},
+)
+data = res.json()`,
+  },
+];
+---
+
+<Section
+  id="inicio"
+  ix="01"
+  title="Início rápido"
+  intro="Do zero ao primeiro fato carimbado em quatro passos. Tudo que você precisa é a chave do bot de um cérebro."
+>
+  <QSteps>
+    <QStep title="Crie um cérebro e pegue a chave">
+      <p>
+        Cada cérebro é um espaço de memória isolado. Crie um pelo painel e copie a
+        <code class="ic">chave do bot</code>. Ela já vem escopada às áreas e ao nível de
+        sigilo que você liberou — toda leitura é filtrada por esse escopo.
+      </p>
+    </QStep>
+
+    <QStep title="Mande a primeira informação">
+      <p>
+        Um <code class="ic">POST /v1/ingest</code> com o conteúdo cru. Não precisa
+        formatar nem estruturar: jogue o texto da call, o e-mail, o que for.
+      </p>
+      <CodeTabs tabs={ingestTabs} filename="primeira ingestão" />
+    </QStep>
+
+    <QStep title="Deixe organizar">
+      <p>
+        O Galeed classifica, liga às pessoas e áreas, e decide o que vira fato. É
+        assíncrono: você acompanha pelo webhook <code class="ic">ingest.organized</code>
+        ou simplesmente pergunta depois.
+      </p>
+    </QStep>
+
+    <QStep title="Pergunte em português">
+      <p>
+        Um <code class="ic">POST /v1/ask</code> com a pergunta em linguagem natural. A
+        resposta sintetiza as fontes e devolve cada fato com o selo — sempre com a fonte
+        citada.
+      </p>
+      <CodeTabs tabs={askTabs} filename="primeira pergunta" />
+    </QStep>
+  </QSteps>
+</Section>

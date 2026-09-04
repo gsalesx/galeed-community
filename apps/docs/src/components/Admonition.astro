@@ -1,0 +1,42 @@
+---
+// Callout informativo. Três tipos, cada um com o SVG exato do design.
+//   note → ícone de informação (círculo + i)
+//   warn → ícone de aviso (triângulo)
+//   tip  → ícone de lâmpada
+type AdmonType = "note" | "warn" | "tip";
+
+interface Props {
+  type?: AdmonType;
+  /** remove a margem inferior (último elemento de uma seção) */
+  flush?: boolean;
+}
+
+const { type = "note", flush = false } = Astro.props;
+const style = flush ? "margin-bottom:0" : undefined;
+---
+
+<div class:list={["admon", type]} style={style}>
+  {
+    type === "note" && (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 16v-4M12 8h.01" />
+      </svg>
+    )
+  }
+  {
+    type === "warn" && (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+      </svg>
+    )
+  }
+  {
+    type === "tip" && (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />
+      </svg>
+    )
+  }
+  <span><slot /></span>
+</div>

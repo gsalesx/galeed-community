@@ -1,0 +1,41 @@
+---
+import Section from "../components/Section.astro";
+import Principle from "../components/Principle.astro";
+import Admonition from "../components/Admonition.astro";
+---
+
+<Section
+  id="introducao"
+  ix="00"
+  title="Introdução"
+  intro="O que o Galeed é, em termos simples, e o modelo mental que você precisa antes de tocar na API."
+>
+  <div class="prose">
+    <p>
+      Galeed é a <strong>memória do seu negócio, via API</strong>. Você joga
+      conteúdo cru de qualquer fonte &mdash; transcrição de call, mensagem de
+      grupo, e-mail, planilha &mdash; e ele guarda. Depois você pergunta em
+      português e recebe a resposta com a <strong>fonte citada</strong> e um
+      <strong>grau de certeza</strong>.
+    </p>
+    <p>
+      O ciclo é sempre o mesmo, e a API o espelha em três verbos: você
+      <strong>ingere</strong>, o Galeed <strong>organiza</strong>, e você
+      <strong>pergunta</strong>. Você não precisa etiquetar, titular nem
+      estruturar nada à mão. Cada pedaço do que você manda vira um
+      <strong>fato</strong> ou uma <strong>hipótese</strong>, ligado às pessoas
+      e aos assuntos, com um carimbo de quando virou verdade e de onde veio.
+    </p>
+    <Principle>
+      <b>Você só joga. Ele organiza.</b> Toda resposta volta com a fonte e o
+      grau de certeza. E o cérebro nunca chuta: o que não bate com uma receita
+      de extração entra como hipótese &mdash; nunca como fato.
+    </Principle>
+    <Admonition type="note" flush>
+      <b>O nome.</b> Em Gênesis 31:48, Jacó ergue um monte de pedras como marco
+      de um acordo e o chama de <i>Galeed</i>, o monte do testemunho &mdash; um
+      registro permanente do que foi combinado. É essa a ideia da API: cada
+      fato é uma pedra no monte.
+    </Admonition>
+  </div>
+</Section>

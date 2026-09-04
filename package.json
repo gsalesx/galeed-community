@@ -1,0 +1,48 @@
+{
+  "name": "galeed",
+  "version": "0.5.1",
+  "description": "A memória do seu negócio — uma camada de memória para IA sobre Postgres+pgvector. Captura, organiza e lembra.",
+  "type": "module",
+  "license": "BUSL-1.1",
+  "bin": {
+    "galeed": "apps/server/src/cli.ts"
+  },
+  "scripts": {
+    "galeed": "npx tsx apps/server/src/cli.ts",
+    "ai-team": "npx tsx tools/ai-team/src/index.ts",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "dev": "node tools/dev.mjs",
+    "caso": "node tools/casos/rodar.mjs",
+    "dev:bff": "npx tsx apps/server/src/connectors/web-server.ts",
+    "dev:web": "cd apps/web && npm run dev",
+    "docs:dev": "cd apps/docs && npm run dev",
+    "worker": "npx tsx apps/server/src/connectors/ingest-worker.ts",
+    "webhook:worker": "npx tsx apps/server/src/connectors/webhook-worker.ts",
+    "gateway:dev": "npx tsx apps/server/src/connectors/gateway-server.ts",
+    "test": "vitest run apps/server/test/unit",
+    "test:unit": "vitest run apps/server/test/unit",
+    "test:watch": "vitest apps/server/test/unit",
+    "test:integration": "vitest run apps/server/test/integration",
+    "test:smoke": "vitest run apps/server/test/smoke",
+    "test:all": "vitest run",
+    "test:billing-gate": "vitest run apps/server/test/unit && if [ -n \"$DATABASE_URL\" ] && [ -n \"$STRIPE_SECRET_KEY\" ]; then vitest run apps/server/test/integration; else echo '[billing-gate] integration PULADA (sem DATABASE_URL+STRIPE_SECRET_KEY) — caminhos de dinheiro com mutacao NAO validados; rode test:integration com DB+Stripe antes do commit de billing.'; fi"
+  },
+  "dependencies": {
+    "ipaddr.js": "^1.9.1",
+    "postgres": "^3.4.9",
+    "stripe": "^22.2.1",
+    "tsx": "^4.22.4",
+    "unpdf": "^1.6.2"
+  },
+  "optionalDependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8",
+    "yaml": "^2.6.1"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

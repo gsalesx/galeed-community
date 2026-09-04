@@ -1,0 +1,29 @@
+{
+  "_doc": "Shape oficial GET /v1/pessoas — https://developers.contaazul.com/open-api-docs/open-api-person/v1/retornapessoasporfiltros.md (wrapper {items, totalItems} — atenção: AQUI é 'items', NÃO 'itens'; items.id uuid, items.nome, items.perfis ex.[CLIENTE,FORNECEDOR], items.tipo_pessoa FISICA|JURIDICA|ESTRANGEIRA, items.documento, items.data_criacao, items.data_alteracao, items.id_legado int compat, items.uuid_legado compat — NUNCA chave)",
+  "_nota": "id_legado/uuid_legado presentes de propósito para o teste provar que NUNCA viram external_ref (chave é só o uuid novo 'id').",
+  "totalItems": 2,
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "nome": "João Silva",
+      "perfis": ["CLIENTE"],
+      "tipo_pessoa": "FISICA",
+      "documento": "123.456.789-00",
+      "data_criacao": "2024-01-15",
+      "data_alteracao": "2024-01-15T10:30:00",
+      "id_legado": 700001,
+      "uuid_legado": "legacy-550e8400"
+    },
+    {
+      "id": "660f9511-f3ac-52e5-b827-557766551111",
+      "nome": "Distribuidora Norte Ltda",
+      "perfis": ["CLIENTE", "FORNECEDOR"],
+      "tipo_pessoa": "JURIDICA",
+      "documento": "12.345.678/0001-99",
+      "data_criacao": "2023-11-02",
+      "data_alteracao": "2025-02-20T16:45:00",
+      "id_legado": 700002,
+      "uuid_legado": "legacy-660f9511"
+    }
+  ]
+}

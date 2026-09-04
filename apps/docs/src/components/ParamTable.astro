@@ -1,0 +1,63 @@
+---
+// Tabela de parâmetros .ptable. Dois modos:
+//   1) data-driven: passe `cols` (cabeçalhos) e `rows` (linhas).
+//   2) slot: passe <thead>/<tbody> próprios para casos especiais.
+//
+// Em cada row:
+//   name (mono, negrito) + type (chip mono roxo) + required ("obrigatório"/"opcional")
+//   desc (HTML permitido — use Fragment set:html ou texto simples)
+export interface ParamRow {
+  name: string;
+  type?: string;
+  required?: boolean | "obrigatório" | "opcional";
+  /** descrição — aceita HTML (ex.: <code class="ic">...</code>) */
+  desc: string;
+}
+
+interface Props {
+  cols?: [string, string];
+  rows?: ParamRow[];
+}
+
+const { cols = ["Parâmetro", "Descrição"], rows } = Astro.props;
+
+function reqLabel(r: ParamRow): { kind: "req" | "opt"; text: string } | null {
+  if (r.required === true || r.required === "obrigatório")
+    return { kind: "req", text: "obrigatório" };
+  if (r.required === false || r.required === "opcional")
+    return { kind: "opt", text: "opcional" };
+  return null;
+}
+---
+
+<table class="ptable">
+  {
+    rows ? (
+      <>
+        <thead>
+          <tr>
+            <th>{cols[0]}</th>
+            <th>{cols[1]}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const rl = reqLabel(r);
+            return (
+              <tr>
+                <td class="pn">
+                  {r.name}
+                  {r.type && <span class="pt">{r.type}</span>}
+                  {rl && <span class={rl.kind}>{rl.text}</span>}
+                </td>
+                <td class="pd" set:html={r.desc} />
+              </tr>
+            );
+          })}
+        </tbody>
+      </>
+    ) : (
+      <slot />
+    )
+  }
+</table>

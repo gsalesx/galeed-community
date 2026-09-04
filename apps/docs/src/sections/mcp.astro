@@ -1,0 +1,60 @@
+---
+import Section from "../components/Section.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import Tools from "../components/Tools.astro";
+import Tool from "../components/Tool.astro";
+import Admonition from "../components/Admonition.astro";
+
+const config = `{
+  "mcpServers": {
+    "galeed": {
+      "command": "npx",
+      "args": ["-y", "@galeed/mcp"],
+      "env": { "GALEED_KEY": "gld_live_8x2k...e1" }
+    }
+  }
+}`;
+---
+
+<Section
+  id="mcp"
+  ix="11"
+  title="MCP: conecte qualquer IA"
+  intro="O Galeed expõe um servidor MCP (Model Context Protocol). Qualquer agente que fala MCP — o Claude, o seu próprio agente, o que for — ganha a memória como ferramenta, já respeitando o escopo da chave."
+>
+  <div class="prose">
+    <p>
+      Adicione o servidor à config do seu cliente MCP. A chave do bot define o que o
+      agente enxerga: ele <strong>nunca</strong> recebe um fato fora do escopo, mesmo que
+      peça.
+    </p>
+  </div>
+
+  <CodeBlock lang="json" filename="config do cliente MCP" code={config} />
+
+  <div class="sub">Ferramentas expostas</div>
+  <Tools>
+    <Tool name="galeed_ask">
+      Pergunta em linguagem natural. Devolve a síntese + os selos. O equivalente MCP do <code
+        class="ic">/ask</code
+      >.
+    </Tool>
+    <Tool name="galeed_facts">
+      Busca fatos por área, status ou data. Pro agente puxar contexto estruturado.
+    </Tool>
+    <Tool name="galeed_ingest">
+      Grava conteúdo novo, se a chave tiver <code class="ic">can_ingest</code>. É assim que o
+      agente alimenta a memória.
+    </Tool>
+    <Tool name="galeed_ingest_status">
+      Acompanha o batch de ingestão pelo <code class="ic">batch_id</code> — o agente sabe
+      quando o que ele gravou virou memória.
+    </Tool>
+  </Tools>
+
+  <Admonition type="tip" flush>
+    <b>O escopo viaja com a chave.</b> Conecte uma chave restrita a um agente de atendimento
+    e ele vai responder só com o que aquele papel pode ver. A mesma governança de Acesso
+    vale aqui, sem nenhuma config extra.
+  </Admonition>
+</Section>

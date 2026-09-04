@@ -1,0 +1,122 @@
+---
+import Section from "../components/Section.astro";
+import ParamTable from "../components/ParamTable.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import Endpoint from "../components/Endpoint.astro";
+import Admonition from "../components/Admonition.astro";
+
+const events = [
+  {
+    name: "ingest.organized",
+    desc: "Um lote terminou de ser organizado. Traz as contagens (fatos criados, itens que foram pra revisão).",
+  },
+  {
+    name: "review.pending",
+    desc: 'Trechos não casaram com a receita e entraram na fila de revisão como <code class="ic">hipótese</code>, esperando alguém.',
+  },
+  {
+    name: "fact.superseded",
+    desc: 'Um fato foi substituído por um mais novo (virou <code class="ic">archived</code>). Traz só o id e a data — nunca o valor.',
+  },
+  {
+    name: "access.denied",
+    desc: "Uma leitura foi <b>100% barrada</b> pelo escopo da chave (ou uma escrita sem permissão). Só em negação TOTAL — nunca quando parte do resultado é mostrada.",
+  },
+];
+
+const register = `curl -X POST https://api.galeed.com/v1/webhooks \\
+  -H "Authorization: Bearer gld_live_8x2k...e1" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "url": "https://seu-app.com/webhooks/galeed",
+    "events": ["ingest.organized", "fact.superseded"]
+  }'`;
+
+const registerResp = `{
+  "id": "wh_7a1j9",
+  "url": "https://seu-app.com/webhooks/galeed",
+  "events": ["ingest.organized", "fact.superseded"],
+  "secret": "whsec_3f8c...e2",
+  "status": "active"
+}`;
+
+const payload = `{
+  "event": "ingest.organized",
+  "batch_id": "ing_2026q2_7a1j9",
+  "result": { "facts": 4, "pending_review": 1 },
+  "at": "2026-06-12T14:03:48Z"
+}`;
+
+const verify = `import crypto from "node:crypto";
+
+// Em cada POST que você receber do Galeed:
+const esperada = crypto
+  .createHmac("sha256", SEU_SECRET)  // o secret mostrado no registro
+  .update(rawBody)                   // o CORPO CRU, antes de parsear o JSON
+  .digest("hex");
+
+if (esperada !== req.headers["x-galeed-signature"]) {
+  return res.status(401).end();      // não é do Galeed — descarte
+}`;
+---
+
+<Section
+  id="webhooks"
+  ix="13"
+  title="Webhooks"
+  intro="A ingestão é assíncrona, então o Galeed avisa o seu app por HTTP quando algo é organizado ou muda de estado. Você registra uma URL com a sua chave, recebe um secret, e valida a assinatura de cada entrega."
+>
+  <div class="sub">Registrar</div>
+  <Endpoint method="post" path="/webhooks" scope="requer can_ingest" scopeIcon="lock" />
+  <div class="prose">
+    <p>
+      A URL precisa ser <strong>https://</strong> e pública — o Galeed recusa IP privado, loopback e
+      link-local (anti-SSRF). O <code class="ic">secret</code> é mostrado <strong>uma única vez</strong>:
+      guarde-o, é com ele que você verifica a assinatura de cada entrega.
+    </p>
+  </div>
+  <CodeBlock lang="bash" filename="registrar um webhook" code={register} />
+  <CodeBlock lang="json" filename="201 — secret mostrado uma vez" code={registerResp} />
+  <div class="prose">
+    <p>
+      Liste com <code class="ic">GET /v1/webhooks</code> (a resposta nunca traz o secret) e remova com
+      <code class="ic">DELETE /v1/webhooks/:id</code>. Os webhooks são por cérebro — a chave só
+      enxerga os do próprio.
+    </p>
+  </div>
+
+  <div class="sub">Eventos</div>
+  <ParamTable cols={["Evento", "Quando dispara"]} rows={events} />
+
+  <Admonition type="warn">
+    <b>access.denied só dispara em negação TOTAL.</b> Leitura escopada normal esconde alguns fatos o
+    tempo todo — isso é o campo <code class="ic">withheld</code> da resposta, não um alerta. O webhook
+    só sai quando uma leitura volta <b>100% vazia</b> por barreira de escopo (ou numa escrita sem
+    permissão), e no máximo um por chave por minuto — pra não virar ruído nem vazar a existência do
+    que ficou escondido.
+  </Admonition>
+
+  <div class="sub">Payload</div>
+  <CodeBlock lang="json" filename="payload · ingest.organized" code={payload} />
+  <div class="prose">
+    <p>
+      Os payloads são <strong>mínimos</strong> — contagens, ids e datas, nunca o valor de um fato.
+      Quer o detalhe? Chame <code class="ic">/v1/facts</code> com a sua chave.
+    </p>
+  </div>
+
+  <div class="sub">Verificar a assinatura</div>
+  <div class="prose">
+    <p>
+      Toda entrega traz o header <code class="ic">X-Galeed-Signature</code> = HMAC-SHA256 do corpo
+      cru, com o seu secret. Confira antes de confiar no payload:
+    </p>
+  </div>
+  <CodeBlock lang="ts" filename="validar X-Galeed-Signature" code={verify} />
+
+  <Admonition type="note" flush>
+    Entrega é <b>assíncrona com retry</b> (backoff exponencial até desistir). Responda
+    <code class="ic">2xx</code> pra confirmar; <code class="ic">5xx</code>/timeout são re-tentados,
+    <code class="ic">4xx</code> não. Depois de várias falhas seguidas o webhook é desativado.
+  </Admonition>
+</Section>

@@ -1,0 +1,24 @@
+---
+description: Convenções do apps/server — core, connectors, testes
+globs: apps/server/**/*
+alwaysApply: false
+---
+
+# Server (core + connectors)
+
+## Onde cada coisa mora
+
+- Ingestores: `src/core/ingestion/ingestors/` (1 arquivo + registro em `boot.ts`)
+- Extração / tags `src:`, `canal:`, `area:`: `src/core/ingestion/process-blob-job.ts`
+- Fatos / ask: `src/core/retrieval/`
+- Acesso (fail-closed): `src/core/access/` — `'*'` = acesso total
+- Espelho GitHub: `src/core/platform/github-sync.ts`
+- BFF: `connectors/web-server.ts` · Gateway: `connectors/gateway-server.ts` · Worker: `connectors/ingest-worker.ts`
+
+## Regras ao editar
+
+- `normalize()` de ingestor é **puro** (sem fetch/env/IO). Devolve `[]` em ping/ack.
+- `externalRef` estável = dedupe. Chat: declare `janela` e prefixe `chatId` com o slug.
+- Claims determinísticos (zero IA) para linhas/tabelas — modelo em `planilha.ts`.
+- Teste unitário em `apps/server/test/unit/` no padrão existente; rode `npm test` na raiz.
+- Não inventar endpoints `/v1` fora do gateway; o cérebro vem do token (sem `?brain=` na borda pública).

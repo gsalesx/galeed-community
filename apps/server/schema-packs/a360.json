@@ -1,0 +1,61 @@
+{
+  "_comment": "Pack do tenant Accelera/A360 (PT, calls de venda). Plugado via GALEED_SCHEMA_PACK. Domínio vive AQUI, não no core (ADR-002).",
+  "synonymClasses": [
+    [
+      "preco",
+      "valor",
+      "mensalidade",
+      "ticket",
+      "fee"
+    ],
+    ["relacao", "papel", "funcao", "cargo", "role", "profissao", "vinculo", "vinculacao", "afiliacao", "aluno"],
+    ["decisao", "decidido", "escolha", "definicao"],
+    ["compromisso", "promessa", "prometido"]
+  ],
+  "roleTokens": {},
+  "extractable": {
+    "accelera-preco": {
+      "prompt_template": "prompts/extract/accelera-preco.md",
+      "fixture_corpus": "fixtures/extract/accelera-preco.jsonl",
+      "eval_dimensions": [
+        "precos",
+        "decisoes",
+        "claims"
+      ],
+      "benchmark_min_recall": 0.8
+    },
+    "reunioes": {
+      "prompt_template": "prompts/extract/accelera-preco.md",
+      "fixture_corpus": "fixtures/extract/accelera-preco.jsonl",
+      "eval_dimensions": [
+        "precos",
+        "decisoes",
+        "objecoes",
+        "claims"
+      ]
+    },
+    "notas": {
+      "prompt_template": "prompts/extract/memoria-nao-numerica.md",
+      "fixture_corpus": "fixtures/extract/memoria-nao-numerica.jsonl",
+      "eval_dimensions": [
+        "relacoes",
+        "decisoes",
+        "compromissos",
+        "facts"
+      ],
+      "benchmark_min_recall": 0.8
+    },
+    "email": {
+      "prompt_template": "prompts/extract/memoria-nao-numerica.md",
+      "fixture_corpus": "fixtures/extract/memoria-nao-numerica.jsonl",
+      "eval_dimensions": [
+        "relacoes",
+        "decisoes",
+        "compromissos",
+        "precos",
+        "facts"
+      ],
+      "benchmark_min_recall": 0.8
+    }
+  }
+}

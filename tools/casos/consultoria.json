@@ -1,0 +1,58 @@
+{
+  "empresa": "Argo Consultoria de Marketing — Florianópolis/SC (caso 100% estratégico)",
+  "historia": "Consultoria com 8 pessoas e 12 clientes. O caso NÃO tem uma pergunta de preço: é pesquisa de mercado, análise de concorrente, decisão de posicionamento, call de alinhamento do time e dados de tráfego pago — o conhecimento que costuma morar na cabeça dos sócios e evaporar.",
+  "eventos": [
+    {
+      "ingestor": "texto",
+      "rotulo": "resumo da pesquisa de mercado (feita com 25 clientes do nicho)",
+      "payload": {
+        "title": "Pesquisa de mercado — clínicas odontológicas premium",
+        "ref": "argo-pesquisa-2026-06",
+        "occurred_at": "2026-06-20",
+        "text": "Resumo da pesquisa com 25 clínicas odontológicas de ticket alto em SC. Principais achados: 80% dizem que o maior gargalo é agenda ociosa em horário comercial, não falta de leads. 60% já contrataram agência e saíram frustradas por falta de relatório claro. O canal preferido de comunicação dos donos é WhatsApp, e a decisão de contratação é quase sempre do próprio dentista dono. Ninguém citou preço como critério principal de escolha — os critérios foram confiança, casos comprovados no nicho e clareza de relatório."
+      }
+    },
+    {
+      "ingestor": "texto",
+      "rotulo": "análise de concorrente (feita pelo time)",
+      "payload": {
+        "title": "Análise de concorrente — Agência Vetor",
+        "ref": "argo-conc-vetor-01",
+        "occurred_at": "2026-06-25",
+        "text": "A Agência Vetor, nosso principal concorrente no nicho odontológico, mudou o posicionamento: agora vende 'crescimento garantido em contrato' e abriu um squad exclusivo de clínicas. Ponto forte deles: prova social pesada (30 casos publicados). Ponto fraco: entrega padronizada, os clientes reclamam de atendimento raso nas renovações. Risco pra nós: eles estão indo pra cima da nossa base com proposta agressiva. Oportunidade: nosso atendimento próximo é exatamente o que a base deles reclama de não ter."
+      }
+    },
+    {
+      "ingestor": "notetaker",
+      "rotulo": "call de alinhamento estratégico dos sócios",
+      "payload": {
+        "title": "Alinhamento de posicionamento — sócios",
+        "ref": "argo-align-q3",
+        "occurred_at": "2026-07-01T09:00:00-03:00",
+        "participants": ["Rafa (CEO)", "Duda (Operações)", "Theo (Growth)"],
+        "transcript": "Rafa: com a pesquisa e a análise da Vetor na mesa, decidi: vamos nos especializar 100% em clínicas odontológicas premium e abandonar os outros nichos até dezembro, porque é onde temos os melhores casos e o concorrente é vulnerável no atendimento. Duda: concordo, mas assumo a responsabilidade de fazer a transição dos 4 clientes fora do nicho sem quebra de receita — me dou até setembro. Theo: aprendemos no funil do segundo trimestre que criativo com o dentista aparecendo converte o dobro do criativo institucional; vou reorientar toda a produção pra isso. Rafa: registra também o risco: se a Vetor lançar o contrato de garantia antes de nós fecharmos os 3 estudos de caso novos, perdemos a janela de diferenciação. Prioridade máxima nos estudos de caso."
+      }
+    },
+    {
+      "ingestor": "planilha",
+      "rotulo": "métricas de tráfego pago do trimestre (números que NÃO são preço)",
+      "payload": {
+        "titulo": "Tráfego pago — Q2 2026 (nicho odontológico)",
+        "data": "2026-06-30",
+        "linhas": [
+          { "entidade": "Funil odonto Q2", "atributo": "CPL", "valor": "27,50", "unidade": "BRL" },
+          { "entidade": "Funil odonto Q2", "atributo": "taxa de agendamento", "valor": "18%" },
+          { "entidade": "Criativo com dentista", "atributo": "taxa de conversão", "valor": "2,1%" },
+          { "entidade": "Criativo institucional", "atributo": "taxa de conversão", "valor": "0,9%" }
+        ]
+      }
+    }
+  ],
+  "perguntas": [
+    "Qual foi a decisão de posicionamento e por quê?",
+    "Quais compromissos os sócios assumiram e pra quando?",
+    "O que sabemos da Agência Vetor — pontos fortes, fracos e o risco pra nós?",
+    "O que a pesquisa de mercado revelou sobre como as clínicas escolhem agência?",
+    "Que aprendizado tivemos sobre criativos e o que os números mostram?"
+  ]
+}

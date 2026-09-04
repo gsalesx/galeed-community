@@ -1,0 +1,117 @@
+---
+import Section from "../components/Section.astro";
+import Endpoint from "../components/Endpoint.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import Admonition from "../components/Admonition.astro";
+
+const exemploTexto = `curl -X POST "https://seu-galeed/v1/ingestors/texto" \\
+  -H "Authorization: Bearer gld_live_8x2k...e1" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "title": "Ata da reunião", "text": "Decidimos que...", "occurred_at": "2026-07-01" }'`;
+
+const exemploChat = `{ "canal": "instagram", "chat_id": "dm-8817",
+  "chat_label": "Instagram — @beatriz",
+  "quem": "Beatriz", "texto": "Vocês têm horário no sábado?" }`;
+
+const espelho = `README.md            ← painel: o que o cérebro sabe, dossiês, últimas memórias
+conhecimento/        ← um dossiê por pessoa/empresa/assunto
+reunioes/2026/2026-08-03 — Reunião de equipe.md
+conversas/2026/2026-08-01 — WhatsApp 4799992222.md
+documentos/2026/2026-08-01 — Tabela de preços (agosto).md
+anotacoes/2026/…
+entrada/             ← SUA pasta: solte .md/.txt/.csv/.pdf e o Galeed ingere`;
+---
+
+<Section
+  id="integracoes"
+  ix="12"
+  title="Integrações prontas"
+  intro="Além do /ingest cru, o Galeed tem ingestores por canal — cada um com um webhook público que entende o formato da ferramenta e prepara o conteúdo antes do funil (dedupe + fila + extração)."
+>
+  <Endpoint method="post" path="/ingestors/:slug" scope="requer can_ingest" scopeIcon="lock" />
+
+  <div class="prose">
+    <p>
+      <code class="ic">GET /v1/ingestors</code> lista os disponíveis. Re-entregar o mesmo
+      evento <strong>não duplica</strong> (dedupe por referência estável). Ferramenta que não
+      deixa configurar header? Use <code class="ic">?token=gld_live_...</code> na URL.
+    </p>
+  </div>
+
+  <div class="sub">Ingestores de fábrica</div>
+  <div class="prose">
+    <ul>
+      <li><code class="ic">texto</code> — webhook genérico pra qualquer automação (e o template pra copiar).</li>
+      <li><code class="ic">evolution-whatsapp</code> — WhatsApp self-hosted (Evolution API, evento <i>MESSAGES_UPSERT</i>).</li>
+      <li><code class="ic">chatwoot</code> — o inbox omnichannel: WhatsApp, Instagram DM, Telegram, e-mail e livechat numa integração só (evento <i>message_created</i>).</li>
+      <li><code class="ic">chat</code> — QUALQUER canal de conversa (ManyChat, Telegram, Crisp…): a automação só mapeia os campos.</li>
+      <li><code class="ic">notetaker</code> — transcrições de reunião (Fireflies, tl;dv, MeetGeek…).</li>
+      <li><code class="ic">formulario</code> — leads e submissões (Google Forms, Typeform, site).</li>
+      <li><code class="ic">planilha</code> — tabela → fatos carimbados NA HORA, sem IA (preços, catálogo, comissões).</li>
+    </ul>
+  </div>
+
+  <CodeBlock lang="bash" filename="o mais simples: texto" code={exemploTexto} />
+
+  <div class="sub">Janela de conversa (chats não ingerem mensagem a mensagem)</div>
+  <div class="prose">
+    <p>
+      "Consegue remarcar?" sem o "claro, sexta 15h" que vem depois não vira fato. Por isso
+      todo canal de chat usa a <strong>janela de conversa</strong>: cada mensagem entra num
+      buffer por chat (<code class="ic">202 buffered</code>) e a conversa INTEIRA vira uma
+      memória só quando o chat silencia (~30 min) ou junta ~100 mensagens. A extração enxerga
+      pergunta + resposta + decisão juntas — e o custo cai ~10-20× num WhatsApp movimentado.
+    </p>
+  </div>
+
+  <CodeBlock lang="json" filename="POST /v1/ingestors/chat" code={exemploChat} />
+
+  <div class="sub">Sem código: n8n e Zapier</div>
+  <div class="prose">
+    <p>
+      <strong>n8n</strong> — nó nativo <code class="ic">n8n-nodes-galeed</code> (Settings →
+      Community Nodes): ingestão (texto, chat, reunião, formulário, planilha, payload cru) +
+      memória (perguntar, buscar fatos). <strong>Zapier</strong> — app oficial com 6 ações
+      (distribuída por link privado) ou, hoje mesmo, a ação <i>Webhooks by Zapier</i> apontando
+      pros ingestores acima. Cases prontos de Zaps no repositório
+      (<code class="ic">ZAPIER.md</code>).
+    </p>
+  </div>
+
+  <div class="sub">GitHub: o cérebro num repositório que qualquer pessoa navega</div>
+  <div class="prose">
+    <p>
+      Em <strong>Ajustes → GitHub do cérebro</strong> (repo privado + PAT fine-grained com
+      <i>contents: read/write</i>), a memória vira um repositório organizado pra gente — um
+      commit legível por sincronização (~2 min), espelho fiel (o que sai do cérebro some do
+      repo):
+    </p>
+  </div>
+
+  <CodeBlock lang="text" filename="estrutura do espelho" code={espelho} />
+
+  <div class="prose">
+    <p>
+      A <code class="ic">entrada/</code> é a sua caixa de entrada: quando o arquivo
+      <strong>some</strong> de lá, virou memória; se ficou, ainda está processando (ou deu
+      erro). Subpastas classificam: <code class="ic">entrada/reunioes/ata.md</code> entra
+      como reunião.
+    </p>
+  </div>
+
+  <div class="sub">Pasta local (Drive sem OAuth)</div>
+  <div class="prose">
+    <p>
+      Google Drive for Desktop / OneDrive / Dropbox sincronizando no disco +
+      <code class="ic">galeed pasta --dir ~/GoogleDrive/Galeed</code>: todo
+      pdf/md/txt/csv novo ou alterado entra na fila. Rodar de novo não re-ingere.
+    </p>
+  </div>
+
+  <Admonition type="warn" flush>
+    <b>Bot que também LÊ o cérebro?</b> Convide-o em <b>Acesso</b> com
+    <b>"Todas as áreas (acesso total)"</b> — o recomendado pra integrações (n8n, Zapier,
+    API). O escopo por área é fail-closed: sem o acesso total, o conteúdo que entra em modo
+    livre (sem etiqueta de área) fica invisível pro token.
+  </Admonition>
+</Section>

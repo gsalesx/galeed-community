@@ -1,0 +1,21 @@
+{
+  "_doc": "Shape oficial …/contas-a-receber/buscar — https://developers.contaazul.com/docs/financial-apis-openapi/v1/searchinstallmentstoreceivebyfilter.md (wrapper {itens, itens_totais}; mesmos campos da conta a pagar, mas com cliente no lugar de fornecedor)",
+  "_nota": "shape interno de cliente (id/nome) inferido da doc; confirmar no HTC (R7). data_vencimento_de/_ate OBRIGATÓRIOS (R4).",
+  "itens_totais": 1,
+  "itens": [
+    {
+      "id": "d7b39c7f-5678-4cde-8abc-000000000010",
+      "descricao": "Mensalidade plano Pro",
+      "data_vencimento": "2026-05-10",
+      "data_competencia": "2026-05-01",
+      "status": "RECEIVED",
+      "status_traduzido": "RECEBIDO",
+      "total": 12450.9,
+      "nao_pago": 0,
+      "pago": 12450.9,
+      "data_alteracao": "2026-05-11T10:00:00",
+      "cliente": { "id": "cli-beta-0002", "nome": "Beta Serviços SA" },
+      "categorias": [{ "id": "cat-receita", "nome": "Receita recorrente" }]
+    }
+  ]
+}

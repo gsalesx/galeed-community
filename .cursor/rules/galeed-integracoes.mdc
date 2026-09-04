@@ -1,0 +1,15 @@
+---
+description: Integrações n8n / Zapier / MCP — credenciais e fail-closed
+globs: apps/{n8n-nodes-galeed,zapier-galeed,mcp}/**/*
+alwaysApply: false
+---
+
+# Integrações
+
+- Credencial: URL do Galeed **sem** `/v1` + chave `gld_live_...`.
+- Bot que **lê** precisa de Acesso → **"Todas as áreas (acesso total)"** (senão resposta vazia).
+- Ingerir exige `can_ingest`. `ref`/`externalRef` estável evita duplicata.
+- Zapier/webhooks externos precisam de HTTPS público (localhost → túnel).
+- MCP: `npx -y @galeed/mcp` com `GALEED_KEY` + `GALEED_URL` — ver `mcp.json.example`.
+
+Skills: `galeed-n8n`, `galeed-zapier`, `galeed-conectar-ia`.

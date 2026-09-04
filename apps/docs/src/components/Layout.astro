@@ -1,0 +1,145 @@
+---
+import "../styles/global.css";
+import { sectionsByGroup } from "../data/toc";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Galeed — Documentação",
+  description = "A memória do seu negócio, via API. Galeed recebe conteúdo cru de qualquer fonte, organiza sozinho, e devolve fatos carimbados com a fonte citada.",
+} = Astro.props;
+
+const groups = sectionsByGroup();
+---
+
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="shell">
+      <!-- ============ TOC ============ -->
+      <nav class="toc">
+        <div class="brand">
+          <span class="glyph"><img src="/galeed-logo.png" alt="Galeed" /></span>
+          <span>Galeed<span class="sub">docs · API v1</span></span>
+        </div>
+
+        {
+          groups.map((g) => (
+            <>
+              <div class="grp">{g.group}</div>
+              {g.items.map((s) => (
+                <a class="lnk" href={`#${s.id}`}>
+                  <span class="ix">{s.ix}</span> {s.title}
+                  {s.method === "get" && <span class="mm get">GET</span>}
+                  {s.method === "post" && <span class="mm post">POST</span>}
+                  {s.method === "del" && <span class="mm post">DELETE</span>}
+                </a>
+              ))}
+            </>
+          ))
+        }
+
+        <div class="back">
+          <a href="https://galeed.com">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              ><path d="M19 12H5M11 18l-6-6 6-6"></path></svg
+            > Voltar ao conjunto
+          </a>
+        </div>
+      </nav>
+
+      <!-- ============ CONTENT ============ -->
+      <main class="content">
+        <slot />
+      </main>
+    </div>
+
+    <div class="toast" id="toast">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        ><path d="M20 6 9 17l-5-5"></path></svg
+      ><span id="toast-msg">Copiado</span>
+    </div>
+
+    <script>
+      // ---- copy code blocks ----
+      const toast = document.getElementById("toast")!;
+      const toastMsg = document.getElementById("toast-msg")!;
+      let toastT: ReturnType<typeof setTimeout>;
+      document.addEventListener("click", (e) => {
+        const btn = (e.target as HTMLElement).closest(".copy");
+        if (!btn) return;
+        const block = btn.closest(".codeblock");
+        // Em abas: copia o <pre> do painel ATIVO; senão, o único <pre> do bloco.
+        const code = block?.matches("[data-codetabs]")
+          ? block.querySelector<HTMLElement>(".ct-panel.active pre")
+          : block?.querySelector<HTMLElement>("pre");
+        if (!code) return;
+        navigator.clipboard?.writeText(code.innerText).then(() => {
+          toastMsg.textContent = "Código copiado";
+          toast.classList.add("show");
+          clearTimeout(toastT);
+          toastT = setTimeout(() => toast.classList.remove("show"), 1600);
+        });
+      });
+
+      // ---- code tabs: troca de aba (event delegation) ----
+      document.addEventListener("click", (e) => {
+        const tab = (e.target as HTMLElement).closest<HTMLElement>(".ct-tab");
+        if (!tab) return;
+        const wrap = tab.closest<HTMLElement>("[data-codetabs]");
+        if (!wrap) return;
+        const idx = tab.dataset.idx;
+        wrap.querySelectorAll<HTMLElement>(".ct-tab").forEach((t) => {
+          const on = t.dataset.idx === idx;
+          t.classList.toggle("active", on);
+          t.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        wrap.querySelectorAll<HTMLElement>(".ct-panel").forEach((p) => {
+          p.classList.toggle("active", p.dataset.idx === idx);
+        });
+      });
+
+      // ---- active section in TOC on scroll ----
+      const links = [...document.querySelectorAll<HTMLAnchorElement>(".toc a.lnk")];
+      const map = new Map(
+        links.map((a) => [a.getAttribute("href")!.slice(1), a]),
+      );
+      const clear = () =>
+        links.forEach((l) => {
+          l.style.background = "";
+          l.style.color = "";
+        });
+      const obs = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((en) => {
+            if (en.isIntersecting) {
+              clear();
+              const a = map.get(en.target.id);
+              if (a) {
+                a.style.background = "var(--accent-soft)";
+                a.style.color = "var(--accent-ink)";
+              }
+            }
+          });
+        },
+        { rootMargin: "-8% 0px -78% 0px" },
+      );
+      document.querySelectorAll("section[id]").forEach((s) => obs.observe(s));
+    </script>
+  </body>
+</html>

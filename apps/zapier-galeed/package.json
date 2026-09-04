@@ -1,0 +1,20 @@
+{
+  "name": "zapier-galeed",
+  "version": "0.1.0",
+  "description": "Zapier App do Galeed — a memória do seu negócio: ingira texto, chats, reuniões, formulários e planilhas, e pergunte com fonte.",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "validate": "zapier validate",
+    "smoke": "node test/smoke.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "zapier-platform-core": "19.0.0"
+  },
+  "devDependencies": {
+    "zapier-platform-cli": "19.0.0"
+  }
+}

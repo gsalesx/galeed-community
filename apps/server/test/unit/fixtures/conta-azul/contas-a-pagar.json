@@ -1,0 +1,34 @@
+{
+  "_doc": "Shape oficial POST/GET …/contas-a-pagar/buscar — https://developers.contaazul.com/docs/financial-apis-openapi/v1/searchinstallmentstopaybyfilter.md (wrapper {itens, itens_totais}; itens.id uuid, itens.descricao, itens.data_vencimento, itens.data_competencia, itens.status + itens.status_traduzido enum PERDIDO|RECEBIDO|EM_ABERTO|RENEGOCIADO|RECEBIDO_PARCIAL|ATRASADO, itens.total/nao_pago/pago, itens.data_alteracao ISO SP/GMT-3, itens.fornecedor, itens.categorias[])",
+  "_nota": "shape interno de fornecedor (id/nome) inferido da doc — a página oficial não exemplifica o objeto completo; confirmar no HTC com resposta real (R7). data_vencimento_de/_ate são OBRIGATÓRIOS na busca (R4 — janela limita o incremental).",
+  "itens_totais": 2,
+  "itens": [
+    {
+      "id": "c6a28b6e-1234-4abc-9def-000000000001",
+      "descricao": "Aluguel do escritório",
+      "data_vencimento": "2027-08-15",
+      "data_competencia": "2018-03-16",
+      "status": "OVERDUE",
+      "status_traduzido": "ATRASADO",
+      "total": 781201.79,
+      "nao_pago": 781201.79,
+      "pago": 0,
+      "data_alteracao": "2027-08-15T14:30:00",
+      "fornecedor": { "id": "forn-imob-0001", "nome": "Imobiliária Central" },
+      "categorias": [{ "id": "cat-aluguel", "nome": "Aluguel" }]
+    },
+    {
+      "id": "c6a28b6e-1234-4abc-9def-000000000002",
+      "descricao": "Fornecedor",
+      "data_vencimento": "2026-06-01",
+      "data_competencia": "2026-05-20",
+      "status": "OPEN",
+      "status_traduzido": "EM_ABERTO",
+      "total": 320.5,
+      "nao_pago": 320.5,
+      "pago": 0,
+      "data_alteracao": "2026-05-20T08:00:00",
+      "categorias": [{ "id": "cat-diversos", "nome": "Diversos" }]
+    }
+  ]
+}

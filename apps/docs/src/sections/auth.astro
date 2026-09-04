@@ -1,0 +1,91 @@
+---
+import Section from "../components/Section.astro";
+import CodeTabs from "../components/CodeTabs.astro";
+import ParamTable from "../components/ParamTable.astro";
+import Admonition from "../components/Admonition.astro";
+
+const authTabs = [
+  {
+    lang: "bash",
+    label: "curl",
+    code: `curl https://api.galeed.com/v1/ask \\
+  -H "Authorization: Bearer gld_live_8x2k9d2m...e1" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "question": "Qual o preço fechado com a Acme?" }'`,
+  },
+  {
+    lang: "javascript",
+    label: "Node",
+    code: `const res = await fetch("https://api.galeed.com/v1/ask", {
+  method: "POST",
+  headers: {
+    authorization: "Bearer gld_live_8x2k9d2m...e1",
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({ question: "Qual o preço fechado com a Acme?" }),
+});`,
+  },
+  {
+    lang: "python",
+    label: "Python",
+    code: `import requests
+
+res = requests.post(
+    "https://api.galeed.com/v1/ask",
+    headers={
+        "Authorization": "Bearer gld_live_8x2k9d2m...e1",
+        "Content-Type": "application/json",
+    },
+    json={"question": "Qual o preço fechado com a Acme?"},
+)`,
+  },
+];
+---
+
+<Section
+  id="auth"
+  ix="06"
+  title="Autenticação"
+  intro="Toda chamada usa a chave do bot do cérebro, no header Authorization. A chave já carrega o escopo — a API nunca devolve mais do que ela pode ver."
+>
+  <CodeTabs tabs={authTabs} filename="header em toda chamada" />
+
+  <div class="sub">Escopo da chave</div>
+  <div class="prose">
+    <p>
+      Cada chave nasce com um conjunto de áreas e um teto de sigilo. Toda leitura
+      é filtrada por esse escopo do lado do servidor: se a chave não alcança o
+      <code class="ic">financeiro</code>, uma pergunta sobre preço simplesmente não
+      enxerga aqueles fatos. É menor privilégio por padrão — a chave só vê o que
+      você liberou.
+    </p>
+  </div>
+
+  <ParamTable
+    cols={["Campo da chave", "Descrição"]}
+    rows={[
+      {
+        name: "areas",
+        type: "string[]",
+        desc: 'As áreas que a chave pode ler. <code class="ic">["*"]</code> = todas (use com cautela).',
+      },
+      {
+        name: "max_sensitivity",
+        type: "enum",
+        desc: "O teto de sigilo: <b>open</b> · internal · confidential · secret. Nada acima é retornado.",
+      },
+      {
+        name: "can_ingest",
+        type: "boolean",
+        desc: 'Se a chave pode escrever (<code class="ic">/v1/ingest</code>) ou só ler.',
+      },
+    ]}
+  />
+
+  <Admonition type="warn" flush>
+    <b>Falha fechado.</b> Conteúdo recém-ingerido, ainda sem classificação, entra
+    como <code class="ic">secret</code> por padrão. Ele só fica visível depois que
+    alguém amplia o acesso de propósito. Não é bug: é o princípio de nunca vazar
+    nada por engano.
+  </Admonition>
+</Section>

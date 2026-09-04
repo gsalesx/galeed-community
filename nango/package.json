@@ -1,0 +1,10 @@
+{
+  "name": "galeed-nango-conta-azul",
+  "private": true,
+  "description": "Sync functions Nango da Conta Azul (M22-B) — artefato de DEPLOY isolado; NÃO é instalado pelo npm install da raiz.",
+  "type": "module",
+  "dependencies": {
+    "nango": "latest",
+    "zod": "^3.23.8"
+  }
+}

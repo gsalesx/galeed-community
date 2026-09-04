@@ -1,0 +1,495 @@
+---
+import Section from "../components/Section.astro";
+import Chip from "../components/Chip.astro";
+import Admonition from "../components/Admonition.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import { SECTIONS } from "../data/toc";
+
+// índice e título vêm da fonte única (toc.ts) — sem hardcode que descole da nav.
+const meta = SECTIONS.find((s) => s.id === "fluxos")!;
+
+const askWithheld = `{
+  "answer": "O preço atual da Acme é R$ 2.500/mês.",
+  "facts": [ /* ... só o que a chave alcança ... */ ],
+  "withheld": { "count": 3, "reason": "fora do seu acesso" }
+}`;
+
+const supersededEvent = `{
+  "event": "fact.superseded",
+  "archived": {
+    "id": "fact_7a1j04",
+    "text": "Preço Acme: R$ 12.000/mês",
+    "valid_until": "2026-05-30"
+  },
+  "successor": {
+    "id": "fact_8x2k01",
+    "text": "Preço Acme: R$ 2.500/mês",
+    "supersedes": "fact_7a1j04"
+  }
+}`;
+---
+
+<Section
+  id={meta.id}
+  ix={meta.ix}
+  title={meta.title}
+  intro="Como as peças se encaixam, em três desenhos: o loop central, a leitura que falha fechado, e a linha do tempo que nunca apaga o passado."
+>
+  <!-- ============ FLUXO 1 — ingere → organiza → pergunta ============ -->
+  <div class="sub">1 · O loop central</div>
+  <div class="prose">
+    <p>
+      Tudo no Galeed gira em torno de três verbos. Você <strong>ingere</strong> conteúdo cru,
+      ele <strong>organiza</strong> sozinho (cada trecho vira fato ou hipótese, ligado a pessoas,
+      áreas e uma fonte citável), e você <strong>pergunta</strong> em português. A resposta volta
+      com a fonte carimbada — e cada pergunta nova reaproveita tudo que já entrou.
+    </p>
+  </div>
+
+  <div class="flow loop">
+    <div class="node">
+      <span class="ntag">POST <span class="np">/v1/ingest</span></span>
+      <span class="nt">Você ingere</span>
+      <span class="nd">Joga o texto cru: call, e-mail, mensagem. Sem formatar nada.</span>
+    </div>
+    <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"
+      ><path d="M2 12h32M28 6l8 6-8 6" fill="none" stroke="currentColor" stroke-width="2"
+      ></path></svg
+    >
+    <div class="node accent">
+      <span class="ntag">async</span>
+      <span class="nt">Ele organiza</span>
+      <span class="nd">Classifica, liga às pessoas e áreas, decide o que vira fato. O cérebro nunca chuta.</span>
+    </div>
+    <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"
+      ><path d="M2 12h32M28 6l8 6-8 6" fill="none" stroke="currentColor" stroke-width="2"
+      ></path></svg
+    >
+    <div class="node">
+      <span class="ntag">POST <span class="np">/v1/ask</span></span>
+      <span class="nt">Você pergunta</span>
+      <span class="nd">Em linguagem natural. Recebe síntese + fatos, cada um com o selo da fonte.</span>
+    </div>
+    <!-- a volta: o que organizou alimenta a próxima pergunta -->
+    <svg class="loopback" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"
+      ><path
+        d="M97 4 C97 32, 50 36, 3 36 M11 30l-8 6 8 6"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-dasharray="4 4"></path></svg
+    >
+    <span class="loopnote">cada fato vira contexto para a próxima pergunta</span>
+  </div>
+
+  <Admonition type="note">
+    <b>O loop não tem fim de linha.</b> O que você ingere hoje sustenta a resposta de amanhã.
+    Não há etapa de "indexar" ou "treinar" à mão: ingerir é alimentar a memória, perguntar é
+    consultá-la.
+  </Admonition>
+
+  <!-- ============ FLUXO 2 — escopo & falha fechado ============ -->
+  <div class="sub">2 · Escopo e falha fechado</div>
+  <div class="prose">
+    <p>
+      A chave do bot já carrega o escopo: as <strong>áreas</strong> que pode ler e o
+      <strong>teto de sigilo</strong>. Toda leitura é filtrada no servidor por esse escopo.
+      Se um fato está acima do que a chave alcança, ele nunca aparece — e a resposta ainda diz
+      quantos ficaram de fora, em vez de fingir que está completa.
+    </p>
+  </div>
+
+  <div class="flow gate">
+    <div class="node key">
+      <span class="ntag">chave do bot</span>
+      <span class="nt">Escopo restrito</span>
+      <div class="kv">
+        <span class="kk">areas</span><span class="kvv mono">["vendas"]</span>
+        <span class="kk">max_sensitivity</span><span class="kvv"><Chip variant="s-int">internal</Chip></span>
+      </div>
+    </div>
+    <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"
+      ><path d="M2 12h32M28 6l8 6-8 6" fill="none" stroke="currentColor" stroke-width="2"
+      ></path></svg
+    >
+    <div class="node filter">
+      <span class="ntag"
+        ><svg class="ic-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          ><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"
+          ></path></svg
+        > filtro no servidor</span
+      >
+      <span class="nt">Leitura filtrada</span>
+      <span class="nd">Cada fato é testado contra a área e o sigilo da chave, antes de sair.</span>
+    </div>
+    <svg class="arrow split" viewBox="0 0 40 60" aria-hidden="true"
+      ><path
+        d="M2 30h14M16 12v36M16 12h12M16 48h12M24 6l8 6-8 6M24 42l8 6-8 6"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"></path></svg
+    >
+    <div class="branches">
+      <div class="node pass">
+        <span class="btag ok">passa</span>
+        <span class="nd"
+          ><Chip variant="fact">fact</Chip> em <code class="ic">vendas</code>, sigilo
+          <Chip variant="s-int">internal</Chip> → entra na resposta.</span
+        >
+      </div>
+      <div class="node block">
+        <span class="btag err">403 · withheld</span>
+        <span class="nd"
+          ><Chip variant="fact">fact</Chip> em <code class="ic">financeiro</code> ou marcado
+          <Chip variant="s-secret">secret</Chip> → fica de fora, contado em
+          <code class="ic">withheld</code>.</span
+        >
+      </div>
+    </div>
+  </div>
+
+  <CodeBlock lang="json" filename="resposta · o que ficou de fora" code={askWithheld} />
+
+  <Admonition type="warn">
+    <b>Falha fechado.</b> Conteúdo recém-ingerido, ainda sem classificação, entra como
+    <Chip variant="s-secret">secret</Chip> por padrão. Ele só fica visível quando alguém amplia o
+    acesso de propósito. O default é esconder, nunca vazar por engano.
+  </Admonition>
+
+  <!-- ============ FLUXO 3 — linha do tempo / supersede ============ -->
+  <div class="sub">3 · Linha do tempo e supersede</div>
+  <div class="prose">
+    <p>
+      A memória do Galeed não sobrescreve — ela <strong>versiona</strong>. Quando um fato novo
+      contradiz um antigo, o antigo não some: ele vira <strong>archived</strong>, ganha um
+      <code class="ic">valid_until</code>, e o novo aponta para ele em <code class="ic">supersedes</code>.
+      Com <code class="ic">as_of</code> você revisita qualquer data e vê o que era verdade naquele
+      momento.
+    </p>
+  </div>
+
+  <div class="timeline">
+    <div class="tline" aria-hidden="true"></div>
+
+    <div class="tevent">
+      <span class="dot arch"></span>
+      <span class="tdate mono">mar/2026</span>
+      <div class="tcard archived">
+        <Chip variant="arch">archived</Chip>
+        <span class="tfact">Preço Acme: <b>R$ 12.000/mês</b></span>
+        <span class="tmeta mono">valid_until: 2026-05-30</span>
+      </div>
+    </div>
+
+    <div class="tevent">
+      <span class="dot fact"></span>
+      <span class="tdate mono">jun/2026</span>
+      <div class="tcard current">
+        <Chip variant="fact">fact</Chip>
+        <span class="tfact">Preço Acme: <b>R$ 2.500/mês</b></span>
+        <span class="tmeta mono">supersedes: fact_7a1j04 · valid_until: null</span>
+      </div>
+    </div>
+
+    <div class="asof">
+      <svg class="asof-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        ><path d="M3 12a9 9 0 1 0 9-9 9.7 9.7 0 0 0-6.7 2.7L3 8M3 3v5h5"></path></svg
+      >
+      <span
+        ><code class="ic">GET /v1/facts?as_of=2026-04-01</code> devolve o registro como ele era — o
+        preço de R$ 12.000, ainda vivo, antes de virar arquivado.</span
+      >
+    </div>
+  </div>
+
+  <CodeBlock lang="json" filename="webhook · fact.superseded" code={supersededEvent} />
+
+  <Admonition type="tip" flush>
+    <b>Nada se perde, nada vira fato sozinho.</b> O fato substituído continua consultável por
+    auditoria; o substituto carrega a prova de quem veio antes. É o monte de pedras: cada versão
+    fica registrada, na ordem em que virou verdade.
+  </Admonition>
+</Section>
+
+<style>
+  /* ---------- diagramas dos fluxos (mesma linguagem do design) ---------- */
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin: 14px 0 4px;
+    position: relative;
+  }
+
+  .node {
+    flex: 1 1 0;
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 14px 15px;
+    box-shadow: var(--shadow);
+  }
+  .node.accent {
+    border-color: oklch(82% 0.06 150);
+    background: linear-gradient(180deg, var(--accent-soft), var(--surface) 70%);
+  }
+  .node .ntag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+  .node.accent .ntag {
+    color: var(--accent-ink);
+    background: var(--surface);
+    border-color: oklch(88% 0.04 150);
+  }
+  .node .ntag .np {
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+  .node .nt {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+  .node .nd {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  .arrow {
+    width: 38px;
+    flex-shrink: 0;
+    align-self: center;
+    color: var(--border-strong);
+  }
+
+  /* loop 1 — a volta tracejada por baixo */
+  .flow.loop {
+    padding-bottom: 36px;
+  }
+  .flow.loop .loopback {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 36px;
+    color: var(--accent);
+    opacity: 0.55;
+  }
+  .flow.loop .loopnote {
+    position: absolute;
+    bottom: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--accent-ink);
+    background: var(--bg);
+    padding: 0 8px;
+  }
+
+  /* fluxo 2 — escopo */
+  .node.key .kv {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5px 10px;
+    align-items: center;
+    margin-top: 2px;
+  }
+  .node.key .kk {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+  }
+  .node.key .kvv {
+    font-size: 12px;
+    color: var(--fg);
+  }
+  .node.filter .ic-lock {
+    width: 12px;
+    height: 12px;
+    color: var(--faint);
+  }
+  .arrow.split {
+    width: 38px;
+    height: auto;
+    align-self: center;
+  }
+  .branches {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1 1 240px;
+    min-width: 220px;
+  }
+  .node.pass {
+    border-color: oklch(85% 0.05 150);
+    background: var(--accent-soft);
+  }
+  .node.block {
+    border-color: oklch(86% 0.06 25);
+    background: var(--sn-secret-soft);
+  }
+  .branches .node {
+    box-shadow: none;
+    padding: 12px 14px;
+  }
+  .btag {
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+  .btag.ok {
+    color: var(--accent-ink);
+    background: var(--surface);
+  }
+  .btag.err {
+    color: var(--danger);
+    background: var(--surface);
+  }
+
+  /* fluxo 3 — linha do tempo */
+  .timeline {
+    position: relative;
+    margin: 16px 0 4px;
+    padding-left: 26px;
+  }
+  .timeline .tline {
+    position: absolute;
+    left: 6px;
+    top: 8px;
+    bottom: 8px;
+    width: 1.5px;
+    background: var(--border-strong);
+  }
+  .tevent {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .tevent .dot {
+    position: absolute;
+    left: -26px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px var(--bg);
+  }
+  .tevent .dot.arch {
+    background: var(--st-arch);
+  }
+  .tevent .dot.fact {
+    background: var(--st-fact);
+  }
+  .tevent .tdate {
+    font-size: 11px;
+    color: var(--faint);
+    width: 60px;
+    flex-shrink: 0;
+  }
+  .tcard {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--surface);
+    padding: 11px 14px;
+  }
+  .tcard.current {
+    border-color: oklch(88% 0.04 250);
+    background: var(--st-fact-soft);
+  }
+  .tcard.archived {
+    background: var(--surface-2);
+  }
+  .tcard .tfact {
+    font-size: 13.5px;
+    color: var(--fg);
+  }
+  .tcard.archived .tfact {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--border-strong);
+  }
+  .tcard .tfact b {
+    font-weight: 600;
+  }
+  .tcard .tmeta {
+    margin-left: auto;
+    font-size: 10.5px;
+    color: var(--faint);
+  }
+  .asof {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 16px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 11px;
+    background: var(--surface);
+    padding: 13px 15px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+  .asof .asof-ic {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--accent);
+  }
+
+  @media (max-width: 720px) {
+    .flow {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .flow .arrow {
+      transform: rotate(90deg);
+      width: 26px;
+      margin: 0 auto;
+    }
+    .flow.loop .loopback,
+    .flow.loop .loopnote {
+      display: none;
+    }
+    .flow.loop {
+      padding-bottom: 0;
+    }
+    .arrow.split {
+      height: 26px;
+    }
+    .tcard .tmeta {
+      margin-left: 0;
+    }
+  }
+</style>

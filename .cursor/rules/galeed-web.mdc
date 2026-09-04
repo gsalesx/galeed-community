@@ -1,0 +1,13 @@
+---
+description: Painel React (apps/web) — telas e BFF
+globs: apps/web/**/*
+alwaysApply: false
+---
+
+# Painel web
+
+- Telas em `apps/web/src/screens/` — uma pasta por tela.
+- Dados do painel vêm do BFF `/api` (`apps/server/src/connectors/web-server.ts`), sessão por cookie.
+- Dev: `npm run dev` na raiz sobe Vite em `:5173` + BFF `:8789`. Painel em branco = BFF caiu.
+- Preserve o design system existente; não inventar layout genérico de dashboard novo.
+- Auth/cookie: em produção atrás de HTTPS use `GALEED_SECURE_COOKIES=1`.

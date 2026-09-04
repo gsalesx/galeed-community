@@ -1,0 +1,151 @@
+/* Galeed — base.css: reset + body + tipografia base + utilitárias + foco.
+   Depende de tokens.css. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--fg);
+  background-color: var(--bg);
+  /* radial-gradient accent-soft do mockup: leve sopro verde no topo */
+  background-image: radial-gradient(
+    1200px 600px at 70% -10%,
+    var(--accent-soft),
+    transparent 60%
+  );
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tipografia base */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  /* herda a cor do contexto (body=--fg no claro; #fff dentro de blocos escuros) —
+     forçar --fg aqui deixava título escuro invisível em seção escura (hero, AskCard etc.) */
+  color: inherit;
+}
+h1 {
+  font-size: 32px;
+  letter-spacing: -0.025em;
+}
+h2 {
+  font-size: 24px;
+  font-weight: 600;
+}
+h3 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+p {
+  line-height: 1.55;
+}
+
+a {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+code,
+kbd,
+samp {
+  font-family: var(--mono);
+}
+
+/* Utilitárias mínimas */
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.muted {
+  color: var(--muted);
+}
+.faint {
+  color: var(--faint);
+}
+
+/* Foco acessível — anel accent-soft, sem outline padrão */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* Animações compartilhadas (Loading "pensando") */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes bounce {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Hover de componentes (inline style não cobre :hover) */
+button[data-variant="primary"]:hover:not(:disabled) {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+}
+button[data-variant="secondary"]:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+button[data-variant="ghost"]:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
