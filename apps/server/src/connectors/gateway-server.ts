@@ -182,6 +182,23 @@ function bearerToken(req: IncomingMessage): string {
   return m ? m[1].trim() : "";
 }
 
+/** Metadados do webhook pra log — sem token, sem texto da mensagem. */
+function webhookEventMeta(body: unknown): { event: string; instance: string; dataItems: number } {
+  const b = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const event = typeof b.event === "string" ? b.event : "";
+  let instance = "";
+  if (typeof b.instance === "string") instance = b.instance;
+  else if (typeof b.instanceName === "string") instance = b.instanceName;
+  else if (b.instance && typeof b.instance === "object") {
+    const inst = b.instance as Record<string, unknown>;
+    if (typeof inst.instanceName === "string") instance = inst.instanceName;
+    else if (typeof inst.name === "string") instance = inst.name;
+  }
+  const data = b.data;
+  const dataItems = Array.isArray(data) ? data.length : data && typeof data === "object" ? 1 : 0;
+  return { event, instance, dataItems };
+}
+
 /** auditoria de leitura (best-effort, não derruba a request). Espelha logAccess do api-server.ts. */
 async function logAccess(brain: string, scope: Scope, query: string, nReturned: number) {
   try {
@@ -387,9 +404,22 @@ export function startGatewayServer(bootHome = brainHome()) {
       // mandam header Authorization (ex.: alguns paineis de notetaker) conseguem entregar mesmo
       // assim. Custo conhecido: token pode vazar em log de acesso — documentado no INGESTORES.md;
       // prefira SEMPRE o header quando a ferramenta suportar.
-      const token = bearerToken(req) || (ingestorsMatch ? String(u.searchParams.get("token") ?? "").trim() : "");
+      const bearer = bearerToken(req);
+      const queryTok = ingestorsMatch ? String(u.searchParams.get("token") ?? "").trim() : "";
+      const token = bearer || queryTok;
+      const authSource = bearer ? "bearer" : queryTok ? "query" : "none";
+      if (req.method === "POST" && ingestorsMatch?.[1]) {
+        console.error(
+          `[ingestor-webhook] hit slug=${ingestorsMatch[1]} auth=${authSource} hasBearer=${Boolean(bearer)} hasQueryToken=${Boolean(queryTok)}`,
+        );
+      }
       const auth = token ? await authenticateTokenGlobal(token) : null;
-      if (!auth) return send(res, 401, { error: "token inválido" });
+      if (!auth) {
+        if (req.method === "POST" && ingestorsMatch?.[1]) {
+          console.error(`[ingestor-webhook] 401 slug=${ingestorsMatch[1]} auth=${authSource}`);
+        }
+        return send(res, 401, { error: "token inválido" });
+      }
       const { brain, scope } = auth;
 
       // ----- POST /v1/ask -----
@@ -554,6 +584,7 @@ export function startGatewayServer(bootHome = brainHome()) {
         // mesmo gate de escrita fail-closed do /v1/ingest.
         if (!scope.canIngest) {
           emitAccessDenied(brain, scope, "can_ingest", `/v1/ingestors/${slug}`);
+          console.error(`[ingestor-webhook] 403 can_ingest slug=${slug} brain=${brain} principal=${scope.principalId}`);
           return send(res, 403, { error: "token sem capacidade de escrita (can_ingest)" });
         }
         const ing = getIngestor(slug);
@@ -594,7 +625,10 @@ export function startGatewayServer(bootHome = brainHome()) {
           r = await deliverIngestorWebhook(brain, ing, body);
         } catch (err) {
           // erro de USO (payload ruim / normalize plugável quebrado) → 400 legível; infra segue pro 500.
-          if (err instanceof IngestorUsageError) return send(res, 400, { error: err.message });
+          if (err instanceof IngestorUsageError) {
+            console.error(`[ingestor-webhook] 400 slug=${slug} brain=${brain} err=${err.message}`);
+            return send(res, 400, { error: err.message });
+          }
           throw err;
         }
         await logAccess(brain, scope, `ingestor:${slug}`, r.enfileirados + r.aplicados);
@@ -603,10 +637,15 @@ export function startGatewayServer(bootHome = brainHome()) {
         // "ignored" — 4xx faria a ferramenta re-tentar pra sempre. 400 SÓ quando havia itens e
         // NENHUM entrou (payload malformado de verdade — aí re-tentar até é útil pra debugar).
         if (r.recebidos > 0 && r.erros.length === r.recebidos) {
+          console.error(`[ingestor-webhook] 400 lote-vazio slug=${slug} brain=${brain} erros=${r.erros.length}`);
           return send(res, 400, { error: "nenhum item do lote pôde entrar", detalhes: r.erros });
         }
         // "buffered" = mensagens acumuladas na janela de conversa (ingerem quando ela fechar).
         const status = r.recebidos === 0 ? "ignored" : r.najanela === r.recebidos ? "buffered" : "organizing";
+        const meta = webhookEventMeta(body);
+        console.error(
+          `[ingestor-webhook] ok slug=${slug} brain=${brain} event=${meta.event || "-"} instance=${meta.instance || "-"} dataItems=${meta.dataItems} status=${status} recebidos=${r.recebidos} na_janela=${r.najanela} enfileirados=${r.enfileirados} erros=${r.erros.length}`,
+        );
         return send(res, 202, {
           status,
           ingestor: r.ingestor,

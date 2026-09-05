@@ -519,7 +519,9 @@ function WhatsAppEvolution({
           lastError: view.lastError,
         }]
       : [];
+  const hasPending = instances.some((i) => !i.connected);
   const waiting = instances.some((i) => !i.connected && (i.qrBase64 || i.pairingCode || i.state === "connecting"));
+  const canAddAnother = instances.length > 0 && !hasPending;
 
   function apply(r: Awaited<ReturnType<typeof api.evolution.connect>>) {
     setLocal(r);
@@ -750,7 +752,7 @@ function WhatsAppEvolution({
         </div>
       ))}
 
-      {(adding || instances.length === 0 || instances.some((i) => !i.connected)) && view?.configured !== false && (
+      {(adding || instances.length === 0 || hasPending) && view?.configured !== false && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <Button size="sm" variant={mode === "qr" ? "primary" : "secondary"} onClick={() => setMode("qr")}>
@@ -789,18 +791,20 @@ function WhatsAppEvolution({
               )}
             </div>
           )}
-          <Button
-            variant="primary"
-            disabled={busy !== null || view?.online === false || (mode === "number" && digitsHint.length < 10)}
-            onClick={() =>
-              connect({
-                add: instances.length > 0,
-                number: mode === "number" ? digitsHint : undefined,
-              })
-            }
-          >
-            {busy === "add" || busy === "new" ? "Conectando…" : instances.length ? "Gerar conta" : "Conectar WhatsApp"}
-          </Button>
+          {(instances.length === 0 || adding) && !hasPending && (
+            <Button
+              variant="primary"
+              disabled={busy !== null || view?.online === false || (mode === "number" && digitsHint.length < 10)}
+              onClick={() =>
+                connect({
+                  add: canAddAnother,
+                  number: mode === "number" ? digitsHint : undefined,
+                })
+              }
+            >
+              {busy === "add" || busy === "new" ? "Conectando…" : instances.length ? "Gerar conta" : "Conectar WhatsApp"}
+            </Button>
+          )}
         </div>
       )}
 
@@ -808,7 +812,7 @@ function WhatsAppEvolution({
         <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--danger)", lineHeight: 1.45 }}>{view.lastError}</p>
       )}
 
-      {view?.online && instances.length > 0 && !adding && (
+      {view?.online && canAddAnother && !adding && (
         <Button variant="secondary" disabled={busy !== null} onClick={() => { setAdding(true); setMode("qr"); }}>
           Adicionar WhatsApp
         </Button>
