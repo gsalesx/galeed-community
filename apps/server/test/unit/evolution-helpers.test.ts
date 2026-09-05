@@ -86,6 +86,7 @@ describe("painel Conectar WhatsApp", () => {
   it("lista contas, QR ou número e pairing code", () => {
     expect(ui).toContain("Adicionar WhatsApp");
     expect(ui).toContain("Conectar com número de telefone");
-    expect(ui).toContain("pairingCode");
+    expect(ui).toContain("keepPendingCodes");
+    expect(ui).toContain("Pedir código");
   });
 });

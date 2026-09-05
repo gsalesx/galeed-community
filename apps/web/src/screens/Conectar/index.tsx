@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Icon, Modal, Toast } from "../../ui";
 import { api } from "../../lib/api";
-import type { Principal, Token } from "../../lib/api";
+import type { EvolutionStatus, Principal, Token } from "../../lib/api";
 import { useMutation, useQuery } from "../../lib/useQuery";
 import { useBrain } from "../../lib/auth";
 import { relativeTime } from "../../lib/format";
@@ -491,6 +491,39 @@ function KeysEmpty() {
 
 /** Ingestores prontos — webhooks de fábrica do registry (GET /api/ingestors). Cada um já sabe
  *  "trabalhar" o payload do canal (o middleware) antes de ingerir: é só apontar a ferramenta pra URL. */
+/** Status não traz QR/código — o poll não pode apagar o que o connect acabou de devolver. */
+function keepPendingCodes(next: EvolutionStatus, prev: EvolutionStatus | null): EvolutionStatus {
+  const prevList = prev?.instances?.length
+    ? prev.instances
+    : prev?.instanceName
+      ? [{
+          instanceName: prev.instanceName,
+          state: prev.state,
+          connected: prev.connected,
+          qrBase64: prev.qrBase64,
+          pairingCode: prev.pairingCode ?? null,
+          lastError: prev.lastError,
+        }]
+      : [];
+  const prevByName = new Map(prevList.map((i) => [i.instanceName, i]));
+  const list = (next.instances ?? []).map((inst) => {
+    if (inst.connected) return { ...inst, qrBase64: null, pairingCode: null };
+    const p = prevByName.get(inst.instanceName);
+    return {
+      ...inst,
+      qrBase64: inst.qrBase64 || p?.qrBase64 || null,
+      pairingCode: inst.pairingCode || p?.pairingCode || null,
+    };
+  });
+  const focus = list.find((i) => !i.connected && (i.qrBase64 || i.pairingCode));
+  return {
+    ...next,
+    instances: list,
+    qrBase64: next.qrBase64 || focus?.qrBase64 || null,
+    pairingCode: next.pairingCode || focus?.pairingCode || null,
+  };
+}
+
 function WhatsAppEvolution({
   setToast,
 }: {
@@ -579,7 +612,7 @@ function WhatsAppEvolution({
         const now = s.instances ?? [];
         const was = instances.filter((i) => !i.connected).map((i) => i.instanceName);
         const newly = now.filter((i) => i.connected && was.includes(i.instanceName));
-        setLocal(s);
+        setLocal((prev) => keepPendingCodes(s, prev));
         if (newly.length) {
           setToast({ msg: newly.length === 1 ? "WhatsApp conectado!" : "Contas WhatsApp conectadas.", tone: "ok" });
           stQ.refetch();
@@ -720,6 +753,15 @@ function WhatsAppEvolution({
                   Desconectar
                 </Button>
               </>
+            ) : mode === "number" ? (
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={busy !== null || digitsHint.length < 10 || view?.configured === false}
+                onClick={() => connect({ instanceName: inst.instanceName, number: digitsHint })}
+              >
+                {busy === inst.instanceName ? "Conectando…" : "Pedir código"}
+              </Button>
             ) : (
               <>
                 <Button
@@ -737,14 +779,6 @@ function WhatsAppEvolution({
                   onClick={() => refreshQr(inst.instanceName)}
                 >
                   Renovar QR
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy !== null || digitsHint.length < 10}
-                  onClick={() => connect({ instanceName: inst.instanceName, number: digitsHint })}
-                >
-                  Pedir código
                 </Button>
               </>
             )}
@@ -803,6 +837,19 @@ function WhatsAppEvolution({
               }
             >
               {busy === "add" || busy === "new" ? "Conectando…" : instances.length ? "Gerar conta" : "Conectar WhatsApp"}
+            </Button>
+          )}
+          {hasPending && mode === "number" && (
+            <Button
+              variant="primary"
+              disabled={busy !== null || view?.online === false || digitsHint.length < 10}
+              onClick={() => {
+                const pending = instances.find((i) => !i.connected);
+                if (!pending) return;
+                connect({ instanceName: pending.instanceName, number: digitsHint });
+              }}
+            >
+              Pedir código
             </Button>
           )}
         </div>
