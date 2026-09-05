@@ -10,6 +10,7 @@ import {
   extractPairingCode,
   normalizeWhatsAppNumber,
   isZombieEvolutionState,
+  keepEvolutionInstances,
   evolutionFetch,
   getEvolutionConfig,
   upsertEvolutionConfig,
@@ -373,6 +374,14 @@ export async function evolutionStatusHandler(home: string): Promise<EvolutionSta
   }
 
   await reconcileFromEvolution(home);
+  const rows = await listEvolutionInstances(home);
+  const stated = await Promise.all(
+    rows.map(async (r) => ({
+      instanceName: r.instanceName,
+      state: await fetchConnectionState(r.instanceName),
+    })),
+  );
+  await cleanupZombies(home, keepEvolutionInstances(stated));
   return statusPack(home, cfg?.ingestToken ?? null, { lastError: cfg?.lastError ?? null });
 }
 

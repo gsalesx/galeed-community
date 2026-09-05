@@ -89,6 +89,25 @@ export function isZombieEvolutionState(state: string | null | undefined): boolea
   return s === "close" || s === "closed" || s.includes("not connection") || s === "refused";
 }
 
+/** Preserva open/connecting/unknown e no máximo 1 zumbi (o slot de QR). Extra CLOSE some. */
+export function keepEvolutionInstances(
+  rows: { instanceName: string; state: string | null }[],
+): Set<string> {
+  const keep = new Set<string>();
+  const zombies: string[] = [];
+  for (const r of rows) {
+    const s = (r.state || "").toLowerCase();
+    if (s === "open" || s === "connecting") keep.add(r.instanceName);
+    else if (isZombieEvolutionState(r.state)) zombies.push(r.instanceName);
+    else keep.add(r.instanceName);
+  }
+  if (zombies.length) {
+    zombies.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    keep.add(zombies[zombies.length - 1]);
+  }
+  return keep;
+}
+
 /** Código de emparelhamento (8 chars) das formas comuns da Evolution v2. */
 export function extractPairingCode(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;

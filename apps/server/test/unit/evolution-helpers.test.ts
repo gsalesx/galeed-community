@@ -9,6 +9,7 @@ import {
   extractPairingCode,
   normalizeWhatsAppNumber,
   isZombieEvolutionState,
+  keepEvolutionInstances,
 } from "../../src/core/platform/evolution.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -46,6 +47,22 @@ describe("normalizeWhatsAppNumber / pairing / zombie", () => {
     expect(isZombieEvolutionState("NOT CONNECTION")).toBe(true);
     expect(isZombieEvolutionState("open")).toBe(false);
     expect(isZombieEvolutionState("connecting")).toBe(false);
+  });
+  it("no status, preserva a open e no máximo 1 CLOSE", () => {
+    const keep = keepEvolutionInstances([
+      { instanceName: "galeed-x", state: "open" },
+      { instanceName: "galeed-x-2", state: "close" },
+      { instanceName: "galeed-x-3", state: "close" },
+      { instanceName: "galeed-x-4", state: "close" },
+    ]);
+    expect([...keep].sort()).toEqual(["galeed-x", "galeed-x-4"]);
+  });
+  it("sem open, fica só o último CLOSE (slot de QR)", () => {
+    const keep = keepEvolutionInstances([
+      { instanceName: "galeed-x-2", state: "close" },
+      { instanceName: "galeed-x-3", state: "close" },
+    ]);
+    expect([...keep]).toEqual(["galeed-x-3"]);
   });
 });
 
