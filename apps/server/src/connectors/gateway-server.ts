@@ -404,21 +404,28 @@ export function startGatewayServer(bootHome = brainHome()) {
       // mandam header Authorization (ex.: alguns paineis de notetaker) conseguem entregar mesmo
       // assim. Custo conhecido: token pode vazar em log de acesso — documentado no INGESTORES.md;
       // prefira SEMPRE o header quando a ferramenta suportar.
+      // Evolution manda Authorization (apikey dela) E ?token=gld_… — se o Bearer falhar, tenta a query.
       const bearer = bearerToken(req);
       const queryTok = ingestorsMatch ? String(u.searchParams.get("token") ?? "").trim() : "";
-      const token = bearer || queryTok;
-      const authSource = bearer ? "bearer" : queryTok ? "query" : "none";
       if (req.method === "POST" && ingestorsMatch?.[1]) {
         console.error(
-          `[ingestor-webhook] hit slug=${ingestorsMatch[1]} auth=${authSource} hasBearer=${Boolean(bearer)} hasQueryToken=${Boolean(queryTok)}`,
+          `[ingestor-webhook] hit slug=${ingestorsMatch[1]} hasBearer=${Boolean(bearer)} hasQueryToken=${Boolean(queryTok)}`,
         );
       }
-      const auth = token ? await authenticateTokenGlobal(token) : null;
+      let auth = bearer ? await authenticateTokenGlobal(bearer) : null;
+      let authSource = bearer ? "bearer" : queryTok ? "query" : "none";
+      if (!auth && queryTok && queryTok !== bearer) {
+        auth = await authenticateTokenGlobal(queryTok);
+        if (auth) authSource = bearer ? "query-fallback" : "query";
+      }
       if (!auth) {
         if (req.method === "POST" && ingestorsMatch?.[1]) {
           console.error(`[ingestor-webhook] 401 slug=${ingestorsMatch[1]} auth=${authSource}`);
         }
         return send(res, 401, { error: "token inválido" });
+      }
+      if (req.method === "POST" && ingestorsMatch?.[1] && authSource === "query-fallback") {
+        console.error(`[ingestor-webhook] auth-ok slug=${ingestorsMatch[1]} auth=${authSource}`);
       }
       const { brain, scope } = auth;
 
