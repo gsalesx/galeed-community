@@ -1,6 +1,6 @@
 /** BFF WhatsApp via Evolution — N contas por cérebro (QR ou pairing code).
  *  Cria bot com can_ingest + acesso total, configura webhook MESSAGES_UPSERT no ingestor. */
-import { createPrincipal, setGrant, issueToken } from "../../core/access/principals.ts";
+import { createPrincipal, setGrant, issueToken, authenticateTokenGlobal } from "../../core/access/principals.ts";
 import { getEngine } from "../../core/platform/engine.ts";
 import {
   evolutionEnv,
@@ -24,6 +24,9 @@ import { BffError } from "./bff-common.ts";
 
 const PRINCIPAL_ID = "agent-whatsapp-evolution";
 const PRINCIPAL_LABEL = "WhatsApp (Evolution)";
+/** Evita 2º /instance/connect enquanto o 1º ainda gera QR/código — senão a Evolution dá LOGOUT. */
+const CONNECT_REUSE_MS = 90_000;
+const connectStartedAt = new Map<string, number>();
 
 export interface EvolutionInstanceView {
   instanceName: string;
@@ -57,16 +60,13 @@ export type EvolutionActionInput = {
   number?: string;
 };
 
-async function ensureBotAndToken(home: string): Promise<{ token: string; principalId: string }> {
-  const existing = await getEvolutionConfig(home);
-  if (existing?.ingestToken) {
-    return { token: existing.ingestToken, principalId: existing.principalId };
-  }
-
-  const instanceName = evolutionInstanceName(home);
+async function ensureBotPrincipal(home: string): Promise<void> {
   const e = await getEngine(home);
-  if (!(await e.getPrincipal(PRINCIPAL_ID))) {
+  const p = await e.getPrincipal(PRINCIPAL_ID);
+  if (!p) {
     await createPrincipal(home, { id: PRINCIPAL_ID, kind: "agent", label: PRINCIPAL_LABEL });
+  } else if (p.status !== "active") {
+    await e.upsertPrincipal({ ...p, status: "active" });
   }
   await setGrant(home, {
     principalId: PRINCIPAL_ID,
@@ -74,6 +74,17 @@ async function ensureBotAndToken(home: string): Promise<{ token: string; princip
     sensitivityMax: "restrito",
     canIngest: true,
   });
+}
+
+async function ensureBotAndToken(home: string): Promise<{ token: string; principalId: string; rotated: boolean }> {
+  await ensureBotPrincipal(home);
+  const existing = await getEvolutionConfig(home);
+  if (existing?.ingestToken) {
+    const ok = await authenticateTokenGlobal(existing.ingestToken);
+    if (ok) return { token: existing.ingestToken, principalId: existing.principalId || PRINCIPAL_ID, rotated: false };
+  }
+
+  const instanceName = existing?.instanceName || evolutionInstanceName(home);
   const { token } = await issueToken(home, { principalId: PRINCIPAL_ID, label: "webhook-evolution" });
   await upsertEvolutionConfig(home, {
     instanceName,
@@ -82,7 +93,34 @@ async function ensureBotAndToken(home: string): Promise<{ token: string; princip
     enabled: true,
     lastError: null,
   });
-  return { token, principalId: PRINCIPAL_ID };
+  console.error("[evolution] ingest token reemitido — webhook das instâncias será atualizado");
+  return { token, principalId: PRINCIPAL_ID, rotated: true };
+}
+
+async function syncInstanceWebhooks(home: string, token: string): Promise<void> {
+  const rows = await listEvolutionInstances(home);
+  const names = new Set(rows.map((r) => r.instanceName));
+  const cfg = await getEvolutionConfig(home);
+  if (cfg?.instanceName) names.add(cfg.instanceName);
+  for (const n of names) {
+    try {
+      await setInstanceWebhook(n, token);
+    } catch {
+      /* instância pode ter sumido na Evolution */
+    }
+  }
+}
+
+let lastWebhookSyncAt = 0;
+function dueWebhookSync(force: boolean): boolean {
+  if (force) {
+    lastWebhookSyncAt = Date.now();
+    return true;
+  }
+  const now = Date.now();
+  if (now - lastWebhookSyncAt < 60_000) return false;
+  lastWebhookSyncAt = now;
+  return true;
 }
 
 /** Payload webhook v2.3 — envelope `{ webhook }` (sem ele: "instance requires property webhook"). */
@@ -205,7 +243,55 @@ async function fetchConnectPayload(
   return { qr: extractQrBase64(json), pairingCode: extractPairingCode(json) };
 }
 
+function connectIsInFlight(instanceName: string): boolean {
+  const t = connectStartedAt.get(instanceName);
+  return t != null && Date.now() - t < CONNECT_REUSE_MS;
+}
+
+async function readPendingCodes(instanceName: string): Promise<{ qr: string | null; pairingCode: string | null }> {
+  try {
+    const { json } = await evolutionFetch(`/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`);
+    const list = Array.isArray(json) ? json : json?.instance ? [json] : [];
+    const hit = list.find((x: any) => instanceNameOf(x) === instanceName) ?? json;
+    return {
+      qr: extractQrBase64(hit) ?? extractQrBase64(json),
+      pairingCode: extractPairingCode(hit) ?? extractPairingCode(json),
+    };
+  } catch {
+    return { qr: null, pairingCode: null };
+  }
+}
+
+/** Um /instance/connect por janela; timeout ou retry só lê o QR/código já gerado. */
+async function obtainConnectCodes(
+  instanceName: string,
+  number: string | undefined,
+  existing: { qr: string | null; pairingCode: string | null },
+): Promise<{ qr: string | null; pairingCode: string | null }> {
+  let qr = existing.qr;
+  let pairingCode = existing.pairingCode;
+  if (qr && pairingCode) return { qr, pairingCode };
+  if (connectIsInFlight(instanceName) || (qr && !number) || pairingCode) {
+    const got = await readPendingCodes(instanceName);
+    return { qr: got.qr ?? qr, pairingCode: got.pairingCode ?? pairingCode };
+  }
+  connectStartedAt.set(instanceName, Date.now());
+  try {
+    const got = await fetchConnectPayload(instanceName, number);
+    return { qr: got.qr ?? qr, pairingCode: got.pairingCode ?? pairingCode };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!isTimeoutMsg(msg)) {
+      connectStartedAt.delete(instanceName);
+      throw err;
+    }
+    const got = await readPendingCodes(instanceName);
+    return { qr: got.qr ?? qr, pairingCode: got.pairingCode ?? pairingCode };
+  }
+}
+
 async function deleteRemoteInstance(instanceName: string): Promise<void> {
+  connectStartedAt.delete(instanceName);
   try {
     await evolutionFetch(`/instance/logout/${encodeURIComponent(instanceName)}`, { method: "DELETE" });
   } catch {
@@ -300,16 +386,32 @@ async function snapshotInstances(
   extras?: { qrByName?: Record<string, string | null>; pairByName?: Record<string, string | null> },
 ): Promise<EvolutionInstanceView[]> {
   const rows = await listEvolutionInstances(home);
+  const liveByName = new Map<string, { qr: string | null; pairingCode: string | null }>();
+  if (rows.length) {
+    try {
+      const { json } = await evolutionFetch("/instance/fetchInstances");
+      const list = Array.isArray(json) ? json : json?.instance ? [json] : [];
+      for (const x of list) {
+        const n = instanceNameOf(x);
+        if (!n) continue;
+        liveByName.set(n, { qr: extractQrBase64(x), pairingCode: extractPairingCode(x) });
+      }
+    } catch {
+      /* status segue sem QR/código live */
+    }
+  }
   const out: EvolutionInstanceView[] = [];
   for (const row of rows) {
     const state = await fetchConnectionState(row.instanceName);
     const connected = isOpen(state);
+    if (connected) connectStartedAt.delete(row.instanceName);
+    const live = liveByName.get(row.instanceName);
     out.push({
       instanceName: row.instanceName,
       state,
       connected,
-      qrBase64: connected ? null : (extras?.qrByName?.[row.instanceName] ?? null),
-      pairingCode: connected ? null : (extras?.pairByName?.[row.instanceName] ?? null),
+      qrBase64: connected ? null : (extras?.qrByName?.[row.instanceName] ?? live?.qr ?? null),
+      pairingCode: connected ? null : (extras?.pairByName?.[row.instanceName] ?? live?.pairingCode ?? null),
       lastError: row.lastError,
     });
   }
@@ -382,7 +484,15 @@ export async function evolutionStatusHandler(home: string): Promise<EvolutionSta
     })),
   );
   await cleanupZombies(home, keepEvolutionInstances(stated));
-  return statusPack(home, cfg?.ingestToken ?? null, { lastError: cfg?.lastError ?? null });
+  let token = cfg?.ingestToken ?? null;
+  try {
+    const ensured = await ensureBotAndToken(home);
+    token = ensured.token;
+    if (dueWebhookSync(ensured.rotated)) await syncInstanceWebhooks(home, token);
+  } catch (err) {
+    console.error("[evolution] status: não deu pra sincronizar webhook:", err instanceof Error ? err.message : err);
+  }
+  return statusPack(home, token, { lastError: cfg?.lastError ?? null });
 }
 
 async function resolveTargetName(
@@ -416,7 +526,7 @@ export async function evolutionConnectHandler(
 
   const number = parseNumber(input.number);
   try {
-    const { token } = await ensureBotAndToken(home);
+    const { token, rotated } = await ensureBotAndToken(home);
     await reconcileFromEvolution(home);
     const existing = (await listEvolutionInstances(home)).map((r) => r.instanceName);
     const instanceName = await resolveTargetName(home, input, existing);
@@ -434,6 +544,12 @@ export async function evolutionConnectHandler(
 
     if (isOpen(stateBefore) && !input.add && !number) {
       await upsertEvolutionInstance(home, instanceName, null);
+      try {
+        await setInstanceWebhook(instanceName, token);
+      } catch {
+        /* sessão open segue; webhook tenta de novo no status */
+      }
+      if (rotated) await syncInstanceWebhooks(home, token);
       return statusPack(home, token, {
         focus: instanceName,
         message: "WhatsApp já conectado — mensagens vão pro cérebro.",
@@ -447,19 +563,15 @@ export async function evolutionConnectHandler(
     } catch {
       /* webhook já pode ter ido no create */
     }
+    if (rotated) await syncInstanceWebhooks(home, token);
 
     const state = await fetchConnectionState(instanceName);
     let qr = created.qr;
     let pairingCode = created.pairingCode;
     if (state !== "open" && (!qr || number) && !pairingCode) {
-      try {
-        const got = await fetchConnectPayload(instanceName, number);
-        qr = got.qr ?? qr;
-        pairingCode = got.pairingCode ?? pairingCode;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (!isTimeoutMsg(msg)) throw err;
-      }
+      const got = await obtainConnectCodes(instanceName, number, { qr, pairingCode });
+      qr = got.qr;
+      pairingCode = got.pairingCode;
     }
 
     await setEvolutionInstanceError(home, instanceName, null);
@@ -471,8 +583,8 @@ export async function evolutionConnectHandler(
         ? "Digite o código no WhatsApp (Aparelhos conectados → Conectar com número de telefone)."
         : waiting
           ? number
-            ? "A Evolution ainda está gerando o código — tente de novo em alguns segundos."
-            : "A Evolution ainda está gerando o QR — clique em Renovar QR em alguns segundos."
+            ? "A Evolution ainda está gerando o código — aguarde, ele aparece sozinho em alguns segundos."
+            : "A Evolution ainda está gerando o QR — aguarde alguns segundos sem clicar de novo."
           : "Escaneie o QR no WhatsApp (Aparelhos conectados).";
 
     return statusPack(home, token, {
@@ -519,16 +631,9 @@ export async function evolutionQrHandler(
         message: "Já conectado — não precisa de QR.",
       });
     }
-    let qr: string | null = null;
-    let pairingCode: string | null = null;
-    try {
-      const got = await fetchConnectPayload(instanceName, number);
-      qr = got.qr;
-      pairingCode = got.pairingCode;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!isTimeoutMsg(msg)) throw err;
-    }
+    const got = await obtainConnectCodes(instanceName, number, { qr: null, pairingCode: null });
+    const qr = got.qr;
+    const pairingCode = got.pairingCode;
     await setEvolutionInstanceError(home, instanceName, null);
     return statusPack(home, cfg.ingestToken, {
       focus: instanceName,
@@ -536,7 +641,7 @@ export async function evolutionQrHandler(
         ? "Código renovado — digite no WhatsApp em até ~60s."
         : qr
           ? "QR renovado — escaneie em até ~60s."
-          : "Não veio QR/código — tente de novo em alguns segundos.",
+          : "Não veio QR/código ainda — aguarde alguns segundos sem clicar de novo.",
       qrByName: { [instanceName]: qr },
       pairByName: { [instanceName]: pairingCode },
     });

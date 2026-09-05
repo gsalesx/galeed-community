@@ -412,11 +412,16 @@ export function startGatewayServer(bootHome = brainHome()) {
           `[ingestor-webhook] hit slug=${ingestorsMatch[1]} hasBearer=${Boolean(bearer)} hasQueryToken=${Boolean(queryTok)}`,
         );
       }
-      let auth = bearer ? await authenticateTokenGlobal(bearer) : null;
-      let authSource = bearer ? "bearer" : queryTok ? "query" : "none";
-      if (!auth && queryTok && queryTok !== bearer) {
+      // Ingestor: ?token= primeiro. A Evolution manda a apikey dela no Bearer e o gld_ na query.
+      let auth = null as Awaited<ReturnType<typeof authenticateTokenGlobal>>;
+      let authSource = "none";
+      if (ingestorsMatch && queryTok) {
         auth = await authenticateTokenGlobal(queryTok);
-        if (auth) authSource = bearer ? "query-fallback" : "query";
+        if (auth) authSource = bearer && bearer !== queryTok ? "query-fallback" : "query";
+      }
+      if (!auth && bearer) {
+        auth = await authenticateTokenGlobal(bearer);
+        if (auth) authSource = "bearer";
       }
       if (!auth) {
         if (req.method === "POST" && ingestorsMatch?.[1]) {
@@ -424,7 +429,7 @@ export function startGatewayServer(bootHome = brainHome()) {
         }
         return send(res, 401, { error: "token inválido" });
       }
-      if (req.method === "POST" && ingestorsMatch?.[1] && authSource === "query-fallback") {
+      if (req.method === "POST" && ingestorsMatch?.[1]) {
         console.error(`[ingestor-webhook] auth-ok slug=${ingestorsMatch[1]} auth=${authSource}`);
       }
       const { brain, scope } = auth;

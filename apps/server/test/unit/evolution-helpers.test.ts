@@ -90,3 +90,28 @@ describe("painel Conectar WhatsApp", () => {
     expect(ui).toContain("Pedir código");
   });
 });
+
+describe("BFF Evolution connect reuse", () => {
+  it("não chama connect de novo enquanto o código ainda está gerando", () => {
+    const bff = readFileSync(join(here, "../../src/connectors/bff/bff-evolution.ts"), "utf8");
+    expect(bff).toContain("obtainConnectCodes");
+    expect(bff).toContain("CONNECT_REUSE_MS");
+    expect(bff).toContain("connectIsInFlight");
+  });
+  it("reemite ingest token inválido e sincroniza webhook", () => {
+    const bff = readFileSync(join(here, "../../src/connectors/bff/bff-evolution.ts"), "utf8");
+    expect(bff).toContain("authenticateTokenGlobal");
+    expect(bff).toContain("ingest token reemitido");
+    expect(bff).toContain("syncInstanceWebhooks");
+  });
+});
+
+describe("gateway ingestor auth", () => {
+  it("tenta ?token= antes do Bearer", () => {
+    const gw = readFileSync(join(here, "../../src/connectors/gateway-server.ts"), "utf8");
+    expect(gw).toContain("Ingestor: ?token= primeiro");
+    expect(gw.indexOf("authenticateTokenGlobal(queryTok)")).toBeLessThan(
+      gw.indexOf("authenticateTokenGlobal(bearer)"),
+    );
+  });
+});
