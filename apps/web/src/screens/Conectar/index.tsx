@@ -221,15 +221,22 @@ export default function Conectar() {
       </Card>
 
       {/* ===================== Suas fontes / conexões ===================== */}
-      <SectionTitle
-        icon="plus"
-        title="Suas fontes e conexões"
-        subtitle="O que alimenta o cérebro. Aponte qualquer canal que fala webhook para a URL de ingestão."
-      />
-
-      <Card padding="16px 18px 18px" style={{ marginBottom: 16 }}>
-        <EndpointHeader kind="WEBHOOK" title="URL de ingestão" note="POST · JSON" />
-        <div style={{ height: 12 }} />
+      <Card
+        padding="16px 18px 18px"
+        style={{ marginBottom: 16 }}
+        header={
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Chip>WEBHOOK</Chip>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600 }}>Suas fontes e conexões</div>
+              <span style={{ fontSize: 11.5, color: "var(--faint)", whiteSpace: "nowrap" }}>POST · JSON</span>
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+              O que alimenta o cérebro. Aponte qualquer canal que fala webhook para a URL abaixo.
+            </p>
+          </div>
+        }
+      >
         <FieldRow label="Endpoint" value={`${V1_BASE}/ingest`} onCopy={() => copy(`${V1_BASE}/ingest`, "URL copiada.")} />
         <p style={{ margin: "14px 0 7px", fontSize: 12.5, color: "var(--muted)", fontWeight: 600 }}>
           Exemplo · enviar um evento
@@ -238,14 +245,12 @@ export default function Conectar() {
         <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--faint)", lineHeight: 1.5 }}>
           Autentica com a chave do cérebro em <span className="mono">Authorization: Bearer</span>. O cérebro é derivado do token.
         </p>
+        <IngestoresProntos copy={copy} />
       </Card>
 
       <WhatsAppEvolution setToast={setToast} />
 
       <ChatGptCodex setToast={setToast} />
-
-      {/* ===================== Ingestores prontos ===================== */}
-      <IngestoresProntos copy={copy} />
 
       <SourcesEmpty />
 
@@ -1023,32 +1028,46 @@ function IngestoresProntos({ copy }: { copy: (text: string, label?: string) => v
   if (!lista.length) return null;
 
   return (
-    <Card padding="16px 18px 18px" style={{ marginBottom: 16 }}>
-      <EndpointHeader kind="INGESTORES" title="Ingestores prontos" note="POST · JSON" />
-      <p style={{ margin: "8px 0 4px", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
-        Canais com o formato já tratado: aponte a ferramenta pra URL do ingestor e pronto — o payload
-        cru é preparado antes de entrar no cérebro. Autentica com{" "}
-        <span className="mono">Authorization: Bearer</span> (ou <span className="mono">?token=</span>{" "}
-        quando a ferramenta não manda header).
-      </p>
-      {lista.map((ing) => (
-        <div key={ing.slug} style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600 }}>{ing.nome}</div>
-          <p style={{ margin: "2px 0 8px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
-            {ing.descricao}
-          </p>
-          <FieldRow
-            label="Endpoint"
-            value={`${V1_BASE}/ingestors/${ing.slug}`}
-            onCopy={() => copy(`${V1_BASE}/ingestors/${ing.slug}`, "URL copiada.")}
-          />
+    <details style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 4 }}>
+      <summary
+        style={{
+          cursor: "pointer",
+          padding: "10px 0 4px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <EndpointHeader kind="INGESTORES" title="Ingestores prontos" note="avançado" />
         </div>
-      ))}
-      <p style={{ margin: "14px 0 0", fontSize: 12, color: "var(--faint)", lineHeight: 1.5 }}>
-        Pasta local (Drive/OneDrive sincronizado): <span className="mono">npm run galeed -- pasta --dir ~/SuaPasta</span>.
-        Pra criar o SEU ingestor (é 1 arquivo): <span className="mono">INGESTORES.md</span> na raiz do projeto.
-      </p>
-    </Card>
+      </summary>
+      <div>
+        <p style={{ margin: "0 0 4px", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
+          Canais com o formato já tratado: aponte a ferramenta pra URL do ingestor e pronto — o payload
+          cru é preparado antes de entrar no cérebro. Autentica com{" "}
+          <span className="mono">Authorization: Bearer</span> (ou <span className="mono">?token=</span>{" "}
+          quando a ferramenta não manda header).
+        </p>
+        {lista.map((ing) => (
+          <div key={ing.slug} style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{ing.nome}</div>
+            <p style={{ margin: "2px 0 8px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
+              {ing.descricao}
+            </p>
+            <FieldRow
+              label="Endpoint"
+              value={`${V1_BASE}/ingestors/${ing.slug}`}
+              onCopy={() => copy(`${V1_BASE}/ingestors/${ing.slug}`, "URL copiada.")}
+            />
+          </div>
+        ))}
+        <p style={{ margin: "14px 0 0", fontSize: 12, color: "var(--faint)", lineHeight: 1.5 }}>
+          Pasta local (Drive/OneDrive sincronizado): <span className="mono">npm run galeed -- pasta --dir ~/SuaPasta</span>.
+          Pra criar o SEU ingestor (é 1 arquivo): <span className="mono">INGESTORES.md</span> na raiz do projeto.
+        </p>
+      </div>
+    </details>
   );
 }
 
