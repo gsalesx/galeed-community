@@ -1,6 +1,7 @@
 /** WhatsApp (Evolution) — vários números na mesma fonte. Mora em Fontes. */
 import { useEffect, useState } from "react";
-import { Button, Card, Modal } from "../../ui";
+import { Button, Card } from "../../ui";
+import { ConfirmDialog } from "../shared/ConfirmDialog";
 import { api } from "../../lib/api";
 import type { EvolutionStatus } from "../../lib/api";
 import { useQuery } from "../../lib/useQuery";
@@ -376,28 +377,18 @@ export function WhatsAppEvolution({ setToast, embedded }: { setToast: ToastFn; e
         </Button>
       )}
 
-      <Modal
+      <ConfirmDialog
         open={!!removing}
-        onClose={() => setRemoving(null)}
         title="Remover número"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setRemoving(null)}>Cancelar</Button>
-            <Button
-              variant="primary"
-              disabled={busy !== null}
-              onClick={() => removing && removeNumber(removing)}
-              style={{ background: "var(--danger)", borderColor: "var(--danger)" }}
-            >
-              {busy === removing ? "Removendo…" : "Remover este número"}
-            </Button>
-          </>
-        }
-      >
-        <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>
-          Desloga e apaga só este aparelho. Os outros números seguem. A memória do WhatsApp não é apagada.
-        </p>
-      </Modal>
+        text="Desloga e apaga só este aparelho. Os outros números seguem. A memória do WhatsApp não é apagada."
+        confirmLabel="Remover este número"
+        danger
+        busy={busy !== null}
+        onConfirm={() => {
+          if (removing) void removeNumber(removing);
+        }}
+        onCancel={() => setRemoving(null)}
+      />
     </>
   );
 

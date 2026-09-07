@@ -1,14 +1,13 @@
 /** M21/S5 — Drawer da RECEITA da fonte (fiel a docs/design-system/fontes.html).
  *
  *  Seções na ORDEM do mockup:
- *   1. header (ícone tintado + nome + "receita de extração" + X)
- *   2. "O que essa fonte extrai" — fieldrows EDITÁVEIS (dimension/label/área, remover, adicionar)
- *   3. "Como sai do outro lado" — mcard com selo (StatusChip Fato + LockChip + certeza/via)
- *      e exemplo DETERMINÍSTICO derivado da receita (não LLM)
- *   4. "As regras dessa fonte" — 3 rulelines literais (+ select de sigilo)
+ *   1. header (ícone tintado + nome + "Filtro desta fonte" + X)
+ *   2. "O que guardar das mensagens?" — fieldrows (Informação / Pergunta / Setor)
+ *   3. preview do carimbo — selo visual + texto de formato (não LLM)
+ *   4. "Como funciona" — 3 bullets + sigilo (select permanece)
  *   5. "Alimenta as áreas" — chips derivados (read-only)
- *   6. "Leitura automática" — toggle = status ativa/pausada (POST imediato)
- *   7. rodapé — Pausar/Retomar + "Salvar receita" (espera o 200; sem otimismo)
+ *   6. rodapé — "Salvar receita" (espera o 200; sem otimismo).
+ *      Pausar/Retomar e Remover moram no card da lista, não aqui.
  *
  *  Modo "criar": nome + tipo editáveis no header; a fonte nasce em POST /api/sources.
  */
@@ -29,9 +28,6 @@ export interface SourceDrawerProps {
   presetChannel?: "upload" | "paste";
   onClose: () => void;
   onSaved: () => void; // pai refaz as queries + mostra "Receita salva."
-  /** aditivo ao DESIGN-SPEC §4: o toggle muda status na hora e o card da lista
-   *  precisa refletir sem reload (CONTRACT) — pai só refaz a query, sem toast. */
-  onStatusChanged?: () => void;
   /** áreas já usadas nas outras fontes (datalist do input de área) */
   knownAreas?: string[];
   /** M22-D — dispara o fluxo de conexão da fonte aberta (só p/ fontes-conector). */
@@ -114,13 +110,20 @@ const INPUT_STYLE: CSSProperties = {
   minWidth: 0,
 };
 
+const FIELD_CAP: CSSProperties = {
+  display: "block",
+  fontSize: 10.5,
+  fontWeight: 600,
+  color: "var(--muted)",
+  marginBottom: 4,
+};
+
 export function SourceDrawer({
   mode,
   source,
   presetChannel,
   onClose,
   onSaved,
-  onStatusChanged,
   knownAreas = [],
   onConnect,
   aguardandoConexao = false,
@@ -137,9 +140,7 @@ export function SourceDrawer({
   const [type, setType] = useState(source?.type ?? "");
   const [fields, setFields] = useState<SourceRecipeField[]>(source?.recipe?.fields ?? []);
   const [sens, setSens] = useState(source?.default_sensitivity ?? "restrito");
-  const [status, setStatus] = useState<"ativa" | "pausada">(source?.status ?? "ativa");
   const [salvando, setSalvando] = useState(false);
-  const [mudandoStatus, setMudandoStatus] = useState(false);
   const [toast, setToast] = useState<{ msg: string; tone: ToastTone } | null>(null);
 
   // transição de entrada (0.25s, como o mockup; reduced-motion zerado no base.css)
@@ -171,22 +172,6 @@ export function SourceDrawer({
 
   function setField(i: number, patch: Partial<SourceRecipeField>) {
     setFields((cur) => cur.map((f, j) => (j === i ? { ...f, ...patch } : f)));
-  }
-
-  async function alternarStatus() {
-    if (mode === "criar" || !source || mudandoStatus) return;
-    const next = status === "ativa" ? "pausada" : "ativa";
-    setMudandoStatus(true);
-    try {
-      await api.sources.setStatus(source.id, next);
-      setStatus(next);
-      setToast({ msg: next === "pausada" ? "Leitura pausada." : "Leitura retomada.", tone: "neutral" });
-      onStatusChanged?.();
-    } catch (e) {
-      setToast({ msg: msgDeErro(e, "Não deu pra mudar o status da fonte."), tone: "warn" });
-    } finally {
-      setMudandoStatus(false);
-    }
   }
 
   async function salvar() {
@@ -226,16 +211,8 @@ export function SourceDrawer({
     }
   }
 
-  // exemplo ESTÁTICO ilustrativo derivado da receita (determinístico, não LLM)
-  const primeiroCampo = fields.find((f) => (f.label || f.dimension).trim());
-  const exemplo = primeiroCampo ? (
-    <>
-      Quando entrar algo com <b>{primeiroCampo.label.trim() || primeiroCampo.dimension.trim()}</b>, sai um fato com
-      este selo e a fonte citada.
-    </>
-  ) : (
-    <>Assim que a fonte tiver receita, o primeiro registro aparece aqui com o selo.</>
-  );
+  const chegaPor =
+    channel === "whatsapp" ? "pelo WhatsApp" : name.trim() ? `por ${name.trim()}` : "pela fonte";
 
   return (
     <>
@@ -255,7 +232,7 @@ export function SourceDrawer({
       {/* drawer */}
       <aside
         role="dialog"
-        aria-label="Receita da fonte"
+        aria-label="Filtro desta fonte"
         aria-modal="true"
         style={{
           position: "fixed",
@@ -324,7 +301,7 @@ export function SourceDrawer({
               </b>
             )}
             <small className="mono" style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 2 }}>
-              receita de extração
+              Filtro desta fonte
             </small>
           </div>
           <button
@@ -352,15 +329,18 @@ export function SourceDrawer({
 
         {/* body */}
         <div style={{ flex: 1, overflow: "auto", padding: 18 }}>
-          {/* 2. O que essa fonte extrai */}
-          <div style={{ ...LBL_STYLE, marginTop: 0 }}>O que essa fonte extrai</div>
+          {/* 2. O que guardar das mensagens? */}
+          <div style={{ ...LBL_STYLE, marginTop: 0 }}>O que guardar das mensagens?</div>
+          <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
+            Cada linha é como um filtro do que será guardado como fato. Sem linhas, o cérebro guarda o que achar.
+          </p>
           <div>
             {fields.map((f, i) => (
               <div
                 key={i}
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   gap: 10,
                   padding: "9px 11px",
                   border: "1px solid var(--border)",
@@ -369,38 +349,49 @@ export function SourceDrawer({
                   marginBottom: 7,
                 }}
               >
-                <input
-                  className="mono"
-                  value={f.dimension}
-                  onChange={(e) => setField(i, { dimension: e.target.value.toLowerCase() })}
-                  placeholder="campo"
-                  aria-label={`Nome do campo ${i + 1}`}
-                  style={{ ...INPUT_STYLE, width: 118, flexShrink: 0, fontSize: 11.5, fontWeight: 600 }}
-                />
-                <input
-                  value={f.label}
-                  onChange={(e) => setField(i, { label: e.target.value })}
-                  placeholder="o que é (legível)"
-                  aria-label={`Descrição do campo ${i + 1}`}
-                  style={{ ...INPUT_STYLE, flex: 1 }}
-                />
-                <input
-                  className="mono"
-                  value={f.area}
-                  onChange={(e) => setField(i, { area: e.target.value })}
-                  placeholder="área"
-                  aria-label={`Área do campo ${i + 1}`}
-                  list="fts-areas"
-                  style={{
-                    ...INPUT_STYLE,
-                    width: 92,
-                    flexShrink: 0,
-                    fontSize: 10.5,
-                    color: "var(--accent-ink)",
-                    background: "var(--accent-soft)",
-                    borderColor: "oklch(88% 0.04 150)",
-                  }}
-                />
+                <div style={{ width: 118, flexShrink: 0 }}>
+                  <span style={FIELD_CAP}>Informação</span>
+                  <input
+                    className="mono"
+                    value={f.dimension}
+                    onChange={(e) => setField(i, { dimension: e.target.value.toLowerCase().replace(/\s+/g, "") })}
+                    placeholder="Quantidade"
+                    aria-label={`Informação ${i + 1}`}
+                    style={{ ...INPUT_STYLE, width: "100%", fontSize: 11.5, fontWeight: 600 }}
+                  />
+                  <span style={{ display: "block", fontSize: 10, color: "var(--faint)", marginTop: 4, lineHeight: 1.35 }}>
+                    Uma palavra. Sem espaço.
+                  </span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={FIELD_CAP}>Pergunta</span>
+                  <input
+                    value={f.label}
+                    onChange={(e) => setField(i, { label: e.target.value })}
+                    placeholder="Quantas unidades"
+                    aria-label={`Pergunta ${i + 1}`}
+                    style={{ ...INPUT_STYLE, width: "100%" }}
+                  />
+                </div>
+                <div style={{ width: 92, flexShrink: 0 }}>
+                  <span style={FIELD_CAP}>Setor</span>
+                  <input
+                    className="mono"
+                    value={f.area}
+                    onChange={(e) => setField(i, { area: e.target.value })}
+                    placeholder="Comercial"
+                    aria-label={`Setor ${i + 1}`}
+                    list="fts-areas"
+                    style={{
+                      ...INPUT_STYLE,
+                      width: "100%",
+                      fontSize: 10.5,
+                      color: "var(--accent-ink)",
+                      background: "var(--accent-soft)",
+                      borderColor: "oklch(88% 0.04 150)",
+                    }}
+                  />
+                </div>
                 <button
                   type="button"
                   title="Remover campo"
@@ -415,6 +406,7 @@ export function SourceDrawer({
                     placeItems: "center",
                     padding: 2,
                     flexShrink: 0,
+                    marginTop: 18,
                   }}
                 >
                   <Icon name="x" size={13} />
@@ -447,8 +439,7 @@ export function SourceDrawer({
             </button>
           </div>
 
-          {/* 3. Como sai do outro lado */}
-          <div style={LBL_STYLE}>Como sai do outro lado</div>
+          {/* 3. Preview do carimbo */}
           <div
             style={{
               background: "var(--surface)",
@@ -456,6 +447,7 @@ export function SourceDrawer({
               borderRadius: 12,
               overflow: "hidden",
               boxShadow: "var(--shadow)",
+              marginTop: 18,
             }}
           >
             <div
@@ -478,23 +470,24 @@ export function SourceDrawer({
                 via <b style={{ color: "var(--fg)", fontWeight: 600 }}>{name.trim() || "esta fonte"}</b>
               </span>
             </div>
-            <div style={{ padding: "12px 13px", fontSize: 13, lineHeight: 1.55 }}>{exemplo}</div>
+            <div style={{ padding: "12px 13px", fontSize: 13, lineHeight: 1.55, color: "var(--muted)" }}>
+              Este é só o formato. Fato de verdade só aparece depois da primeira linha. Lista vazia = sem filtro.
+            </div>
           </div>
 
-          {/* 4. As regras dessa fonte */}
-          <div style={LBL_STYLE}>As regras dessa fonte</div>
-          <Rule icon="check">
-            Só vira fato o que a receita <b style={{ color: "var(--fg)" }}>reconhece com nome, valor e data</b>. Cada
-            fato sai com o selo e a fonte citada.
-          </Rule>
+          {/* 4. Como funciona */}
+          <div style={LBL_STYLE}>Como funciona</div>
+          <Rule icon="check">A mensagem sempre chega {chegaPor}.</Rule>
+          <Rule icon="check">O que casar com o filtro vai para o cérebro como fato com selo e fonte.</Rule>
           <Rule icon="info" hyp>
-            O que ela <b style={{ color: "oklch(36% 0.1 65)" }}>não reconhecer</b> vira hipótese e entra na fila de
-            revisão. Nunca vira fato sozinho.
+            O que não casar vai para Revisar. Você aprova ou descarta. Nada vira fato sozinho.
           </Rule>
+          <p style={{ margin: "0 0 8px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
+            Para virar fato, tem que dar para ler no texto o quê e de quem. Se faltar, vai para Revisar.
+          </p>
           <Rule icon="lock-closed">
             <span>
-              Entra com o sigilo <b style={{ color: "var(--fg)" }}>{SENS_LABEL[sens] ?? sens}</b> por padrão. Você muda
-              isso em{" "}
+              Entra {SENS_LABEL[sens] ?? "Secreto"}. O seletor muda o cadeado desta fonte. Quem pode ver:{" "}
               <Link to="/app/acesso" style={{ fontWeight: 600, color: "var(--accent-ink)" }}>
                 Acesso
               </Link>
@@ -603,56 +596,10 @@ export function SourceDrawer({
             </>
           )}
 
-          {/* 6. Leitura automática (só faz sentido com a fonte criada) */}
-          {mode === "editar" && (
-            <div style={{ ...LBL_STYLE, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              Leitura automática
-              <button
-                type="button"
-                title="Pausar ou retomar"
-                aria-label="Pausar ou retomar a leitura"
-                aria-pressed={status === "ativa"}
-                onClick={alternarStatus}
-                disabled={mudandoStatus}
-                style={{
-                  position: "relative",
-                  width: 38,
-                  height: 22,
-                  borderRadius: 99,
-                  background: status === "ativa" ? "var(--accent)" : "var(--border-strong)",
-                  border: "none",
-                  transition: "background .18s",
-                  flexShrink: 0,
-                  cursor: mudandoStatus ? "wait" : "pointer",
-                  padding: 0,
-                }}
-              >
-                <span
-                  aria-hidden
-                  style={{
-                    position: "absolute",
-                    top: 2.5,
-                    left: status === "ativa" ? 19 : 2.5,
-                    width: 17,
-                    height: 17,
-                    borderRadius: "50%",
-                    background: "#fff",
-                    transition: "left .18s",
-                    boxShadow: "0 1px 3px oklch(30% 0.02 250 / .3)",
-                  }}
-                />
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* 7. rodapé */}
+        {/* 6. rodapé */}
         <div style={{ padding: "14px 18px", borderTop: "1px solid var(--border)", display: "flex", gap: 9 }}>
-          {mode === "editar" && (
-            <Button onClick={alternarStatus} disabled={mudandoStatus} style={{ flex: 1 }}>
-              {status === "ativa" ? "Pausar leitura" : "Retomar leitura"}
-            </Button>
-          )}
           <Button variant="primary" onClick={salvar} disabled={!valido || salvando} style={{ flex: 1 }}>
             {salvando ? "Salvando…" : "Salvar receita"}
           </Button>

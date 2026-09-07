@@ -27,6 +27,7 @@ import { Catalog } from "./Catalog";
 import { WhatsAppEvolution } from "./WhatsAppEvolution";
 import { WebhookIngest } from "./WebhookIngest";
 import { SourceDrawer } from "./SourceDrawer";
+import { ConfirmDialog } from "../shared/ConfirmDialog";
 import {
   anexarEstadoConector,
   descricaoDaSync,
@@ -88,6 +89,15 @@ interface DrawerState {
   presetChannel?: "upload" | "paste";
 }
 
+type ConfirmPedido =
+  | { kind: "pause"; source: Source }
+  | { kind: "resume"; source: Source }
+  | { kind: "remove"; source: Source };
+
+function ehWhatsapp(s: Source): boolean {
+  return s.channel === "whatsapp";
+}
+
 export default function Fontes() {
   const navigate = useNavigate();
   const { current } = useBrain();
@@ -102,6 +112,8 @@ export default function Fontes() {
   const [linkManual, setLinkManual] = useState<{ provider: string; url: string } | null>(null);
   const [conectorIndisponivel, setConectorIndisponivel] = useState<string | null>(null);
   const [waOpen, setWaOpen] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmPedido | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const catRef = useRef<HTMLDivElement>(null);
 
   // M22-D — a verdade da lista é /api/sources + /api/connectors/status mesclados (LEI 1/§2.3).
@@ -212,6 +224,53 @@ export default function Fontes() {
     sourcesQ.refetch();
     connStatusQ.refetch();
     countsQ.refetch();
+  }
+
+  async function removerFonte(source: Source) {
+    if (!ehWhatsapp(source)) {
+      setToast({ msg: "Esta fonte ainda não tem remoção por aqui.", tone: "warn" });
+      return;
+    }
+    const st = await api.evolution.status();
+    const instances = st.instances?.length
+      ? st.instances
+      : st.instanceName
+        ? [{ instanceName: st.instanceName }]
+        : [];
+    if (instances.length === 0) {
+      setToast({ msg: "Nenhum número conectado para remover.", tone: "neutral" });
+      return;
+    }
+    for (const inst of instances) {
+      await api.evolution.disconnect({ instanceName: inst.instanceName });
+    }
+    refetchTudo();
+    setToast({ msg: "Números desconectados. A memória permanece.", tone: "neutral" });
+  }
+
+  async function executarConfirm() {
+    if (!confirm || confirmBusy) return;
+    setConfirmBusy(true);
+    try {
+      if (confirm.kind === "pause" || confirm.kind === "resume") {
+        await api.sources.setStatus(confirm.source.id, confirm.kind === "pause" ? "pausada" : "ativa");
+        setToast({
+          msg: confirm.kind === "pause" ? "Leitura pausada." : "Leitura retomada.",
+          tone: "neutral",
+        });
+        refetchTudo();
+      } else {
+        await removerFonte(confirm.source);
+      }
+      setConfirm(null);
+    } catch (e) {
+      setToast({
+        msg: e instanceof Error && e.message ? e.message : "Não deu pra concluir.",
+        tone: "warn",
+      });
+    } finally {
+      setConfirmBusy(false);
+    }
   }
 
   return (
@@ -349,6 +408,10 @@ export default function Fontes() {
               source={s}
               aguardando={aguardando != null && aguardando === s.connector?.provider}
               onOpen={() => setDrawer({ mode: "editar", source: s })}
+              onPause={() =>
+                setConfirm({ kind: s.status === "ativa" ? "pause" : "resume", source: s })
+              }
+              onRemove={() => setConfirm({ kind: "remove", source: s })}
             />
           ))}
         </div>
@@ -442,7 +505,6 @@ export default function Fontes() {
           knownAreas={knownAreas}
           onClose={fecharDrawer}
           onSaved={aposSalvar}
-          onStatusChanged={refetchTudo}
           aguardandoConexao={
             aguardando != null && drawer.source != null && aguardando === drawer.source.connector?.provider
           }
@@ -453,6 +515,33 @@ export default function Fontes() {
           }
         />
       )}
+
+      <ConfirmDialog
+        open={confirm != null}
+        title={
+          confirm?.kind === "pause"
+            ? "Pausar fonte"
+            : confirm?.kind === "resume"
+              ? "Retomar fonte"
+              : "Remover fonte"
+        }
+        text={
+          confirm?.kind === "pause"
+            ? "As mensagens param de entrar. O que já está no cérebro permanece."
+            : confirm?.kind === "resume"
+              ? "As mensagens voltam a entrar. O que já está no cérebro permanece."
+              : "Desconecta os números deste WhatsApp. A fonte para de ler. O que já está no cérebro permanece."
+        }
+        confirmLabel={
+          confirm?.kind === "pause" ? "Pausar" : confirm?.kind === "resume" ? "Retomar" : "Remover"
+        }
+        danger={confirm?.kind !== "resume"}
+        busy={confirmBusy}
+        onConfirm={() => void executarConfirm()}
+        onCancel={() => {
+          if (!confirmBusy) setConfirm(null);
+        }}
+      />
 
       {/* toasts */}
       {toast && (
@@ -491,7 +580,19 @@ function SecHeader({ children }: { children: ReactNode }) {
 }
 
 /** card .src do mockup: ícone tintado · nome+status · meta · chips da receita · stats */
-function SourceCard({ source, aguardando, onOpen }: { source: Source; aguardando: boolean; onOpen: () => void }) {
+function SourceCard({
+  source,
+  aguardando,
+  onOpen,
+  onPause,
+  onRemove,
+}: {
+  source: Source;
+  aguardando: boolean;
+  onOpen: () => void;
+  onPause: () => void;
+  onRemove: () => void;
+}) {
   const tint = tintDaFonte(source);
   const fields = source.recipe?.fields ?? [];
   const areas: string[] = [];
@@ -597,6 +698,34 @@ function SourceCard({ source, aguardando, onOpen }: { source: Source; aguardando
         </div>
         <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>
           {conn ? descricaoDaSync(source.connector, (iso) => relativeTime(iso)) : metaDaFonte(source)}
+        </div>
+        <div
+          style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <Button
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPause();
+            }}
+          >
+            {ativa ? "Pausar" : "Retomar"}
+          </Button>
+          {ehWhatsapp(source) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              style={{ color: "var(--danger)" }}
+            >
+              Remover
+            </Button>
+          )}
         </div>
         {(fields.length > 0 || areas.length > 0) && (
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
