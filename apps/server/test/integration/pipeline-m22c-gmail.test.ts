@@ -1,8 +1,8 @@
-/** INTEGRAÇÃO M22-C — e-mail (record Gmail) → normalizador → seam → pipeline → fato carimbado.
+/** INTEGRAÇÃO M22-C — e-mail (record Gmail) → normalizador → seam → pipeline → fato.
  *  DB real :5434; LLM MOCKADO (vi.mock de extract.ts trocando SÓ extractUnit; buildEmbeddings resolve).
  *  Padrão do p1d-dedup-fatia.test.ts (vi.hoisted, IngestJob literal COMPLETO, processBlobJob direto).
  *  Prova: página com a DATA DO E-MAIL (≠ hoje); fato com valid_from=data-do-email (fallback page.date,
- *  P1-A); claim fora_da_receita (facts) na fila de revisão; re-sync = 0 duplicata / 0 LLM; html-only não
+ *  P1-A); claim fora_do_filtro (facts) na fila de revisão; re-sync = 0 duplicata / 0 LLM; html-only não
  *  quebra; fonte pausada falha fechado. Brain __m22c_gmail (wipe antes/depois). No-op sem DATABASE_URL. */
 import { describe, it, expect, afterAll, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
@@ -15,9 +15,9 @@ vi.mock("../../src/core/extraction/extract.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/core/extraction/extract.ts")>();
   return {
     ...actual,
-    // 1 claim por dim da receita: context_quote VERBATIM da linha ancorável do corpo, entity "maria",
+    // 1 claim por tipo das regras: context_quote VERBATIM da linha ancorável do corpo, entity "maria",
     // SEM valid_from/date (prova a âncora P1-A no page.date). precos = numérico (R$ 30 mil → ancorado);
-    // demais = textual (não-numérico → grounded basta). `facts` (fora da receita) também emitido.
+    // demais = textual (não-numérico → grounded basta). `facts` (fora das regras) também emitido.
     extractUnit: vi.fn(async (_home: string, _page: any, unit: any, ctx: any) => {
       h.calls++;
       const quote =
@@ -188,7 +188,7 @@ describe("M22-C pipeline — e-mail → fato carimbado com a data do e-mail", ()
     }
   });
 
-  it("2. fato carimbado: valid_from = data do e-mail (P1-A page.date); claim fora_da_receita (facts) na fila", async () => {
+  it("2. fato carimbado: valid_from = data do e-mail (P1-A page.date); claim fora_do_filtro (facts) na fila", async () => {
     if (!hasDb() || !(await dbAvailable())) return;
     await reset();
     try {
@@ -203,9 +203,9 @@ describe("M22-C pipeline — e-mail → fato carimbado com a data do e-mail", ()
       // todo fato vigente ancora na data do e-mail (mock sem valid_from → fallback page.date, P1-A)
       for (const f of fatos) expect(f.valid_from).toBe("2025-05-14");
 
-      // o claim da dim `facts` (fora da receita do e-mail) cai na fila como fora_da_receita
+      // o claim da dim `facts` (fora das regras do e-mail) cai na fila como fora_do_filtro
       const review = await queryReview();
-      const fora = review.filter((r) => r.dimension === "facts" && r.reason === "fora_da_receita");
+      const fora = review.filter((r) => r.dimension === "facts" && r.reason === "fora_do_filtro");
       expect(fora.length).toBeGreaterThan(0);
       expect(fora[0].source_id).toBe(SOURCE_ID);
     } finally {

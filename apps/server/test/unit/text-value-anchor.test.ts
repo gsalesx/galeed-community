@@ -1,14 +1,14 @@
 /** Achado criacao-de-fatos #5 — viés numérico RESIDUAL no gate C4: número tinha caminho próprio de
  *  ancoragem (value no body via numberSurfaceForms, sem quote) que o fato QUALITATIVO não tinha —
  *  perfil de evidência IDÊNTICO (valor no body, quote ausente): numérico aprovado, textual
- *  enfileirado/rebaixado. Fix: textValueIsAnchored nos TRÊS espelhos do C4 (applyRecipeGate,
+ *  enfileirado/rebaixado. Fix: textValueIsAnchored nos TRÊS espelhos do C4 (applyFilterGate,
  *  gateClaimAnchoring, derivePageFacts) — valor textual verbatim no body ancora como número ancora.
  *  Puro, sem DB/LLM (molde p1a-sem-evidencia.test.ts + m21-golden-rule.test.ts). */
 import { describe, it, expect } from "vitest";
 import { textValueIsAnchored } from "../../src/lib/value-anchor.ts";
-import { applyRecipeGate } from "../../src/core/ingestion/golden-rule.ts";
+import { applyFilterGate } from "../../src/core/ingestion/golden-rule.ts";
 import { derivePageFacts } from "../../src/core/retrieval/indexer.ts";
-import type { PageRow, ExtractionRow, SourceRecipe } from "../../src/core/platform/engine.ts";
+import type { PageRow, ExtractionRow, SourceFilter } from "../../src/core/platform/engine.ts";
 
 const maps = { reconcileMap: {}, entityMap: {} };
 const BODY = "na call de maio ficou definido: vamos focar no premium, sim, porque as clientes citam confiança.";
@@ -72,12 +72,12 @@ describe("derivePageFacts — C4 simétrico (motor, modo livre)", () => {
   });
 });
 
-describe("applyRecipeGate — C4 simétrico (gate sob contrato, espelho expressão-a-expressão)", () => {
-  const RECIPE: SourceRecipe = { fields: [{ dimension: "facts", label: "Fatos", area: "" }] };
+describe("applyFilterGate — C4 simétrico (gate sob contrato, espelho expressão-a-expressão)", () => {
+  const RECIPE: SourceFilter = { fields: [{ dimension: "facts", label: "Fatos", area: "" }] };
 
   it("triple textual sem quote com value verbatim no body → APROVADO (antes: fila 'nao_ancorado')", () => {
     const merged = { facts: [{ text: "t", entity: "accelera", predicate: "posicionamento", value: "premium" }] };
-    const out = applyRecipeGate(merged, RECIPE, "f1", "pg-1", BODY);
+    const out = applyFilterGate(merged, RECIPE, "f1", "pg-1", BODY);
     expect(out.rejected).toEqual([]);
     expect(out.approved.facts).toHaveLength(1);
     expect(out.approved.facts[0].source_id).toBe("f1");
@@ -85,7 +85,7 @@ describe("applyRecipeGate — C4 simétrico (gate sob contrato, espelho express�
 
   it("triple textual sem quote com value ausente do body → fila 'nao_ancorado' (nada afrouxou)", () => {
     const merged = { facts: [{ text: "t", entity: "accelera", predicate: "posicionamento", value: "popular" }] };
-    const out = applyRecipeGate(merged, RECIPE, "f1", "pg-1", BODY);
+    const out = applyFilterGate(merged, RECIPE, "f1", "pg-1", BODY);
     expect(out.rejected).toHaveLength(1);
     expect(out.rejected[0].reason).toBe("nao_ancorado");
   });

@@ -5,7 +5,7 @@
 > Integrações sem código: nó do n8n em `apps/n8n-nodes-galeed/` · Zapier em [ZAPIER.md](./ZAPIER.md).
 
 O Galeed tem **um funil único de entrada** (o "seam"): tudo que entra passa por dedupe,
-fila assíncrona, extração de fatos e pela receita da fonte. Um **ingestor** é a peça que
+fila assíncrona, extração de fatos e pelas regras da fonte. Um **ingestor** é a peça que
 fica ANTES do funil — o *middleware* que recebe o dado cru de um canal (WhatsApp, notetaker,
 automação, pasta…) e o **prepara** antes de ingerir de vez:
 
@@ -16,7 +16,7 @@ canal externo ──► Ingestor.normalize()  ◄── o middleware: limpa, rec
               seam único (dedupe + fila)
                         │
                         ▼
-        extração de fatos ─► receita/regra de ouro ─► fatos com selo
+        extração de fatos ─► regras/regra de ouro ─► fatos com status
 ```
 
 Todo ingestor registrado ganha **automaticamente** um webhook público:
@@ -185,7 +185,7 @@ expect(meuCanalIngestor.normalize(payloadCru, ctx)[0].content).toContain("...");
 ```
 
 5. Suba o gateway (`npm run dev`) e chame `POST /v1/ingestors/meu-canal`. Pronto: fila,
-   status no painel (Adicionar), extração e receita vêm de graça.
+   status no painel (Adicionar), extração e filtro vêm de graça.
 
 ## E os conectores OAuth (Drive nativo, Gmail…)?
 

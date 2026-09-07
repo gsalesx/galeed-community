@@ -1,15 +1,15 @@
 /** M21/S2 — a REGRA DE OURO da ingestão com contrato (ADR-016), no gate PURO (sem DB, sem LLM):
- *  o que a receita reconhece E ancora vira fato carimbado; o que não casa vira hipótese na fila —
+ *  o que as regras reconhecem E ancoram vira fato; o que não casa vai pra revisar —
  *  nunca fato sozinho, nunca descarte silencioso. Casos do DESIGN-SPEC §8 + asserts do CONTRACT. */
 import { describe, it, expect } from "vitest";
-import { applyRecipeGate, recipeGuidance } from "../../src/core/ingestion/golden-rule.ts";
-import type { SourceRecipe } from "../../src/core/platform/engine.ts";
+import { applyFilterGate, filterGuidance } from "../../src/core/ingestion/golden-rule.ts";
+import type { SourceFilter } from "../../src/core/platform/engine.ts";
 
 const BODY =
   "Reunião de preço: o valor da Accelera subiu para 30000 reais no tier executivo, " +
   "decisão tomada pela diretoria em conjunto com o financeiro.";
 
-const RECIPE: SourceRecipe = {
+const RECIPE: SourceFilter = {
   fields: [{ dimension: "decisoes", label: "decisão tomada", area: "produto" }],
 };
 
@@ -23,21 +23,21 @@ const CLAIM_OK = {
   context_quote: "o valor da Accelera subiu para 30000 reais no tier executivo",
 };
 
-describe("applyRecipeGate — o gate da regra de ouro (puro)", () => {
-  it("1. recipe=null (job sem fonte) ⇒ pass-through byte-idêntico: approved deep-equal, rejected=[]", () => {
+describe("applyFilterGate — o gate da regra de ouro (puro)", () => {
+  it("1. filtro=null (job sem fonte) ⇒ pass-through byte-idêntico: approved deep-equal, rejected=[]", () => {
     const merged = { decisoes: [{ ...CLAIM_OK }], fofoca: [{ text: "qualquer coisa" }] };
-    const out = applyRecipeGate(merged, null, "", "pg-1", BODY);
+    const out = applyFilterGate(merged, null, "", "pg-1", BODY);
     expect(out.approved).toEqual(merged); // deep-equal ao input — NADA injetado, NADA filtrado
     expect(out.rejected).toEqual([]);
     expect(out.counts).toEqual({ approved: 2, rejected: 0 });
   });
 
-  it("2. dimensão fora da receita ⇒ rejeitado reason='fora_da_receita' (e NÃO está em approved)", () => {
-    const merged = { fofoca: [{ ...CLAIM_OK }] }; // quote/número ancorados, mas a dim não é da receita
-    const out = applyRecipeGate(merged, RECIPE, "f1", "pg-1", BODY);
+  it("2. dimensão fora do filtro ⇒ rejeitado reason='fora_do_filtro' (e NÃO está em approved)", () => {
+    const merged = { fofoca: [{ ...CLAIM_OK }] }; // quote/número ancorados, mas a dim não é do filtro
+    const out = applyFilterGate(merged, RECIPE, "f1", "pg-1", BODY);
     expect(out.approved.fofoca).toEqual([]);
     expect(out.rejected).toHaveLength(1);
-    expect(out.rejected[0].reason).toBe("fora_da_receita");
+    expect(out.rejected[0].reason).toBe("fora_do_filtro");
     expect(out.rejected[0].dimension).toBe("fofoca");
     expect(out.rejected[0].source_id).toBe("f1");
     expect(out.rejected[0].status).toBe("pendente");
@@ -46,7 +46,7 @@ describe("applyRecipeGate — o gate da regra de ouro (puro)", () => {
 
   it("3. triple com quote verbatim + value_num presente no body ⇒ aprovado com source_id injetado", () => {
     const merged = { decisoes: [{ ...CLAIM_OK }] };
-    const out = applyRecipeGate(merged, RECIPE, "f1", "pg-1", BODY);
+    const out = applyFilterGate(merged, RECIPE, "f1", "pg-1", BODY);
     expect(out.rejected).toEqual([]);
     expect(out.approved.decisoes).toHaveLength(1);
     expect(out.approved.decisoes[0].source_id).toBe("f1"); // CONTRACT: o carimbo viaja no claim
@@ -63,7 +63,7 @@ describe("applyRecipeGate — o gate da regra de ouro (puro)", () => {
         },
       ],
     };
-    const out = applyRecipeGate(merged, RECIPE, "f1", "pg-1", BODY);
+    const out = applyFilterGate(merged, RECIPE, "f1", "pg-1", BODY);
     expect(out.approved.decisoes).toEqual([]);
     expect(out.rejected).toHaveLength(1);
     expect(out.rejected[0].reason).toBe("nao_ancorado");
@@ -73,7 +73,7 @@ describe("applyRecipeGate — o gate da regra de ouro (puro)", () => {
     const merged = {
       decisoes: [{ ...CLAIM_OK, value: "12345 reais", value_num: 12345 }], // quote verbatim, número não
     };
-    const out = applyRecipeGate(merged, RECIPE, "f1", "pg-1", BODY);
+    const out = applyFilterGate(merged, RECIPE, "f1", "pg-1", BODY);
     expect(out.approved.decisoes).toEqual([]);
     expect(out.rejected).toHaveLength(1);
     expect(out.rejected[0].reason).toBe("nao_ancorado");
@@ -86,7 +86,7 @@ describe("applyRecipeGate — o gate da regra de ouro (puro)", () => {
         { text: "observação solta sem nenhum trecho da fonte" }, // sem quote
       ],
     };
-    const out = applyRecipeGate(merged, RECIPE, "f1", "pg-1", BODY);
+    const out = applyFilterGate(merged, RECIPE, "f1", "pg-1", BODY);
     expect(out.approved.decisoes).toHaveLength(1);
     expect(out.approved.decisoes[0].source_id).toBe("f1");
     expect(out.rejected).toHaveLength(1);
@@ -99,44 +99,44 @@ describe("applyRecipeGate — o gate da regra de ouro (puro)", () => {
       fofoca: [{ ...CLAIM_OK }],
       decisoes: [{ text: "sem quote nenhum" }],
     };
-    const a = applyRecipeGate(merged, RECIPE, "f1", "pg-1", BODY);
-    const b = applyRecipeGate(merged, RECIPE, "f1", "pg-1", BODY);
+    const a = applyFilterGate(merged, RECIPE, "f1", "pg-1", BODY);
+    const b = applyFilterGate(merged, RECIPE, "f1", "pg-1", BODY);
     expect(a.rejected.length).toBeGreaterThan(0);
     expect(a.rejected.map((r) => r.id)).toEqual(b.rejected.map((r) => r.id));
     for (const r of a.rejected) expect(r.id).toMatch(/^[0-9a-f]{32}$/); // sha256 truncado, não uuid
   });
 });
 
-describe("recipeGuidance — receita → orientação de prompt (determinístico)", () => {
-  it("8a. receita com 2 fields ⇒ contém as 2 linhas (+ guidance do tenant quando presente)", () => {
-    const recipe: SourceRecipe = {
+describe("filterGuidance — filtro → orientação de prompt (determinístico)", () => {
+  it("8a. filtro com 2 fields ⇒ contém as 2 linhas (+ guidance do tenant quando presente)", () => {
+    const filtro: SourceFilter = {
       fields: [
         { dimension: "decisoes", label: "decisão tomada", area: "produto" },
         { dimension: "metricas", label: "métrica reportada", area: "" },
       ],
       guidance: "Priorize valores em reais.",
     };
-    const g = recipeGuidance(recipe);
+    const g = filterGuidance(filtro);
     expect(g).toContain("- decisoes: decisão tomada (área destino: produto)");
     expect(g).toContain("- metricas: métrica reportada");
     expect(g).not.toContain("metricas: métrica reportada (área"); // area "" ⇒ sem sufixo de área
     expect(g).toContain("Priorize valores em reais.");
-    expect(g.startsWith("\n\nRECEITA DESTA FONTE")).toBe(true);
+    expect(g.startsWith("\n\nFILTRO DESTA FONTE")).toBe(true);
   });
 
-  it("8b. null e receita vazia (sem fields, sem guidance) ⇒ '' (prompt idêntico ao atual)", () => {
-    expect(recipeGuidance(null)).toBe("");
-    expect(recipeGuidance({ fields: [] })).toBe("");
+  it("8b. null e filtro vazio (sem fields, sem guidance) ⇒ '' (prompt idêntico ao atual)", () => {
+    expect(filterGuidance(null)).toBe("");
+    expect(filterGuidance({ fields: [] })).toBe("");
   });
 });
 
-describe("modo livre — receita sem fields (fix do baseline D)", () => {
-  it("recipe com fields:[] é pass-through (fonte de ingestor nasce livre; receita só gateia quando define dims)", () => {
+describe("modo livre — filtro sem fields (fix do baseline D)", () => {
+  it("filtro com fields:[] é pass-through (fonte de ingestor nasce livre; filtro só gateia quando define dims)", () => {
     const merged = {
       decisions: [{ text: "Decidiu focar em premium porque clientes citam confiança", context_quote: "focar em premium" }],
       facts: [{ text: "CPL caiu pra R$ 12", context_quote: "CPL", entity: "x", predicate: "cpl", value: "R$ 12", value_num: 12 }],
     };
-    const r = applyRecipeGate(merged, { fields: [] }, "src-1", "pagina", "focar em premium CPL");
+    const r = applyFilterGate(merged, { fields: [] }, "src-1", "pagina", "focar em premium CPL");
     expect(r.counts).toEqual({ approved: 2, rejected: 0 });
     expect(r.approved).toEqual(merged);
     expect(r.rejected).toEqual([]);

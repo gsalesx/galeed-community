@@ -17,7 +17,7 @@ const item = (extra: Partial<ReviewItemRow> = {}): ReviewItemRow => ({
   text: "preço do produto X subiu para 100",
   quote: "subiu pra cem reais agora",
   claim: { text: "preço do produto X subiu para 100", value_num: 100 },
-  reason: "fora_da_receita",
+  reason: "fora_do_filtro",
   status: "pendente",
   decided_by: "",
   decided_at: null,
@@ -29,7 +29,7 @@ const source = (extra: Partial<SourceRow> = {}): SourceRow => ({
   name: "Reuniões internas",
   channel: "upload",
   type: "reunioes",
-  recipe: { fields: [{ dimension: "decisoes", label: "decisão tomada", area: "estrategia" }] },
+  filtro: { fields: [{ dimension: "decisoes", label: "decisão tomada", area: "estrategia" }] },
   default_sensitivity: "interno",
   status: "ativa",
   last_read_at: null,
@@ -40,7 +40,7 @@ const dec = (extra: Partial<DecisaoMemoria> = {}): DecisaoMemoria => ({
   id: "d1",
   dimension: "precos",
   source_id: "src-1",
-  reason: "fora_da_receita",
+  reason: "fora_do_filtro",
   text: "preço antigo do plano",
   quote: "custava trinta\nlinha 2",
   decisao: "aprovada",
@@ -70,7 +70,7 @@ describe("M25-B/buildJudgePrompt — com memória", () => {
     expect(prompt).toContain("aprovada um");
     expect(prompt).toContain("aprovada dois");
     expect(prompt).toContain("descartada um");
-    expect(prompt).toContain("[motivo: fora_da_receita]");
+    expect(prompt).toContain("[motivo: fora_do_filtro]");
     // ordem dada (buildJudgePrompt NÃO reordena): "aprovada um" antes de "aprovada dois"
     expect(prompt.indexOf("aprovada um")).toBeLessThan(prompt.indexOf("aprovada dois"));
     // só a 1ª linha da quote entra (firstLine)
@@ -79,10 +79,10 @@ describe("M25-B/buildJudgePrompt — com memória", () => {
   });
 });
 
-describe("M25-B/buildJudgePrompt — receita e fonte ausente", () => {
-  it("receita presente → recipeGuidance aparece", () => {
+describe("M25-B/buildJudgePrompt — filtro e fonte ausente", () => {
+  it("filtro presente → filterGuidance aparece", () => {
     const { prompt } = buildJudgePrompt(item(), source(), "trecho", []);
-    expect(prompt).toContain("RECEITA DESTA FONTE");
+    expect(prompt).toContain("FILTRO DESTA FONTE");
     expect(prompt).toContain("decisoes");
     expect(prompt).toContain("Reuniões internas");
   });

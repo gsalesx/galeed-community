@@ -99,7 +99,7 @@ const TOOLS: ToolDef[] = [
     inputSchema: {
       type: "object",
       properties: {
-        source: { type: "string", description: "Rótulo da fonte (ex.: 'reuniao-cliente', 'email'). Vira a receita de extração." },
+        source: { type: "string", description: "Rótulo da fonte (ex.: 'reuniao-cliente', 'email'). Vira o filtro de extração." },
         content: { type: "string", description: "O conteúdo CRU em texto (não URL, não arquivo)." },
         occurred_at: { type: "string", description: "Quando o conteúdo ocorreu (data ISO 8601). Ancora a linha do tempo." },
         sensitivity: {

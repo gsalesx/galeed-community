@@ -11,9 +11,9 @@ import { slugify } from "../../../lib/slug.ts";
 import {
   getEngine,
   type SourceRow,
-  type SourceRecipe,
+  type SourceFilter,
 } from "../../platform/engine.ts";
-import { applyRecipeGate, addReviewItemsAndNotify } from "../golden-rule.ts";
+import { applyFilterGate, addReviewItemsAndNotify } from "../golden-rule.ts";
 import { capture } from "../capture.ts";
 import { putBlobOnly } from "../ingest-doc.ts";
 import { deriveIncremental } from "../../retrieval/indexer.ts";
@@ -23,7 +23,7 @@ function sha16(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, 16);
 }
 
-/** Os 4 modelos sincronizados. As chaves são as DIMENSÕES da receita (§5). */
+/** Os 4 modelos sincronizados. As chaves são as DIMENSÕES do filtro (§5). */
 export type ContaAzulModel = "vendas" | "contas_a_pagar" | "contas_a_receber" | "pessoas";
 
 /** Um lote de records crus de UM modelo (como saem do GET /records do Nango, sem _nango_metadata). */
@@ -38,11 +38,11 @@ export interface NormalizedErpPage {
   title: string; // PT legível, ex.: "Venda nº 1001 — Acme Ltda"
   date: string; // YYYY-MM-DD — data do EVENTO (LEI V), vira page.date
   body: string; // a página textual PT (fonte do quote/âncora)
-  dimension: ContaAzulModel; // dimensão dos claims (= chave na receita)
+  dimension: ContaAzulModel; // dimensão dos claims (= chave no filtro)
   claims: ErpClaim[]; // claims determinísticos (shape do indexer/gate)
 }
 
-/** Claim no MESMO shape que o applyRecipeGate/derivePageFacts leem (golden-rule.ts §60-68). */
+/** Claim no MESMO shape que o applyFilterGate/derivePageFacts leem (golden-rule.ts §60-68). */
 export interface ErpClaim {
   text: string; // o claim em linguagem natural (PT)
   entity: string; // slug (slugify do nome) — dono claro (LEI II do M23)
@@ -256,13 +256,13 @@ function normalizePessoa(r: any, id: string): NormalizedErpPage | null {
   return { externalRef, title, date, body, dimension: "pessoas", claims: [claim] };
 }
 
-/** A RECEITA da fonte (DADO — jsonb; ADR-016). Financeiro ⇒ sensibilidade 'restrito'.
+/** As regras da fonte (DADO — jsonb `filtro`; ADR-016). Financeiro ⇒ sensibilidade 'restrito'.
  *  SEM guidance e SEM triage_profile: este caminho NÃO passa por prompt nem triagem LLM. */
-export const CONTA_AZUL_RECIPE: SourceRecipe = {
+export const CONTA_AZUL_FILTER: SourceFilter = {
   fields: [
     { dimension: "vendas", label: "venda realizada", area: "financeiro" },
     { dimension: "contas_a_pagar", label: "conta a pagar (despesa)", area: "financeiro" },
-    { dimension: "contas_a_receber", label: "conta a receber (receita)", area: "financeiro" },
+    { dimension: "contas_a_receber", label: "conta a receber (filtro)", area: "financeiro" },
     { dimension: "pessoas", label: "cadastro de pessoa (cliente/fornecedor)", area: "financeiro" },
   ],
 };
@@ -274,7 +274,7 @@ function contaAzulSourceRow(): SourceRow {
     name: "Conta Azul (ERP)",
     channel: "conta-azul", // texto/DADO → vira tag canal:conta-azul (mecanismo M21 existente)
     type: "erp",
-    recipe: CONTA_AZUL_RECIPE,
+    filtro: CONTA_AZUL_FILTER,
     default_sensitivity: "restrito", // financeiro → restrito (falha-fechado)
     status: "ativa",
     last_read_at: null,
@@ -297,7 +297,7 @@ export async function seedContaAzulSource(brain: string): Promise<SourceRow> {
 export interface ErpIngestResult {
   paginasNovas: number; // conteúdo inédito (inclui record ALTERADO — body novo)
   paginasInalteradas: number; // re-sync byte-idêntico → capture skipou (zero duplicata, LEI VI)
-  claimsAprovados: number; // passaram o applyRecipeGate → fato carimbado
+  claimsAprovados: number; // passaram o applyFilterGate → fato
   claimsParaRevisao: number; // hipóteses na fila (galeed_ingest_review)
   descartados: number; // records ilegíveis (com log do motivo)
   slugs: string[];
@@ -323,7 +323,7 @@ export async function ingestContaAzulPages(
   const tags = [
     `src:${source.id}`,
     ...(source.channel?.trim() ? [`canal:${slugify(source.channel)}`] : []),
-    ...[...new Set(source.recipe.fields.map((f) => (f.area || "").trim()).filter(Boolean))].map(
+    ...[...new Set(source.filtro.fields.map((f) => (f.area || "").trim()).filter(Boolean))].map(
       (a) => `area:${slugify(a)}`,
     ),
   ];
@@ -356,9 +356,9 @@ export async function ingestContaAzulPages(
 
     // o capture grava o body como text.trim() + "\n" (capture.ts:69) — usar ESSE body no gate
     const pageBody = p.body.trim() + "\n";
-    const gate = applyRecipeGate(
+    const gate = applyFilterGate(
       { [p.dimension]: p.claims },
-      source.recipe,
+      source.filtro,
       source.id,
       slug,
       pageBody,
@@ -368,7 +368,7 @@ export async function ingestContaAzulPages(
     claimsAprovados += gate.counts.approved;
     claimsParaRevisao += gate.counts.rejected;
     console.log(
-      `[recipe-gate] brain=${brain} page=${slug} approved=${gate.counts.approved} rejected=${gate.counts.rejected} source=conta-azul`,
+      `[filtro-gate] brain=${brain} page=${slug} approved=${gate.counts.approved} rejected=${gate.counts.rejected} source=conta-azul`,
     );
 
     await e.putExtraction({
@@ -415,7 +415,7 @@ export async function ingestContaAzulBatch(
   return { ...res, descartados: descartados.length };
 }
 
-/** Map model do Nango (PascalCase do models.ts) → ContaAzulModel (dimensão da receita). */
+/** Map model do Nango (PascalCase do models.ts) → ContaAzulModel (tipo das regras). */
 const NANGO_MODEL_TO_DIMENSION: Record<string, ContaAzulModel> = {
   Venda: "vendas",
   ContaAPagar: "contas_a_pagar",
@@ -437,7 +437,7 @@ export const contaAzulConnector = {
       name: row.name,
       channel: row.channel as "conta-azul",
       type: row.type as "erp",
-      recipe: row.recipe,
+      filtro: row.filtro,
       default_sensitivity: row.default_sensitivity as "restrito",
     };
   },

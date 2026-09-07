@@ -2,7 +2,7 @@
  *  Shapes idênticos aos de `web/src/lib/api.ts` (bloco hypotheses) — locais por contrato do slot.
  *  REASON_LABEL: o enum NUNCA aparece cru pro usuário (invariante M11). */
 
-export type ReviewReason = "fora_da_receita" | "nao_ancorado" | "entidade_vaga" | "conexao_sugerida";
+export type ReviewReason = "fora_do_filtro" | "nao_ancorado" | "entidade_vaga" | "conexao_sugerida";
 export type ReviewStatus = "pendente" | "aprovada" | "descartada";
 
 /** M25-B — recomendação do juiz persistida no item ("" = juiz não passou por aqui). */
@@ -38,12 +38,12 @@ export type {
   JudgeRun,
   BatchApproveResult,
   BatchDiscardResult,
-  RecipeBatchResult,
+  FilterBatchResult,
   BatchRetido,
 } from "../../lib/api";
 
 export const REASON_LABEL: Record<ReviewReason, string> = {
-  fora_da_receita: "Não está na receita da fonte — nenhum campo reconhece isso.",
+  fora_do_filtro: "Não está nas regras da fonte — nenhum campo reconhece isso.",
   nao_ancorado: "O número ou a citação não confere com o texto original — pode ser invenção.",
   entidade_vaga: "Não dá pra saber de quem ou do quê isso fala — a entidade é vaga (“ele”, “a empresa”…), sem dono claro.",
   conexao_sugerida: "O sono do cérebro notou que estas duas entidades convivem com os mesmos vizinhos no mapa, sem ligação direta — pode existir relação. Aprovar cria a CONEXÃO no mapa (nunca vira fato).",

@@ -49,7 +49,7 @@ const source = (extra: Partial<SourceRow> = {}): SourceRow => ({
   name: "Calls de teste",
   channel: "upload",
   type: "reunioes",
-  recipe: { fields: [{ dimension: "decisoes", label: "decisão", area: "estrategia" }] },
+  filtro: { fields: [{ dimension: "decisoes", label: "decisão", area: "estrategia" }] },
   default_sensitivity: "interno",
   status: "ativa",
   last_read_at: null,
@@ -67,7 +67,7 @@ const review = (extra: Partial<ReviewItemRow> = {}): ReviewItemRow => {
     text: `claim ${id}`,
     quote: "trecho da call que ancora o claim",
     claim: { text: `claim ${id}`, entity: "andre", context_quote: "trecho da call que ancora o claim" },
-    reason: "fora_da_receita",
+    reason: "fora_do_filtro",
     status: "pendente",
     decided_by: "",
     decided_at: null,
@@ -197,8 +197,8 @@ describe.skipIf(!hasDb())("M25-B/integração — juiz triador", () => {
     const e = await getEngine(BRAIN);
     const sql = await rawConnect();
     // 2 decisões estruturalmente iguais (mesma dim/source/reason), texts distintos p/ desempate trigram
-    const dPrecoX = review({ id: "dec-preco", dimension: "precos", reason: "fora_da_receita", text: "preço do produto X subiu" });
-    const dAgenda = review({ id: "dec-agenda", dimension: "precos", reason: "fora_da_receita", text: "agenda da call de sexta" });
+    const dPrecoX = review({ id: "dec-preco", dimension: "precos", reason: "fora_do_filtro", text: "preço do produto X subiu" });
+    const dAgenda = review({ id: "dec-agenda", dimension: "precos", reason: "fora_do_filtro", text: "agenda da call de sexta" });
     const dOutra = review({ id: "dec-outra", dimension: "objecoes", reason: "nao_ancorado", text: "objecao sobre prazo" });
     await e.addReviewItems([dPrecoX, dAgenda, dOutra]);
     // marca as 3 como decididas (memória) — via engine (caminho humano real)
@@ -207,7 +207,7 @@ describe.skipIf(!hasDb())("M25-B/integração — juiz triador", () => {
     await e.setReviewStatus("dec-outra", "descartada", "dono@x.com");
 
     // item-alvo na MESMA (dim/source/reason) das estruturais, texto de preço
-    const alvo = review({ id: "alvo", dimension: "precos", reason: "fora_da_receita", text: "preço do produto Y" });
+    const alvo = review({ id: "alvo", dimension: "precos", reason: "fora_do_filtro", text: "preço do produto Y" });
     await e.addReviewItems([alvo]);
 
     mockTool("humano", 0.6);

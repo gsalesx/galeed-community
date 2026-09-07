@@ -2,7 +2,7 @@
  *   - wizardStart: step 'purpose', pergunta não-vazia, painel "Cérebro sem nome", 5 chips, done=false;
  *   - reply avança SEMPRE na ordem purpose→areas→sources→sensitivity→review, mesmo SEM provider
  *     (degrade determinístico — GALEED_PROVIDER="" desliga a IA; o wizard nunca trava);
- *   - no review: cartão legível sem JSON; panel.sources[i].fields = labels da receita;
+ *   - no review: cartão legível sem JSON; panel.sources[i].fields = labels do filtro;
  *   - confirm cria o brain (membership + contexto M11 + pack M13 em MERGE + fontes S1, sigilo
  *     degradado = 'restrito', falha-fechado);
  *   - colisão de slug (outra conta) → BffError 409 e NADA gravado.
@@ -98,7 +98,7 @@ describe("M21/S4 — wizardStart + roteiro determinístico (sem DB)", () => {
     expect(t.state.draft.sensitivity).toBe("restrito");
   });
 
-  it("review: cartão legível SEM JSON; panel.sources[i].fields são labels da receita", async () => {
+  it("review: cartão legível SEM JSON; panel.sources[i].fields são labels do filtro", async () => {
     const t = await runToReview();
     expect(t.card.length).toBeGreaterThan(0);
     expect(t.card).not.toContain("{");
@@ -256,7 +256,7 @@ describe.skipIf(!hasDb())("M21/S4 — wizardConfirm cria o brain (DB real)", () 
     const pack = await loadSchemaPackAsync(BRAIN);
     for (const s of t.state.draft.sources) {
       const dims = pack.extractable[s.type]?.eval_dimensions ?? [];
-      for (const f of s.recipe.fields) expect(dims).toContain(f.dimension);
+      for (const f of s.filtro.fields) expect(dims).toContain(f.dimension);
     }
 
     const e = await getEngine(BRAIN);

@@ -43,8 +43,8 @@ const h = vi.hoisted(() => {
     submitExtractionBatch: vi.fn(),
     buildEmbeddings: vi.fn(async () => {}),
     getEngine: vi.fn(async () => engine),
-    applyRecipeGate: vi.fn(() => ({ approved: {}, rejected: [], counts: { approved: 0, rejected: 0 } })),
-    recipeGuidance: vi.fn(() => ""),
+    applyFilterGate: vi.fn(() => ({ approved: {}, rejected: [], counts: { approved: 0, rejected: 0 } })),
+    filterGuidance: vi.fn(() => ""),
     addReviewItemsAndNotify: vi.fn(async () => {}),
     scoreSegment: vi.fn(() => ({ worthy: true, score: 5, signals: [], profile: "t" })),
     resolveTriageProfile: vi.fn(async () => ({})),
@@ -76,8 +76,8 @@ vi.mock("../../src/core/ingestion/batch-extract.ts", () => ({
 vi.mock("../../src/core/retrieval/embeddings.ts", () => ({ buildEmbeddings: h.buildEmbeddings }));
 vi.mock("../../src/core/platform/engine.ts", () => ({ getEngine: h.getEngine }));
 vi.mock("../../src/core/ingestion/golden-rule.ts", () => ({
-  applyRecipeGate: h.applyRecipeGate,
-  recipeGuidance: h.recipeGuidance,
+  applyFilterGate: h.applyFilterGate,
+  filterGuidance: h.filterGuidance,
   addReviewItemsAndNotify: h.addReviewItemsAndNotify,
 }));
 vi.mock("../../src/core/ingestion/triage.ts", () => ({

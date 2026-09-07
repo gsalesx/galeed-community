@@ -1,13 +1,13 @@
 /** INTEGRAÇÃO M23-C/S4 — o SINAL da fila pro corpus real, no GATE da regra de ouro (DB real, SEM LLM).
- *  Prova mecânica do BRIEF item (6)/(4): sob a receita das 3 classes não-numéricas, o que casa
- *  (quote verbatim ancorado) vira FATO carimbado pela fonte; o que não casa (quote parafraseado →
- *  nao_ancorado; dimensão fora da receita → fora_da_receita) vira HIPÓTESE com motivo na fila.
- *  Determinística: roda applyRecipeGate (gate PURO) + putExtraction + deriveIncremental + a fila.
+ *  Prova mecânica do BRIEF item (6)/(4): sob as regras das 3 classes não-numéricas, o que casa
+ *  (quote verbatim ancorado) vira fato pela fonte; o que não casa (quote parafraseado →
+ *  nao_ancorado; tipo fora das regras → fora_do_filtro) vai pra revisar com motivo na fila.
+ *  Determinística: roda applyFilterGate (gate PURO) + putExtraction + deriveIncremental + a fila.
  *  Brain de teste descartável `__m23c_fila` — NUNCA o Accelera. No-op sem DATABASE_URL (ADR-014). */
 import { describe, it, expect, afterAll } from "vitest";
 import { hasDb, rawConnect, wipeBrain } from "./helpers/db.ts";
 import { getEngine, closeEngines, type SourceRow } from "../../src/core/platform/engine.ts";
-import { applyRecipeGate } from "../../src/core/ingestion/golden-rule.ts";
+import { applyFilterGate } from "../../src/core/ingestion/golden-rule.ts";
 import { deriveIncremental } from "../../src/core/retrieval/indexer.ts";
 
 const BRAIN = "__m23c_fila";
@@ -20,7 +20,7 @@ const BODY =
   "[2025-09-12 11:03:55] Kelvin: Pessoal, time me passou o prazo aqui, quarta dia 17 teremos ela full rodando\n" +
   "[2025-08-21 18:45:02] Marcos: Pensei fazer cold call mas desisti.";
 
-const RECIPE: SourceRow["recipe"] = {
+const RECIPE: SourceRow["filtro"] = {
   fields: [
     { dimension: "relacoes", label: "vínculo declarado", area: "" },
     { dimension: "decisoes", label: "decisão tomada ou descartada", area: "" },
@@ -74,13 +74,13 @@ describe("M23-C/S4 — sinal da fila (gate da regra de ouro, DB real, sem LLM)",
     await run(async () => {
       const e = await getEngine(BRAIN);
 
-      // 1) fonte com a receita das 3 classes
+      // 1) fonte com o filtro das 3 classes
       await e.upsertSource({
         id: SOURCE_ID,
         name: "Fonte M23-C fila",
         channel: "upload",
         type: "notas",
-        recipe: RECIPE,
+        filtro: RECIPE,
         default_sensitivity: "restrito",
         status: "ativa",
         last_read_at: null,
@@ -128,7 +128,7 @@ describe("M23-C/S4 — sinal da fila (gate da regra de ouro, DB real, sem LLM)",
         ],
         precos: [
           {
-            // (c) dimensão FORA da receita → REJECTED fora_da_receita
+            // (c) tipo FORA das regras → REJECTED fora_do_filtro
             text: "mensalidade subiu",
             entity: "kelvin",
             predicate: "preco",
@@ -139,16 +139,16 @@ describe("M23-C/S4 — sinal da fila (gate da regra de ouro, DB real, sem LLM)",
         ],
       };
 
-      const gate = applyRecipeGate(merged, RECIPE, SOURCE_ID, SLUG, BODY);
+      const gate = applyFilterGate(merged, RECIPE, SOURCE_ID, SLUG, BODY);
       expect(gate.counts.approved).toBe(1);
       expect(gate.counts.rejected).toBe(2);
       const byDim = Object.fromEntries(gate.rejected.map((r) => [r.dimension, r.reason]));
       expect(byDim["decisoes"]).toBe("nao_ancorado");
-      expect(byDim["precos"]).toBe("fora_da_receita");
+      expect(byDim["precos"]).toBe("fora_do_filtro");
       expect(gate.approved.compromissos).toHaveLength(1);
       expect(gate.approved.compromissos[0].source_id).toBe(SOURCE_ID);
 
-      // 4) persiste o aprovado → deriva → o claim (a) vira FATO carimbado, valid_from = data da MENSAGEM
+      // 4) persiste o aprovado → deriva → o claim (a) vira fato, valid_from = data da MENSAGEM
       await e.putExtraction({
         source_slug: SLUG,
         type: "notas",
@@ -186,9 +186,9 @@ describe("M23-C/S4 — sinal da fila (gate da regra de ouro, DB real, sem LLM)",
       expect(pend.length).toBe(2);
       const reasons = new Set(pend.map((p) => p.reason));
       expect(reasons.has("nao_ancorado")).toBe(true);
-      expect(reasons.has("fora_da_receita")).toBe(true);
+      expect(reasons.has("fora_do_filtro")).toBe(true);
       // ids determinísticos: re-gate produz os MESMOS ids
-      const gate2 = applyRecipeGate(merged, RECIPE, SOURCE_ID, SLUG, BODY);
+      const gate2 = applyFilterGate(merged, RECIPE, SOURCE_ID, SLUG, BODY);
       expect(gate2.rejected.map((r) => r.id).sort()).toEqual(gate.rejected.map((r) => r.id).sort());
     });
   });

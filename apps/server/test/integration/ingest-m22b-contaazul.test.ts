@@ -1,7 +1,7 @@
 /** INTEGRAÇÃO M22-B — conector Conta Azul end-to-end no DB real (:5434), ZERO LLM. É o gate §5.2
- *  do BRIEF executável: fato carimbado pela fonte com sensibilidade restrito; valid_from = data do
+ *  do BRIEF executável: fato pela fonte com sensibilidade restrito; valid_from = data do
  *  EVENTO (nunca hoje); supersessão bitemporal por série tier (update supersede, venda nova não
- *  apaga antiga); re-sync = zero duplicata; claim fora da receita/entidade vaga → fila; ZERO linha
+ *  apaga antiga); re-sync = zero duplicata; claim fora das regras/entidade vaga → fila; ZERO linha
  *  em galeed_llm_usage; fail-closed em fonte pausada. Brains descartáveis sufixados — NUNCA o
  *  Accelera. No-op sem DATABASE_URL (ADR-014). */
 import { describe, it, expect, afterAll } from "vitest";
@@ -94,7 +94,7 @@ describe("M22-B — conector Conta Azul (DB real, zero LLM)", () => {
 
       const sql = await rawConnect();
       try {
-        // (1) fato carimbado com a fonte + tags + sensibilidade restrito
+        // (1) fato com a fonte + tags + sensibilidade restrito
         const facts = await sql.unsafe(
           `select entity, predicate, tier, status, source_id, valid_from, value_num
              from galeed_facts where brain = $1 and predicate = 'venda' order by tier`,
@@ -209,7 +209,7 @@ describe("M22-B — conector Conta Azul (DB real, zero LLM)", () => {
         name: "Conta Azul (ERP)",
         channel: "conta-azul",
         type: "erp",
-        recipe: { fields: [{ dimension: "vendas", label: "venda realizada", area: "financeiro" }] },
+        filtro: { fields: [{ dimension: "vendas", label: "venda realizada", area: "financeiro" }] },
         default_sensitivity: "restrito",
         status: "pausada",
         last_read_at: null,

@@ -35,12 +35,12 @@ const supersededEvent = `{
   title={meta.title}
   intro="Como as peças se encaixam, em três desenhos: o loop central, a leitura que falha fechado, e a linha do tempo que nunca apaga o passado."
 >
-  <!-- ============ FLUXO 1 — ingere → organiza → pergunta ============ -->
+  <!-- ============ FLUXO 1 — ingere → processa → pergunta ============ -->
   <div class="sub">1 · O loop central</div>
   <div class="prose">
     <p>
       Tudo no Galeed gira em torno de três verbos. Você <strong>ingere</strong> conteúdo cru,
-      ele <strong>organiza</strong> sozinho (cada trecho vira fato ou hipótese, ligado a pessoas,
+      ele <strong>processa</strong> sozinho (cada trecho vira fato ou vai pra revisar, ligado a pessoas,
       áreas e uma fonte citável), e você <strong>pergunta</strong> em português. A resposta volta
       com a fonte carimbada — e cada pergunta nova reaproveita tudo que já entrou.
     </p>
@@ -58,7 +58,7 @@ const supersededEvent = `{
     >
     <div class="node accent">
       <span class="ntag">async</span>
-      <span class="nt">Ele organiza</span>
+      <span class="nt">Ele processa</span>
       <span class="nd">Classifica, liga às pessoas e áreas, decide o que vira fato. O cérebro nunca chuta.</span>
     </div>
     <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"
@@ -68,7 +68,7 @@ const supersededEvent = `{
     <div class="node">
       <span class="ntag">POST <span class="np">/v1/ask</span></span>
       <span class="nt">Você pergunta</span>
-      <span class="nd">Em linguagem natural. Recebe síntese + fatos, cada um com o selo da fonte.</span>
+      <span class="nd">Em linguagem natural. Recebe síntese + fatos, cada um com o status e a fonte.</span>
     </div>
     <!-- a volta: o que organizou alimenta a próxima pergunta -->
     <svg class="loopback" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"

@@ -1,6 +1,6 @@
 /** REFLEXÃO — o 3º andar da memória (sabedoria), estilo "Reflection" dos Generative Agents
  *  (Park et al. 2023). DIFERENTE do sonho:
- *   - SONHO = divergente, lateral: "que conexão ninguém viu?" (hipótese especulativa).
+ *   - SONHO = divergente, lateral: "que conexão ninguém viu?" (item pra revisar especulativo).
  *   - REFLEXÃO = convergente, vertical: "o que eu APRENDI com o que entrou?" (conclusão ancorada).
  *
  *  Sobe de fatos → sabedoria: episódico (fontes/) + semântico (fatos/) → APRENDIZADO (reflexoes/).

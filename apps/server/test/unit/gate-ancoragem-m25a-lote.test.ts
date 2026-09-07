@@ -1,15 +1,15 @@
 /** M25-A/§5.A — gate DETERMINÍSTICO de ancoragem de claim SALVO (gateClaimAnchoring), PURO,
  *  sem DB. A LEI: decisão humana é por LOTE, ancoragem é por ITEM — este gate é a cadeia M23-B
- *  SEM o passo 1 (fora_da_receita). Fixture 9 é o ESPELHO: pra um claim DENTRO da receita,
- *  applyRecipeGate aprova ⇔ gateClaimAnchoring === null (trava a deriva entre as duas cadeias).
+ *  SEM o passo 1 (fora_do_filtro). Fixture 9 é o ESPELHO: pra um claim DENTRO do filtro,
+ *  applyFilterGate aprova ⇔ gateClaimAnchoring === null (trava a deriva entre as duas cadeias).
  *  Molde: gate-m23b-autocontencao.test.ts. */
 import { describe, it, expect } from "vitest";
 import {
   gateClaimAnchoring,
-  applyRecipeGate,
+  applyFilterGate,
   LOTE_PORQUE,
 } from "../../src/core/ingestion/golden-rule.ts";
-import type { SourceRecipe } from "../../src/core/platform/engine.ts";
+import type { SourceFilter } from "../../src/core/platform/engine.ts";
 
 // quote verbatim conhecido plantado no body:
 const QUOTE = "você tá no ramo de clínicas também, não tá?";
@@ -92,8 +92,8 @@ describe("M25-A — gateClaimAnchoring (cadeia de ancoragem, ordem cravada, zero
     expect(gateClaimAnchoring(claim, "")).toBe(LOTE_PORQUE.nao_ancorado);
   });
 
-  it("9. ESPELHO do applyRecipeGate: com a dim NA receita, applyRecipeGate aprova ⇔ gate === null", () => {
-    const recipe: SourceRecipe = {
+  it("9. ESPELHO do applyFilterGate: com a dim NO filtro, applyFilterGate aprova ⇔ gate === null", () => {
+    const filtro: SourceFilter = {
       fields: [{ dimension: "claims", label: "Claims", area: "" }],
       guidance: "",
     };
@@ -113,7 +113,7 @@ describe("M25-A — gateClaimAnchoring (cadeia de ancoragem, ordem cravada, zero
     for (const { claim, body } of fixtures) {
       const gatePassa = gateClaimAnchoring(claim, body) === null;
       const recipeAprova =
-        applyRecipeGate({ claims: [claim] }, recipe, "f1", "pg-1", body).counts.approved === 1;
+        applyFilterGate({ claims: [claim] }, filtro, "f1", "pg-1", body).counts.approved === 1;
       expect(gatePassa).toBe(recipeAprova);
     }
   });

@@ -1,19 +1,19 @@
-/** StatusChip — chip epistêmico do selo (.s-status). Mono uppercase + bolinha
- *  categórica. As 5 variantes do status do selo (fato/hipótese/arquivado/
- *  registro/pessoa). Hipótese NUNCA pode parecer fato — cor sagrada. */
+/** StatusChip — chip epistêmico do status (.s-status). Mono uppercase + bolinha
+ *  categórica. As 5 variantes (fato / pra revisar / arquivado / sem prova / pessoa).
+ *  Pra revisar NUNCA pode parecer fato — cor sagrada. */
 import type { CSSProperties } from "react";
 
 export type StatusVariant = "fact" | "hypo" | "arch" | "reg" | "ent";
 
 const LABEL: Record<StatusVariant, string> = {
   fact: "Fato",
-  hypo: "Hipótese",
+  hypo: "Pra revisar",
   arch: "Arquivado",
-  reg: "Registro",
+  reg: "Sem prova",
   ent: "Pessoa",
 };
 
-// cor (texto), soft (fundo), dot (bolinha). Hipótese tem texto âmbar mais
+// cor (texto), soft (fundo), dot (bolinha). Pra revisar tem texto âmbar mais
 // escuro (oklch literal do 00-foundation §1.7) para contraste.
 const STYLE: Record<StatusVariant, { fg: string; bg: string; dot: string }> = {
   fact: { fg: "var(--st-fact)", bg: "var(--st-fact-soft)", dot: "var(--st-fact)" },

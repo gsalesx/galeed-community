@@ -71,7 +71,7 @@ export const chatIngestor: Ingestor = {
       name: "Chats",
       channel: "chat",
       type: "conversa",
-      recipe: { fields: [] },
+      filtro: { fields: [] },
     };
   },
 

@@ -272,7 +272,7 @@ export const MIGRATIONS: Migration[] = [
           create index if not exists galeed_llm_usage_brain_ts on galeed_llm_usage(brain, ts desc);
           create index if not exists galeed_llm_usage_brain_op on galeed_llm_usage(brain, op)`,
   },
-  // --- M21/S1: FONTES como conceito de 1ª classe + FILA DE REVISÃO (regra de ouro). A receita é DADO
+  // --- M21/S1: FONTES como conceito de 1ª classe + FILA DE REVISÃO (regra de ouro). As regras (`filtro`) são DADO
   // (jsonb) — zero ramo de formato no core (invariante III). `galeed_facts.source_id` é o carimbo da
   // fonte no fato (ADITIVO: '' = fato sem fonte, retrocompat M1–M20). `galeed_ingest_jobs.source_id`
   // liga o job à fonte (null = caminho sem fonte, byte-idêntico a hoje). Fila de revisão é tabela
@@ -826,5 +826,24 @@ export const MIGRATIONS: Migration[] = [
       brain text not null, group_key text not null,
       decision jsonb not null, updated_at timestamptz default now(),
       primary key (brain, group_key))`,
+  },
+  {
+    id: 55,
+    name: "galeed_sources.recipe → filtro + reason fora_da_receita → fora_do_filtro",
+    sql: `
+      do $$
+      begin
+        if exists (
+          select 1 from information_schema.columns
+          where table_schema = 'public' and table_name = 'galeed_sources' and column_name = 'recipe'
+        ) and not exists (
+          select 1 from information_schema.columns
+          where table_schema = 'public' and table_name = 'galeed_sources' and column_name = 'filtro'
+        ) then
+          alter table galeed_sources rename column recipe to filtro;
+        end if;
+      end $$;
+      update galeed_ingest_review set reason = 'fora_do_filtro' where reason = 'fora_da_receita';
+    `,
   },
 ];

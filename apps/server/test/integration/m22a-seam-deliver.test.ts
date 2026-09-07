@@ -2,10 +2,10 @@
  *  Brain de teste sufixado (test-m22a-seam-<unique>); Accelera = produção, NUNCA tocada.
  *
  *  Prova (gate BRIEF §5.1):
- *   - Caminho A (sem claims): blob gravado + job 'queued' carimbado com source_id; re-entrega → deduped.
- *   - Caminho B (com claims): página com tags src:/canal:/area: + fato carimbado (source_id=fonte) com
- *     valid_from ancorado na data DO EVENTO (timestamp do payload, NÃO hoje); claim FORA da receita →
- *     linha em galeed_ingest_review (fora_da_receita); re-entrega → deduped (zero duplicata).
+ *   - Caminho A (sem claims): blob gravado + job 'queued' com source_id da fonte; re-entrega → deduped.
+ *   - Caminho B (com claims): página com tags src:/canal:/area: + fato (source_id=fonte) com
+ *     valid_from ancorado na data DO EVENTO (timestamp do payload, NÃO hoje); claim FORA das regras →
+ *     linha em galeed_ingest_review (fora_do_filtro); re-entrega → deduped (zero duplicata).
  *   - ZERO LLM no caminho B: galeed_llm_usage do brain de teste sem NENHUMA linha (BRIEF §3/§5.2).
  *   - fonte pausada / inexistente → Error legível.
  *  No-op sem DATABASE_URL (padrão ADR-014). */
@@ -29,7 +29,7 @@ const sourceRow = (extra: Partial<SourceRow> = {}): SourceRow => ({
   name: "Conta Azul (vendas)",
   channel: "conta azul",
   type: "registro",
-  recipe: { fields: [{ dimension: "vendas", label: "venda", area: "comercial" }] },
+  filtro: { fields: [{ dimension: "vendas", label: "venda", area: "comercial" }] },
   default_sensitivity: "interno",
   status: "ativa",
   last_read_at: null,
@@ -131,7 +131,7 @@ describe.skipIf(!hasDb())("M22-A seam — deliverConnectorPayload", () => {
     expect(r2.jobId).toBe(r1.jobId);
   });
 
-  it("caminho B (com claims): fato carimbado + valid_from ancorado no evento; fora-da-receita → review; re-entrega → deduped; ZERO LLM", async () => {
+  it("caminho B (com claims): fato carimbado + valid_from ancorado no evento; fora-da-filtro → review; re-entrega → deduped; ZERO LLM", async () => {
     if (!dbOk) return;
     // content COM o externalRef renderizado (contrato com B/C) e os quotes LITERAIS dos claims.
     const content = [
@@ -149,7 +149,7 @@ describe.skipIf(!hasDb())("M22-A seam — deliverConnectorPayload", () => {
       title: "Venda Acme",
       claims: [
         {
-          dimension: "vendas", // DENTRO da receita
+          dimension: "vendas", // DENTRO do filtro
           entity: "Acme",
           predicate: "venda",
           value: "30000 BRL",
@@ -160,7 +160,7 @@ describe.skipIf(!hasDb())("M22-A seam — deliverConnectorPayload", () => {
           text: "Acme comprou por 30000 BRL.",
         },
         {
-          dimension: "status_pedido", // FORA da receita → fila de revisão
+          dimension: "status_pedido", // FORA do filtro → fila de revisão
           entity: "Acme",
           predicate: "status",
           value: "em aberto",
@@ -185,7 +185,7 @@ describe.skipIf(!hasDb())("M22-A seam — deliverConnectorPayload", () => {
     expect(page!.tags).toContain("canal:conta-azul");
     expect(page!.tags).toContain("area:comercial");
 
-    // fato carimbado com source_id = fonte E valid_from ancorado na data DO EVENTO (não hoje).
+    // fato com source_id da fonte E valid_from ancorado na data DO EVENTO (não hoje).
     const fs = await facts();
     const vendaFact = fs.find((f) => String(f.entity).toLowerCase() === "acme" && f.predicate === "venda");
     expect(vendaFact).toBeTruthy();
@@ -193,11 +193,11 @@ describe.skipIf(!hasDb())("M22-A seam — deliverConnectorPayload", () => {
     expect(vendaFact.valid_from).toBe("2026-01-15");
     expect(vendaFact.valid_from).not.toBe(new Date().toISOString().slice(0, 10));
 
-    // claim fora-da-receita virou hipótese na fila com motivo certo.
+    // claim fora das regras foi pra revisar com motivo certo.
     const rev = await reviewRows();
     const foraRec = rev.find((x) => x.dimension === "status_pedido");
     expect(foraRec).toBeTruthy();
-    expect(foraRec.reason).toBe("fora_da_receita");
+    expect(foraRec.reason).toBe("fora_do_filtro");
     expect(foraRec.source_id).toBe(SRC_ID);
 
     // ZERO LLM de EXTRAÇÃO (BRIEF §3/§5.2): o caminho determinístico não chama o LLM pra digerir o

@@ -80,10 +80,10 @@ export async function factsHandler(
   return rows.map(toFactItem);
 }
 
-/** Hit de retrieve no shape que o front consome (com selo). Reusa o que /api/retrieve já devolve. */
+/** Hit de retrieve no shape que o front consome (com status). Reusa o que /api/retrieve já devolve. */
 type RetrieveHitShape = Awaited<ReturnType<typeof retrieve>>[number];
 
-/** Normalização mínima do selo (réplica consciente de normHits@web-server.ts — não exportado): garante
+/** Normalização mínima do status (`Selo`) (réplica consciente de normHits@web-server.ts — não exportado): garante
  *  `selo.tipo` (preferido pelo front) a partir de `selo.natureza` quando ausente. Mantém o handler puro
  *  e sem importar o web-server.ts (evita ciclo). Documentado no ARTIFACTS. */
 function normHit<T>(h: T): T {

@@ -1,6 +1,6 @@
 /** M24-E — card "Percepções" na tela Saúde (decisão (b) do fundador: SEM tela nova). Lista as
  *  percepções que o cérebro produziu DORMINDO (saída do ciclo de sono M24-A/C/D): classe, texto,
- *  severidade, o "porquê" com os NÚMEROS do detector, fontes clicáveis (o selo) e a data do sono.
+ *  severidade, o "porquê" com os NÚMEROS do detector, fontes clicáveis (o status) e a data do sono.
  *  Vivas primeiro; stale/arquivadas atrás de um toggle. Estado vazio honesto. ZERO LLM. */
 import { useState } from "react";
 import { Button, Card, Chip, Skeleton } from "../../ui";

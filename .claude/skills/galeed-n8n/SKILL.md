@@ -24,7 +24,7 @@ planilha/tabela · payload cru pra qualquer slug) + memória (perguntar · busca
 - Bot vai **ler** (Perguntar/Buscar fatos)? Convide em **Acesso → "Todas as áreas
   (acesso total)"** — senão o modo livre é invisível (fail-closed) e a resposta vem vazia.
 
-## Receitas que funcionam
+## Filtros que funcionam
 
 | Fluxo | Trigger n8n | Operação Galeed |
 | --- | --- | --- |

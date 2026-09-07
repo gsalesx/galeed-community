@@ -1,8 +1,8 @@
 /** Decaimento→lixeira (achado decaimento-lixeira#2): página ARQUIVADA fica FORA da recuperação.
  *  O SQL do vectorSearch/FTS já filtra archived no engine; aqui travamos a 3ª porta — a
  *  graph-expansion do retrieve, que injeta vizinhos de galeed_edges (arestas pra página arquivada
- *  PERSISTEM) via pagesBySlug. Sem o check de p.archived, a lixeira voltava via 'grafo' com selo
- *  'registrado'. Sem banco: engine/embeddings/reranker mockados. */
+ *  PERSISTEM) via pagesBySlug. Sem o check de p.archived, a lixeira voltava via 'grafo' com status
+ *  'sem prova'. Sem banco: engine/embeddings/reranker mockados. */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const h = vi.hoisted(() => ({

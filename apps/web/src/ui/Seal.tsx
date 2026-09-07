@@ -1,7 +1,7 @@
 /** Seal — o COMPONENTE-ASSINATURA do Galeed. Carimba TODO trecho devolvido pelo
  *  cérebro. Regras sagradas:
  *   - status, certeza e validade SEMPRE visíveis;
- *   - hipótese NUNCA pode parecer fato (cor categórica fixa);
+ *   - pra revisar NUNCA pode parecer fato (cor categórica fixa);
  *   - item secreto/restrito mostra cadeado vermelho.
  *
  *  Props derivam do shape `Selo` (ARCHITECTURE §5). Tipo redeclarado aqui para
@@ -15,7 +15,7 @@ import type { LockLevel } from "./LockChip";
 import { Icon } from "./Icon";
 import type { IconName } from "./Icon";
 
-/** Shape do selo vindo do /api/retrieve (ARCHITECTURE §5). */
+/** Shape do status (`Selo`) vindo do /api/retrieve (ARCHITECTURE §5). */
 export interface Selo {
   status: "fato" | "hipotese" | "arquivado" | "registrado";
   confidence: number;

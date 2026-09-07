@@ -16,7 +16,7 @@ function fakeHandler(pck: string, channel = "fake"): ConnectorHandler {
       name: `Fonte ${pck}`,
       channel,
       type: "registro",
-      recipe: { fields: [{ dimension: "vendas", label: "venda", area: "comercial" }] },
+      filtro: { fields: [{ dimension: "vendas", label: "venda", area: "comercial" }] },
     }),
     normalize: (record, ctx): ConnectorPayload[] => [
       {
@@ -66,6 +66,6 @@ describe("registro de conectores (Map providerConfigKey → handler)", () => {
     const a = h.sourceSeed();
     const b = h.sourceSeed();
     expect(a).toEqual(b);
-    expect(a.recipe.fields[0].dimension).toBe("vendas");
+    expect(a.filtro.fields[0].dimension).toBe("vendas");
   });
 });

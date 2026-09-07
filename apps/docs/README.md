@@ -46,7 +46,7 @@ API simples e estável para os agentes de conteúdo montarem as seções:
 - `CodeBlock.astro` — bloco com chrome do design (lang, filename, Copiar) + realce Shiki.
 - `Endpoint.astro` — barra de endpoint (método, path com `/v1`, selo de escopo).
 - `ParamTable.astro` — tabela de parâmetros (data-driven via `rows` ou slot).
-- `Fields.astro` / `Field.astro` — anatomia do selo / leitura da receita.
+- `Fields.astro` / `Field.astro` — anatomia do selo / leitura do filtro.
 - `QSteps.astro` / `QStep.astro` — passos numerados do início rápido.
 - `Tools.astro` / `Tool.astro` — grid de ferramentas (MCP).
 - `Codes.astro` — linhas de códigos de status (erros e limites).

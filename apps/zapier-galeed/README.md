@@ -13,7 +13,7 @@ Cases prontos de Zaps (Google Forms, Fireflies, Sheets, ManyChat…) em
 | **Ingerir Mensagem de Chat** | canal de conversa com janela — o diálogo inteiro vira UMA memória | `POST /v1/ingestors/chat` |
 | **Ingerir Transcrição de Reunião** | Fireflies, tl;dv, MeetGeek… | `POST /v1/ingestors/notetaker` |
 | **Ingerir Formulário/Lead** | Google Forms, Typeform, site | `POST /v1/ingestors/formulario` |
-| **Ingerir Planilha/Tabela** | cada linha vira fato carimbado NA HORA (sem IA) | `POST /v1/ingestors/planilha` |
+| **Ingerir Planilha/Tabela** | cada linha vira fato NA HORA (sem IA) | `POST /v1/ingestors/planilha` |
 | **Perguntar ao Cérebro** | resposta sintetizada com fontes — use `{{answer}}` no passo seguinte | `POST /v1/ask` |
 
 Todas as ações de ingestão aceitam `ref` (id estável na origem): reenvio com a mesma

@@ -574,9 +574,9 @@ export async function ask(home: string, q: string, k = 8, scope?: Scope) {
 }
 
 /** Carga ANCORADA devolvida ao fim do stream (M18). Base da MESMA carga do ask()/askHandler: os slugs
- *  das fontes + os gaps. As CITAÇÕES ricas (RetrieveHit[] com selo) e a SÉRIE de fatos são hidratadas na
+ *  das fontes + os gaps. As CITAÇÕES ricas (RetrieveHit[] com status) e a SÉRIE de fatos são hidratadas na
  *  costura do BFF (S3) — askStream devolve `sources`/`gaps`; o S3 reusa o caminho do askHandler p/ as
- *  citations/facts. (Mantém askStream enxuto e sem duplicar a montagem de selo do BFF.) */
+ *  citations/facts. (Mantém askStream enxuto e sem duplicar a montagem de status do BFF.) */
 export interface StreamPayload {
   sources: string[]; // = hits.map(h=>h.slug) — idêntico ao ask()
   gaps: string[]; // lacunas (best-effort: aqui sem os "dropados" do verifyAnswer, pois não há verificação)

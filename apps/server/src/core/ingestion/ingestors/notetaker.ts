@@ -39,7 +39,7 @@ export const notetakerIngestor: Ingestor = {
       // Instalação antiga mantém a fonte com type 'call' (deliver só cria na 1ª entrega) — data-fix:
       // UPDATE de 1 linha no type da fonte.
       type: "reuniao",
-      recipe: { fields: [] },
+      filtro: { fields: [] },
     };
   },
 

@@ -5,7 +5,7 @@
  *
  *  Dados: api.ask(q) (BFF /api/ask, LLM/caro). Estado "pensando" = Loading "Lendo a memória".
  *  Sem fontes → resposta honesta "não encontrei" (não inventa). Baixa confiança → aviso âmbar.
- *  Hipótese nunca vira fato (o Seal carrega a cor categórica).
+ *  Pra revisar nunca vira fato (o Seal carrega a cor categórica).
  *  Spec literal: specs/slots/M8/_design/perguntar.md + 00-foundation.md. */
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -42,7 +42,7 @@ interface Turn {
   error?: string;
 }
 
-/** "De onde veio": conta só fato/hipótese e pluraliza (perguntar.md §4.2 labelOf). */
+/** "De onde veio": conta só fato / pra revisar e pluraliza (perguntar.md §4.2 labelOf). */
 function srcCount(cards: RetrieveHit[]): string {
   let fatos = 0;
   let hipos = 0;
@@ -52,7 +52,7 @@ function srcCount(cards: RetrieveHit[]): string {
   }
   const parts: string[] = [];
   if (fatos > 0) parts.push(`${fatos} ${fatos === 1 ? "fato" : "fatos"}`);
-  if (hipos > 0) parts.push(`${hipos} ${hipos === 1 ? "hipótese" : "hipóteses"}`);
+  if (hipos > 0) parts.push(`${hipos} pra revisar`);
   return parts.join(" · ");
 }
 
@@ -409,7 +409,7 @@ function StreamingBody({ text }: { text: string }) {
 }
 
 function AnswerBody({ answer }: { answer: AskAnswer }) {
-  // só citações com lastro (selo) viram card — protege contra hit malformado vindo do motor
+  // só citações com lastro (status/`Selo`) viram card — protege contra hit malformado vindo do motor
   const cards = (answer.citations ?? []).filter((c) => c.selo);
   const hasSources = cards.length > 0;
   const lowConf =

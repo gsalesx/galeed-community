@@ -12,7 +12,7 @@ sem escrever uma linha de código.
   inteiro vira uma memória só.
 - **Enviar transcrição de reunião** — Fireflies, tl;dv, MeetGeek…
 - **Enviar formulário/lead** — Google Forms, Typeform, site.
-- **Enviar planilha/tabela** — cada linha vira fato carimbado na hora (sem IA).
+- **Enviar planilha/tabela** — cada linha vira fato na hora (sem IA).
 - **Enviar payload cru** — qualquer ingestor pelo slug (inclusive os seus).
 
 **Memória**:
@@ -46,7 +46,7 @@ Docker, use `http://host.docker.internal:8790` como URL na credencial.
 > marcando **"Todas as áreas (acesso total)"** — é o recomendado pra integrações. Sem isso,
 > o escopo por área (fail-closed) esconde o conteúdo que entra em modo livre.
 
-## Receitas prontas
+## Filtros prontas
 
 - **Fireflies → Galeed**: Webhook (Fireflies) → GraphQL (busca o transcript) → *Galeed:
   Enviar transcrição de reunião*.

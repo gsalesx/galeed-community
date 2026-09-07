@@ -1,17 +1,17 @@
-/** M8/S? — Buscar (memória): a TELA-ASSINATURA do selo.
+/** M8/S? — Buscar (memória): a TELA-ASSINATURA do status.
  *
  *  Aqui o Galeed devolve CONHECIMENTO, não texto: cada hit do retrieve vem
  *  envelopado no <Seal/> completo (status, certeza, tipo, proveniência, validade,
  *  supersessão, via, cite-link, cadeado de sigilo) acima do trecho.
  *
- *  Especificação: _design/painel.md §6 ("última busca"/selo) + _design/00-foundation §5.1.
+ *  Especificação: _design/painel.md §6 ("última busca"/status) + _design/00-foundation §5.1.
  *
  *  Dados (read-only, brain injetado pelo cliente):
  *    - api.retrieve(q, k, { asOf })  → hits selados (via vetor/FTS/grafo)
  *  Time-travel: o toggle "Viajar no tempo" passa `asOf` (data ISO) pra api.retrieve,
  *  mostrando como a memória estava naquele dia.
  *
- *  Filtros (FilterChip) são client-side sobre os hits: por status (fato/hipótese/
+ *  Filtros (FilterChip) são client-side sobre os hits: por status (fato/pra revisar/
  *  arquivado), por fonte e por via. Estado vazio é HONESTO — nada é inventado:
  *  antes da 1ª busca mostramos só sugestões de pergunta clicáveis.
  *
@@ -48,10 +48,10 @@ const SUGESTOES = [
   "Mudou algum preço?",
 ];
 
-/** Filtros de status — bolinha categórica do selo (00-foundation §1.3). */
+/** Filtros de status — bolinha categórica (00-foundation §1.3). */
 const STATUS_FILTROS: { key: Selo["status"]; label: string; dot: string }[] = [
   { key: "fato", label: "Fatos", dot: "var(--st-fact)" },
-  { key: "hipotese", label: "Hipóteses", dot: "var(--st-hypo)" },
+  { key: "hipotese", label: "Pra revisar", dot: "var(--st-hypo)" },
   { key: "arquivado", label: "Arquivados", dot: "var(--st-arch)" },
 ];
 
@@ -65,7 +65,7 @@ const VIA_FILTROS: { key: string; label: string }[] = [
 /** Legenda de status (rodapé). */
 const LEGENDA: { label: string; sub: string; dot: string }[] = [
   { label: "Fato", sub: "confirmado", dot: "var(--st-fact)" },
-  { label: "Hipótese", sub: "ainda um palpite", dot: "var(--st-hypo)" },
+  { label: "Pra revisar", sub: "ainda sem confirmação", dot: "var(--st-hypo)" },
   { label: "Arquivado", sub: "guardado", dot: "var(--st-arch)" },
 ];
 
@@ -178,7 +178,7 @@ export default function Buscar() {
       {/* ── PAGE HEAD ──────────────────────────────────────────── */}
       <header style={{ marginBottom: 20 }}>
         <p style={{ fontSize: 14, color: "var(--muted)", margin: 0 }}>
-          Pergunte do seu jeito. Toda resposta vem com selo: de onde veio e o quanto pode confiar.
+          Pergunte do seu jeito. Toda resposta vem com status: de onde veio e o quanto pode confiar.
         </p>
       </header>
 
@@ -403,7 +403,7 @@ function EstadoVazio({ onPick }: { onPick: (s: string) => void }) {
         </span>
       </div>
       <p style={{ fontSize: 14, color: "var(--muted)", margin: "8px 0 20px", lineHeight: 1.55 }}>
-        O cérebro devolve cada trecho com o selo: se é fato ou palpite, o quanto pode confiar,
+        O cérebro devolve cada trecho com o status: se é fato ou ainda está pra revisar, o quanto pode confiar,
         de onde veio e quem pode ver. Comece por uma dessas:
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
@@ -431,7 +431,7 @@ function EstadoVazio({ onPick }: { onPick: (s: string) => void }) {
   );
 }
 
-/** Carregando: skeletons no formato de cards de selo. */
+/** Carregando: skeletons no formato de cards de status. */
 function EstadoCarregando() {
   return (
     <div style={{ maxWidth: 600 }}>
@@ -449,7 +449,7 @@ function EstadoCarregando() {
               background: "var(--surface)",
             }}
           >
-            {/* header do selo */}
+            {/* header do status */}
             <div
               style={{
                 display: "flex",

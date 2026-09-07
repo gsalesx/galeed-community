@@ -3,7 +3,7 @@ info:
   title: Galeed API
   version: "0"
   description: >-
-    Galeed é uma camada de memória para IA sobre Postgres+pgvector — captura, organiza e lembra,
+    Galeed é uma camada de memória para IA sobre Postgres+pgvector — captura, processa e lembra,
     multi-tenant (isolamento pela coluna `brain` em toda tabela). Este documento é a FONTE-DA-VERDADE
     do contrato HTTP, derivada diretamente do código (web-server.ts, api-server.ts, ingest-server.ts e
     os handlers puros em src/connectors/bff/*.ts). NÃO HÁ VERSIONAMENTO: não existe `/api/v1`; o contrato
@@ -21,7 +21,7 @@ servers:
     description: >-
       BFF (web-server.ts, WEB_PORT default 8789). App completo do console; auth por cookie de sessão
       httpOnly `galeed_sess`. Superset de /api/*. Hospeda também auth, wizard, onboarding, ingestão,
-      contexto, fontes, hipóteses, juiz, conectores e RBAC.
+      contexto, fontes, revisar, juiz, conectores e RBAC.
   - url: http://localhost:8788
     description: >-
       API read-only (api-server.ts, API_PORT default 8788). Consumo de devs/agentes via header
@@ -45,8 +45,8 @@ tags:
   - name: Contexto
     description: Editar o contexto do brain + preview de extração + re-extração sob comando.
   - name: Fontes
-    description: Fontes com receita (galeed_sources) + conexão de conectores por fonte.
-  - name: Hipóteses
+    description: Fontes com filtro (galeed_sources) + conexão de conectores por fonte.
+  - name: Revisar
     description: Fila de revisão (regra de ouro) — itens, contagem, grupos e decisões em lote.
   - name: Juiz
     description: Juiz triador — RECOMENDA, nunca decide. Calibração e estimativa de custo.
@@ -899,7 +899,7 @@ paths:
       tags: [Fontes]
       summary: Criar fonte
       description: >-
-        Cria uma fonte com receita (channel `upload`|`paste` no v1). A dim da receita que o pack não cobre
+        Cria uma fonte com filtro (channel `upload`|`paste` no v1). A dim do filtro que o pack não cobre
         entra no extractable[type] (merge idempotente). Sensibilidade default `restrito` (falha-fechado).
       parameters:
         - $ref: "#/components/parameters/BrainRequired"
@@ -963,7 +963,7 @@ paths:
     post:
       tags: [Fontes]
       summary: Atualizar fonte (PATCH semântico)
-      description: Atualiza só os campos presentes (name/type/recipe/defaultSensitivity). Merge receita→pack.
+      description: Atualiza só os campos presentes (name/type/filtro/defaultSensitivity). Merge filtro→pack.
       parameters:
         - $ref: "#/components/parameters/BrainRequired"
         - $ref: "#/components/parameters/SourceId"
@@ -1060,7 +1060,7 @@ paths:
 
   /api/hypotheses:
     get:
-      tags: [Hipóteses]
+      tags: [Revisar]
       summary: Listar itens da fila de revisão
       description: >-
         Itens da fila + nome da fonte + recomendação do juiz por item (read-only, ausente se o juiz não
@@ -1097,7 +1097,7 @@ paths:
 
   /api/hypotheses/count:
     get:
-      tags: [Hipóteses]
+      tags: [Revisar]
       summary: Contagem por status
       description: Contadores da fila { pendente, aprovada, descartada }.
       parameters:
@@ -1123,7 +1123,7 @@ paths:
 
   /api/hypotheses/groups:
     get:
-      tags: [Hipóteses]
+      tags: [Revisar]
       summary: Fila agrupada por decisão
       description: >-
         Pendentes agrupados por (reason, dimension, source_id) — o grupão primeiro. Inclui rollup das
@@ -1146,7 +1146,7 @@ paths:
 
   /api/hypotheses/groups/approve:
     post:
-      tags: [Hipóteses]
+      tags: [Revisar]
       summary: Aprovar grupo (gateado por ancoragem)
       description: Aprova todos os pendentes do grupo, GATEADOS por ancoragem determinística (zero LLM).
       parameters:
@@ -1178,7 +1178,7 @@ paths:
 
   /api/hypotheses/groups/discard:
     post:
-      tags: [Hipóteses]
+      tags: [Revisar]
       summary: Descartar grupo (registrado)
       description: Descarta todos os pendentes do grupo; decided_by gravado item a item (nunca silencioso).
       parameters:
@@ -1212,11 +1212,11 @@ paths:
 
   /api/hypotheses/groups/add-dimension:
     post:
-      tags: [Hipóteses]
-      summary: Adicionar dimensão à receita e re-gatear
+      tags: [Revisar]
+      summary: Adicionar tipo às regras e re-gatear
       description: >-
-        A receita da fonte ganha a dimensão (merge receita→pack) e os pendentes fora_da_receita do grupo
-        são re-gateados sem LLM. Idempotente: dim já na receita ⇒ receita_atualizada=false.
+        As regras da fonte ganham o tipo (merge filtro→pack) e os pendentes fora_do_filtro do grupo
+        são re-gateados sem LLM. Idempotente: tipo já nas regras ⇒ filtro_atualizado=false.
       parameters:
         - $ref: "#/components/parameters/BrainRequired"
       requestBody:
@@ -1227,7 +1227,7 @@ paths:
               $ref: "#/components/schemas/AddDimensionBody"
       responses:
         "200":
-          description: Resultado (receita atualizada + lote)
+          description: Resultado (filtro atualizado + lote)
           content:
             application/json:
               schema:
@@ -1236,7 +1236,7 @@ paths:
                     properties:
                       ok:
                         type: boolean
-                      receita_atualizada:
+                      filtro_atualizado:
                         type: boolean
                   - $ref: "#/components/schemas/LoteAprovacao"
         "400":
@@ -1250,7 +1250,7 @@ paths:
 
   /api/hypotheses/{id}/approve:
     post:
-      tags: [Hipóteses]
+      tags: [Revisar]
       summary: Aprovar item (unitário)
       description: Aprova um item da fila. 409 se o gate de ancoragem reter o claim.
       parameters:
@@ -1278,7 +1278,7 @@ paths:
 
   /api/hypotheses/{id}/discard:
     post:
-      tags: [Hipóteses]
+      tags: [Revisar]
       summary: Descartar item (unitário)
       description: Descarta um item da fila (muda status, nunca deleta). 409 em conflito de decisão.
       parameters:
@@ -2228,8 +2228,8 @@ paths:
   /api/retrieve:
     get:
       tags: [Leitura]
-      summary: Recuperar contexto (com selo)
-      description: Contexto recuperado (fusão RRF híbrida, determinístico) com selo epistêmico por hit.
+      summary: Recuperar contexto (com status)
+      description: Contexto recuperado (fusão RRF híbrida, determinístico) com status por hit.
       security:
         - cookieAuth: []
         - principalToken: []
@@ -2253,7 +2253,7 @@ paths:
         - $ref: "#/components/parameters/PrincipalQuery"
       responses:
         "200":
-          description: Hits com selo
+          description: Hits com status
           content:
             application/json:
               schema:
@@ -2273,7 +2273,7 @@ paths:
     get:
       tags: [Leitura]
       summary: Busca (FTS)
-      description: Busca full-text por termo, opcionalmente filtrada por `type`. Devolve hits com selo.
+      description: Busca full-text por termo, opcionalmente filtrada por `type`. Devolve hits com status.
       security:
         - cookieAuth: []
         - principalToken: []
@@ -2303,7 +2303,7 @@ paths:
         - $ref: "#/components/parameters/PrincipalQuery"
       responses:
         "200":
-          description: Hits com selo
+          description: Hits com status
           content:
             application/json:
               schema:
@@ -2322,9 +2322,9 @@ paths:
   /api/facts:
     get:
       tags: [Leitura]
-      summary: Fatos por dimensão (bitemporal)
+      summary: Fatos por tipo (bitemporal)
       description: >-
-        Fatos tipados (FactItem) por dimensão, com recorte bitemporal opcional (`asOf`, `current`).
+        Fatos tipados (FactItem) por tipo, com recorte bitemporal opcional (`asOf`, `current`).
         Na API read-only com token de principal os fatos são filtrados pelo escopo da página-fonte.
       security:
         - cookieAuth: []
@@ -2436,7 +2436,7 @@ paths:
       tags: [Leitura]
       summary: Perguntar (síntese LLM ancorada)
       description: >-
-        Síntese LLM enriquecida — devolve resposta + citations (com selo) + facts (série bitemporal) +
+        Síntese LLM enriquecida — devolve resposta + citations (com status) + facts (série bitemporal) +
         gaps opcionais. Único endpoint caro do BFF. Só no BFF (não está na API read-only).
       parameters:
         - $ref: "#/components/parameters/BrainRequired"
@@ -2963,7 +2963,7 @@ components:
 
     HitWithSelo:
       type: object
-      description: Hit de recuperação (retrieve/search) com selo epistêmico.
+      description: Hit de recuperação (retrieve/search) com status.
       properties:
         slug:
           type: string
@@ -3337,27 +3337,27 @@ components:
         message:
           type: string
 
-    SourceRecipeField:
+    SourceFilterField:
       type: object
       required: [dimension, label, area]
       properties:
         dimension:
           type: string
-          description: Chave da dimensão de extração (subconjunto das dims do extractable do tipo).
+          description: Chave do tipo de extração (subconjunto das dims do extractable do tipo).
         label:
           type: string
         area:
           type: string
           description: Slug da área destino ("" = sem área).
 
-    SourceRecipe:
+    SourceFilter:
       type: object
       required: [fields]
       properties:
         fields:
           type: array
           items:
-            $ref: "#/components/schemas/SourceRecipeField"
+            $ref: "#/components/schemas/SourceFilterField"
         guidance:
           type: string
         triage_profile:
@@ -3376,8 +3376,8 @@ components:
           description: "v1: upload | paste."
         type:
           type: string
-        recipe:
-          $ref: "#/components/schemas/SourceRecipe"
+        filtro:
+          $ref: "#/components/schemas/SourceFilter"
         default_sensitivity:
           $ref: "#/components/schemas/SensitivityLevel"
         status:
@@ -3403,8 +3403,8 @@ components:
           enum: [upload, paste]
         type:
           type: string
-        recipe:
-          $ref: "#/components/schemas/SourceRecipe"
+        filtro:
+          $ref: "#/components/schemas/SourceFilter"
         defaultSensitivity:
           $ref: "#/components/schemas/SensitivityLevel"
 
@@ -3416,8 +3416,8 @@ components:
           type: string
         type:
           type: string
-        recipe:
-          $ref: "#/components/schemas/SourceRecipe"
+        filtro:
+          $ref: "#/components/schemas/SourceFilter"
         defaultSensitivity:
           $ref: "#/components/schemas/SensitivityLevel"
 
@@ -3494,7 +3494,7 @@ components:
 
     ReviewReason:
       type: string
-      enum: [fora_da_receita, nao_ancorado, entidade_vaga, conexao_sugerida]
+      enum: [fora_do_filtro, nao_ancorado, entidade_vaga, conexao_sugerida]
 
     ReviewStatus:
       type: string
@@ -3561,7 +3561,7 @@ components:
             $ref: "#/components/schemas/HypothesisView"
         decisao:
           type: string
-        dimensao_na_receita:
+        dimensao_no_filtro:
           type: boolean
         recomendacoes:
           type: object

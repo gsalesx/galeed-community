@@ -2,8 +2,8 @@
  *  Shapes idênticos aos de `lib/api.ts` (SourceRow/HypothesisView do BFF) — locais
  *  pra tela não alargar tipo compartilhado (regra do slot). */
 
-export interface SourceRecipeField { dimension: string; label: string; area: string }
-export interface SourceRecipe { fields: SourceRecipeField[]; guidance?: string; triage_profile?: string }
+export interface SourceFilterField { dimension: string; label: string; area: string }
+export interface SourceFilter { fields: SourceFilterField[]; guidance?: string; triage_profile?: string }
 
 /** M22-D — estado da conexão do conector (espelha SourceConnectionView do M22-A §4.5,
  *  migração 29; nunca vem do /api/sources — é MESCLADO client-side via GET /api/connectors/status). */
@@ -35,7 +35,7 @@ export interface Source {
    *  ("conta-azul"/"gmail" — M22-A §2.3); o union literal vira aberto sem perder autocomplete. */
   channel: "upload" | "paste" | (string & {});
   type: string;
-  recipe: SourceRecipe; default_sensitivity: string; status: "ativa" | "pausada";
+  filtro: SourceFilter; default_sensitivity: string; status: "ativa" | "pausada";
   last_read_at: string | null; created_at?: string;
   pages_count?: number; facts_count?: number;
   /** M22-D — populado pelo MERGE client-side (anexarEstadoConector); nunca vem do /api/sources. */

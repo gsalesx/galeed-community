@@ -43,7 +43,7 @@ export const formularioIngestor: Ingestor = {
       name: "Formulários",
       channel: "formulario",
       type: "formulario",
-      recipe: { fields: [] }, // modo livre: a extração LLM lê nome/pedido/contato do texto
+      filtro: { fields: [] }, // modo livre: a extração LLM lê nome/pedido/contato do texto
     };
   },
 

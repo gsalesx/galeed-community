@@ -17,7 +17,7 @@ const SOURCE: SourceRow = {
   name: "Fonte P1-C",
   channel: "upload",
   type: "nota",
-  recipe: { fields: [{ dimension: "decisoes", label: "Decisões", area: "" }], guidance: "" },
+  filtro: { fields: [{ dimension: "decisoes", label: "Decisões", area: "" }], guidance: "" },
   default_sensitivity: "restrito",
   status: "ativa",
   last_read_at: null,

@@ -14,7 +14,7 @@ import { getEngine } from "../platform/engine.ts";
 import { putBlobOnly, sliceForIngest } from "./ingest-doc.ts";
 import { enqueueIngestJob } from "./ingest-queue.ts";
 import { capture } from "./capture.ts";
-import { applyRecipeGate, addReviewItemsAndNotify } from "./golden-rule.ts";
+import { applyFilterGate, addReviewItemsAndNotify } from "./golden-rule.ts";
 import { deriveIncremental } from "../retrieval/indexer.ts";
 import { buildEmbeddings } from "../retrieval/embeddings.ts";
 import { slugify } from "../../lib/slug.ts";
@@ -25,11 +25,11 @@ import type { NangoRecord } from "../../lib/nango.ts";
 // ============================================================================
 
 /** Um claim DETERMINÍSTICO pronto (ERP/M22-B). MESMA semântica de campos que o indexer e o
- *  applyRecipeGate já leem (entity/predicate/value/value_num/context_quote/text + unit/period/tier),
+ *  applyFilterGate já leem (entity/predicate/value/value_num/context_quote/text + unit/period/tier),
  *  uma única semântica de claim no sistema. `context_quote` DEVE ser trecho LITERAL do `content`
  *  (âncora — o gate rejeita o que não confere: golden-rule.ts/quoteIsGrounded). */
 export interface ConnectorClaim {
-  dimension: string; // dimensão de extração (⊆ receita da fonte; fora dela → fila de revisão)
+  dimension: string; // tipo de extração (⊆ regras da fonte; fora delas → fila pra revisar)
   entity: string;
   predicate: string;
   value?: string;
@@ -74,12 +74,12 @@ function sha16(s: string): string {
 function sourceTags(source: {
   id: string;
   channel: string;
-  recipe: { fields: { area?: string }[] };
+  filtro: { fields: { area?: string }[] };
 }): string[] {
   return [
     `src:${source.id}`,
     ...(source.channel?.trim() ? [`canal:${slugify(source.channel)}`] : []),
-    ...[...new Set(source.recipe.fields.map((f) => (f.area || "").trim()).filter(Boolean))].map(
+    ...[...new Set(source.filtro.fields.map((f) => (f.area || "").trim()).filter(Boolean))].map(
       (a) => `area:${slugify(a)}`,
     ),
   ];
@@ -173,11 +173,11 @@ export async function deliverConnectorPayload(
 
   // o pageBody é o body COMO o capture grava (capture.ts:69/70: text.trim() + "\n").
   const pageBody = sl.text.trim() + "\n";
-  const gate = applyRecipeGate(claimsByDim, source.recipe, source.id, cap.slug, pageBody);
+  const gate = applyFilterGate(claimsByDim, source.filtro, source.id, cap.slug, pageBody);
   // C2 — review.pending (gancho da regra de ouro, fail-soft).
   if (gate.rejected.length) await addReviewItemsAndNotify(brain, gate.rejected);
   console.log(
-    `[recipe-gate] brain=${brain} page=${cap.slug} approved=${gate.counts.approved} ` +
+    `[filtro-gate] brain=${brain} page=${cap.slug} approved=${gate.counts.approved} ` +
       `rejected=${gate.counts.rejected} source=${source.id}`,
   );
 
@@ -236,7 +236,7 @@ export interface ConnectorSourceSeed {
   name: string; // nome legível da fonte
   channel: string; // canal de ingestão (NUNCA "conector" — é o canal real, ex.: "conta azul")
   type: string; // tipo de página
-  recipe: { fields: { dimension: string; label: string; area: string }[]; guidance?: string; triage_profile?: string };
+  filtro: { fields: { dimension: string; label: string; area: string }[]; guidance?: string; triage_profile?: string };
   default_sensitivity?: string; // nível; ausente ⇒ engine resolve (fail-closed 'restrito')
 }
 

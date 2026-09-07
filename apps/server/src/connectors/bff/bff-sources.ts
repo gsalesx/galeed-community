@@ -7,27 +7,27 @@ import {
   SENSITIVITY_LEVELS,
   type ReviewItemRow,
   type ReviewStatus,
-  type SourceRecipe,
+  type SourceFilter,
   type SourceRow,
 } from "../../core/platform/engine.ts";
 import { approveReviewItem, discardReviewItem } from "../../core/ingestion/golden-rule.ts";
 import { getRecommendations } from "../../core/ingestion/review-judge.ts"; // M25-B seam — recomendação do juiz por item (read-only)
-import { mergeRecipeDimsIntoPack } from "../../core/extraction/schema-pack.ts";
+import { mergeFilterDimsIntoPack } from "../../core/extraction/schema-pack.ts";
 import { BffError } from "./bff-common.ts";
 
-/** Valida e NORMALIZA a receita na borda (400 legível). `dimension`/`area` lowercase/trim — slug
+/** Valida e NORMALIZA o filtro na borda (400 legível). `dimension`/`area` lowercase/trim — slug
  *  leve, SEM parser novo. Conteúdo dos campos é DADO do tenant: zero validação de domínio. */
-function validateRecipe(recipe: SourceRecipe): SourceRecipe {
-  if (!recipe || typeof recipe !== "object" || !Array.isArray(recipe.fields)) {
-    throw new BffError(400, "a receita tem um campo sem nome.");
+function validateFilter(filtro: SourceFilter): SourceFilter {
+  if (!filtro || typeof filtro !== "object" || !Array.isArray(filtro.fields)) {
+    throw new BffError(400, "as regras têm um campo sem nome.");
   }
-  const fields = recipe.fields.map((f) => {
+  const fields = filtro.fields.map((f) => {
     if (
       !f || typeof f !== "object" ||
       typeof f.dimension !== "string" || typeof f.label !== "string" || typeof f.area !== "string" ||
       !f.dimension.trim()
     ) {
-      throw new BffError(400, "a receita tem um campo sem nome.");
+      throw new BffError(400, "as regras têm um campo sem nome.");
     }
     return {
       dimension: f.dimension.trim().toLowerCase(),
@@ -35,7 +35,7 @@ function validateRecipe(recipe: SourceRecipe): SourceRecipe {
       area: f.area.trim().toLowerCase(),
     };
   });
-  return { ...recipe, fields };
+  return { ...filtro, fields };
 }
 
 /** Sensibilidade na borda: ausente = 'restrito' (falha-fechado); inválida = 400. */
@@ -57,7 +57,7 @@ export interface CreateSourceBody {
   name: string;
   channel: string;              // 'upload' | 'paste' (v1)
   type: string;                 // tipo de página (extractable key)
-  recipe?: SourceRecipe;        // default { fields: [] }
+  filtro?: SourceFilter;        // default { fields: [] }
   defaultSensitivity?: string;  // default 'restrito' (falha-fechado)
 }
 
@@ -69,7 +69,7 @@ export async function createSourceHandler(home: string, body: CreateSourceBody):
   }
   const type = typeof body.type === "string" ? body.type.trim() : "";
   if (!type) throw new BffError(400, "diga o tipo de coisa que entra por essa fonte.");
-  const recipe = body.recipe !== undefined ? validateRecipe(body.recipe) : { fields: [] };
+  const filtro = body.filtro !== undefined ? validateFilter(body.filtro) : { fields: [] };
   const defaultSensitivity = validateSensitivity(body.defaultSensitivity);
 
   const row: SourceRow = {
@@ -77,17 +77,17 @@ export async function createSourceHandler(home: string, body: CreateSourceBody):
     name,
     channel: body.channel,
     type,
-    recipe,
+    filtro,
     default_sensitivity: defaultSensitivity,
     status: "ativa",
     last_read_at: null,
   };
-  // fix-1 (ADR-016): MESMO merge receita→pack do wizardConfirm — dim da receita que o pack não
+  // fix-1 (ADR-016): MESMO merge filtro→pack do wizardConfirm — dim do filtro que o pack não
   // declara entra em extractable[type] (união, idempotente). Sem isso a extração nunca emite a dim
-  // e 100% do campo vira hipótese `fora_da_receita`. Pack ANTES da fonte (ordem do wizard): se o
-  // merge falhar, a fonte não nasce com receita que o pack não cobre.
-  if (recipe.fields.length) {
-    await mergeRecipeDimsIntoPack(home, [{ type, dims: recipe.fields.map((f) => f.dimension) }]);
+  // e 100% do campo vai pra revisar (`fora_do_filtro`). Pack ANTES da fonte (ordem do wizard): se o
+  // merge falhar, a fonte não nasce com regras que o pack não cobre.
+  if (filtro.fields.length) {
+    await mergeFilterDimsIntoPack(home, [{ type, dims: filtro.fields.map((f) => f.dimension) }]);
   }
   const e = await getEngine(home);
   await e.upsertSource(row);
@@ -96,7 +96,7 @@ export async function createSourceHandler(home: string, body: CreateSourceBody):
 
 /** PATCH semântico: só os campos presentes. */
 export interface UpdateSourceBody {
-  name?: string; type?: string; recipe?: SourceRecipe; defaultSensitivity?: string;
+  name?: string; type?: string; filtro?: SourceFilter; defaultSensitivity?: string;
 }
 
 export async function updateSourceHandler(home: string, id: string, body: UpdateSourceBody): Promise<SourceRow> {
@@ -115,14 +115,14 @@ export async function updateSourceHandler(home: string, id: string, body: Update
     if (!type) throw new BffError(400, "diga o tipo de coisa que entra por essa fonte.");
     next.type = type;
   }
-  if (body.recipe !== undefined) next.recipe = validateRecipe(body.recipe);
+  if (body.filtro !== undefined) next.filtro = validateFilter(body.filtro);
   if (body.defaultSensitivity !== undefined) next.default_sensitivity = validateSensitivity(body.defaultSensitivity);
 
-  // fix-1 (ADR-016): receita e/ou tipo mudou → garante receita ⊆ extractable[next.type] (união,
+  // fix-1 (ADR-016): filtro e/ou tipo mudou → garante filtro ⊆ extractable[next.type] (união,
   // idempotente; nunca remove dim do pack). Mesma regra de domínio do wizardConfirm.
-  if ((body.recipe !== undefined || body.type !== undefined) && next.recipe.fields.length) {
-    await mergeRecipeDimsIntoPack(home, [
-      { type: next.type, dims: next.recipe.fields.map((f) => f.dimension) },
+  if ((body.filtro !== undefined || body.type !== undefined) && next.filtro.fields.length) {
+    await mergeFilterDimsIntoPack(home, [
+      { type: next.type, dims: next.filtro.fields.map((f) => f.dimension) },
     ]);
   }
   await e.upsertSource(next);

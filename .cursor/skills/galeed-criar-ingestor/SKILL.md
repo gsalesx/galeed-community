@@ -25,7 +25,7 @@ Guia narrativo: `INGESTORES.md` (raiz). Esta skill é a receita executável.
    ```ts
    sourceSeed() {
      return { name: "Meu canal", channel: "meu-canal", type: "texto",
-              recipe: { fields: [] } }; // fields: [] = modo livre (extração padrão)
+              filtro: { fields: [] } }; // fields: [] = modo livre (extração padrão)
    }
    ```
    O `channel` vira a tag `canal:` da página (decide a pasta no espelho GitHub).

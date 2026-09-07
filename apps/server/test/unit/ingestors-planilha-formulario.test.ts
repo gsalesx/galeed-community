@@ -25,7 +25,7 @@ describe("ingestor planilha — claims determinísticos", () => {
     for (const c of item.claims!) {
       expect(item.content).toContain(c.context_quote); // âncora por construção
       expect(item.content).toContain(c.value!); // grafia exata no body
-      expect(c.dimension).toBe("planilha"); // = dimensão da receita do sourceSeed
+      expect(c.dimension).toBe("planilha"); // = dimensão do filtro do sourceSeed
     }
   });
 

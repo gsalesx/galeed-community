@@ -208,7 +208,7 @@ describe("P1-D — dedup por fatia + canal", () => {
         name: "WhatsApp da Accelera",
         channel: "whatsapp",
         type: "conversa",
-        recipe: { fields: [] },
+        filtro: { fields: [] },
         default_sensitivity: "restrito",
         status: "ativa",
         last_read_at: null,

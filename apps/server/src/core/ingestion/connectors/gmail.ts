@@ -14,7 +14,7 @@
  *   - Template oficial Nango (modelo `Message`, provider key `google-mail`):
  *     https://github.com/NangoHQ/integration-templates/blob/main/integrations/google-mail/syncs/messages.ts */
 
-import type { SourceRecipe, SourceRow } from "../../platform/engine.ts";
+import type { SourceFilter, SourceRow } from "../../platform/engine.ts";
 
 /** Shape do record que a sync (nango/google-mail/syncs/messages.ts, modelo `Message`) salva no
  *  Nango — espelho 1:1 do Message do Gmail API (users.messages.get format=full).
@@ -201,17 +201,17 @@ export function normalizeGmailMessage(record: GmailMessageRecord): EmailDocument
   };
 }
 
-/** RECEITA da fonte e-mail comercial (DADO, ADR-016/invariante III): as 3 classes do M23-C
- *  (docs/M23-receitas-nao-numericas-CONVENCAO.md — predicado FIXO relacao/decisao/compromisso,
- *  quote obrigatório) + a dimensão numérica `precos`. `facts` fica FORA da receita de propósito:
+/** Regras da fonte e-mail comercial (DADO, ADR-016/invariante III): as 3 classes do M23-C
+ *  (docs/M23-filtros-nao-numericas-CONVENCAO.md — predicado FIXO relacao/decisao/compromisso,
+ *  quote obrigatório) + o tipo numérico `precos`. `facts` fica FORA das regras de propósito:
  *  o extractable do tipo EFETIVO ('notas' no a360.json — capture colapsa 'email' via resolveTipo)
- *  ainda a emite e o gate a manda pra fila como fora_da_receita — o sinal honesto do M23-C (nada
- *  some em silêncio). O merge receita→pack grava sob AMBAS as chaves (schema-pack.expandRecipeEntries).
- *  area 'comercial' (M7): a área da receita vira a tag `area:comercial` na página (process-blob-job)
+ *  ainda a emite e o gate a manda pra fila como fora_do_filtro — o sinal honesto do M23-C (nada
+ *  some em silêncio). O merge filtro→pack grava sob AMBAS as chaves (schema-pack.expandRecipeEntries).
+ *  area 'comercial' (M7): a área do filtro vira a tag `area:comercial` na página (process-blob-job)
  *  — sem ela o e-mail nascia SEM área e ficava invisível a todo token escopado (scope.ts: item sem
- *  área só passa com acesso total '*'). É a receita do "e-mail COMERCIAL" — a área é coerente e o
- *  dono edita na tela Fontes. Fonte já conectada mantém a receita gravada (só novo connect herda). */
-export const EMAIL_RECIPE: SourceRecipe = {
+ *  área só passa com acesso total '*'). É o filtro do "e-mail COMERCIAL" — a área é coerente e o
+ *  dono edita na tela Fontes. Fonte já conectada mantém o filtro gravada (só novo connect herda). */
+export const EMAIL_FILTER: SourceFilter = {
   fields: [
     { dimension: "relacoes", label: "vínculo declarado (cliente, fornecedor, parceiro)", area: "comercial" },
     { dimension: "decisoes", label: "decisão tomada ou descartada", area: "comercial" },
@@ -230,8 +230,8 @@ export function emailSourceSeed(id: string, name = "E-mail (Gmail)"): SourceRow 
     id,
     name,
     channel: "gmail", // vira tag canal:gmail na página (process-blob-job.ts)
-    type: "email", // chave CRUA da receita; a extração lê o tipo EFETIVO (resolveTipo → 'notas') — o merge grava sob ambas
-    recipe: EMAIL_RECIPE,
+    type: "email", // chave CRUA do filtro; a extração lê o tipo EFETIVO (resolveTipo → 'notas') — o merge grava sob ambas
+    filtro: EMAIL_FILTER,
     default_sensitivity: "interno", // decisão do CTO: e-mail comercial = sigilo default INTERNO
     status: "ativa",
     last_read_at: null,

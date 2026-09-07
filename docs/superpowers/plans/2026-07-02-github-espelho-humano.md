@@ -309,7 +309,7 @@ export async function contarRetidas(brain: string, sigiloMax: string): Promise<n
 - Modify: `apps/server/src/core/platform/github-sync.ts` (`syncIn`, DDL, `runGithubSync`)
 
 **Interfaces:**
-- Consumes: `enqueueIngestJob({brain,kind,type,contentHash,filename,title,sourceId})`, `putBlobOnly`, `getEngine(brain).upsertSource(row)` (SourceRow: id,name,channel,type,recipe:{fields:[]},default_sensitivity,status).
+- Consumes: `enqueueIngestJob({brain,kind,type,contentHash,filename,title,sourceId})`, `putBlobOnly`, `getEngine(brain).upsertSource(row)` (SourceRow: id,name,channel,type,filtro:{fields:[]},default_sensitivity,status).
 - Produces: `syncIn(cfg): Promise<{ ingeridos: number; jobs: string[]; remover: string[] }>`; `runGithubSync` summary vira `{ brain, entradaIngeridos, entradaRemovidos, espelhoEnviados, espelhoRemovidos, retidas, commit, erro }`.
 
 - [x] **Step 1:** DDL — acrescentar ao bloco lazy:
@@ -322,7 +322,7 @@ alter table galeed_github_entrada add column if not exists job_id text;
 - [x] **Step 2:** `syncIn`:
   - Pular `entrada/LEIA-ME.md` (`if (t.path === "entrada/LEIA-ME.md") continue;`).
   - Hint de subpasta: `const seg = String(t.path).split("/"); const hint = seg.length >= 3 ? ({ reunioes: "reuniao", reuniao: "reuniao", conversas: "chat", conversa: "chat" } as Record<string,string>)[seg[1]] : undefined;`
-  - Se `hint`: garantir a fonte uma vez por rodada — `const srcId = "github-entrada-" + hint;` e `await e.upsertSource({ id: srcId, name: "Entrada GitHub — " + (hint === "reuniao" ? "reuniões" : "conversas"), channel: hint, type: "", recipe: { fields: [] }, default_sensitivity: "restrito", status: "ativa" })` (cache em Set local pra não repetir upsert). Passar `sourceId: srcId` no `enqueueIngestJob`.
+  - Se `hint`: garantir a fonte uma vez por rodada — `const srcId = "github-entrada-" + hint;` e `await e.upsertSource({ id: srcId, name: "Entrada GitHub — " + (hint === "reuniao" ? "reuniões" : "conversas"), channel: hint, type: "", filtro: { fields: [] }, default_sensitivity: "restrito", status: "ativa" })` (cache em Set local pra não repetir upsert). Passar `sourceId: srcId` no `enqueueIngestJob`.
   - Dedupe por hash: se já existe job não-erro com o hash, usar `dup[0].id` como `job_id` do registro (o arquivo aponta pro job que já existe — remoção quando ele concluir).
   - Gravar `doc_hash` e `job_id` no upsert de `galeed_github_entrada`.
   - `remover`: no fim, `select e.path from galeed_github_entrada e join galeed_ingest_jobs j on j.id = e.job_id where e.brain = ${brain} and j.status = 'done'` filtrado por paths ainda presentes na árvore remota desta rodada.

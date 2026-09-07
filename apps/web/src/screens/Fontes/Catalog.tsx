@@ -1,7 +1,7 @@
-/** M21/S5 — Catálogo "Ligar uma fonte nova" (fiel a docs/design-system/fontes.html).
+/** M21/S5 — Catálogo "Adicionar fonte" (fiel a docs/design-system/fontes.html).
  *
  *  Honestidade v1 (invariante "sem botão de mentira"):
- *   • REAIS (habilitados): "Upload de arquivos" e "Colar texto" — Ligar abre o drawer
+ *   • REAIS (habilitados): "Upload de arquivos" e "Colar texto" — Adicionar abre o drawer
  *     em modo CRIAR (a fonte nasce via POST /api/sources).
  *   • CONECTORES vivos (M22-D): "Conta Azul" e "E-mail" ganham "Conectar"/"Abrir"
  *     (cria a fonte-conector + abre a connect session do Nango — fluxo no index.tsx).
@@ -48,7 +48,7 @@ interface ProvCard {
   tag: string;
   icon: IconName;
   tint: Tint;
-  /** presente = card REAL (Ligar habilitado); ausente = "Em breve" disabled */
+  /** presente = card REAL (Adicionar habilitado); ausente = "Em breve" disabled */
   channel?: "upload" | "paste";
   /** M22-D — presente = conector vivo (Conectar/Abrir); chave opaca pro BFF (provider_config_key). */
   provider?: string;
@@ -62,7 +62,7 @@ const CARDS: ProvCard[] = [
     nome: "Upload de arquivos",
     what: (
       <>
-        PDF, planilha, export de conversa: o arquivo entra pela receita do tipo. <Hint>você escolhe os campos</Hint>
+        PDF, planilha, export de conversa: o arquivo entra pelas regras do tipo. <Hint>você escolhe os campos</Hint>
       </>
     ),
     tag: "arquivos",
@@ -72,7 +72,7 @@ const CARDS: ProvCard[] = [
   },
   {
     nome: "Colar texto",
-    what: <>Cola uma conversa ou anotação; a receita diz o que vira fato.</>,
+    what: <>Cola uma conversa ou anotação; as regras dizem o que vira fato.</>,
     tag: "conversas",
     icon: "info",
     tint: "blue",
@@ -211,7 +211,7 @@ export function Catalog({ onCreate, onConnect, fontes, onWhatsApp }: CatalogProp
                     cursor: "pointer",
                   }}
                 >
-                  Ligar
+                  Adicionar
                 </button>
               ) : c.provider !== undefined ? (
                 // M22-D — conector vivo: "Abrir" (já conectado, o pai abre o drawer) ou "Conectar".

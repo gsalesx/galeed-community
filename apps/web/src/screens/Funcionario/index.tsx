@@ -7,7 +7,7 @@
  *  Diferenças vs a tela do dono (Perguntar):
  *   - topbar SLIM, SEM nav de admin (brand + bloco "who"); sem brain switcher/busca;
  *   - scopebar PERSISTENTE: "Você está vendo: <áreas> · até <nível>" (teto = Interno);
- *   - selo idêntico ao do dono, MAS `s-via` carimba a ÁREA aprovada (não vetor/grafo)
+ *   - status idêntico ao do dono, MAS `s-via` marca a ÁREA aprovada (não vetor/grafo)
  *     e o nível "secret" NÃO aparece (teto Interno) → vira recusa;
  *   - estado crítico de RBAC: pergunta fora do acesso → SEM card + recusa honesta
  *     GENÉRICA que NUNCA nomeia a área oculta + nota "Respondi só com o que você pode ver";
@@ -109,7 +109,7 @@ const SUGGESTIONS = [
 // Mapeamentos do shape da API → modelo visual do card
 // ---------------------------------------------------------------------------
 
-const STATUS_LABEL: Record<StatusVis, string> = { fact: "Fato", hypo: "Hipótese" };
+const STATUS_LABEL: Record<StatusVis, string> = { fact: "Fato", hypo: "Pra revisar" };
 const LOCK_LABEL: Record<LockVis, string> = { open: "Aberto", int: "Interno", conf: "Sigiloso" };
 
 const SENS_TO_LOCK: Record<Sensitivity, LockVis | "secret"> = {
@@ -142,7 +142,7 @@ function areaFrom(hit: RetrieveHit, scope: Scope): string {
   // se o tipo bate com uma área liberada, usa o rótulo dela
   const match = scope.areas.find((a) => a.toLowerCase() === t.toLowerCase());
   if (match) return match;
-  // alguns BFFs mandam a área no próprio selo.via como texto (não vec/fts/grafo)
+  // alguns BFFs mandam a área no próprio status (`selo.via`) como texto (não vec/fts/grafo)
   const via = (hit.selo?.via || "").trim();
   const viaMatch = scope.areas.find((a) => a.toLowerCase() === via.toLowerCase());
   if (viaMatch) return viaMatch;
@@ -480,7 +480,7 @@ function Thinking() {
   );
 }
 
-/** Card de citação (selo). Mesma gramática do dono; `s-via` = ÁREA aprovada;
+/** Card de citação (status). Mesma gramática do dono; `s-via` = ÁREA aprovada;
  *  nível "secret" não existe nesta tela (teto Interno). */
 function SealCard({ card }: { card: CardVM }) {
   const confLow = card.conf < 60;

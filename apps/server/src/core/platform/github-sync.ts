@@ -556,7 +556,7 @@ export async function syncIn(cfg: GithubConfig): Promise<SyncInResult> {
         const e = await getEngine(cfg.brain);
         await e.upsertSource({
           id: sourceId, name: `Entrada GitHub — ${hint === "reuniao" ? "reuniões" : "conversas"}`,
-          channel: hint, type: "", recipe: { fields: [] }, default_sensitivity: "restrito", status: "ativa",
+          channel: hint, type: "", filtro: { fields: [] }, default_sensitivity: "restrito", status: "ativa",
         } as any);
         fontesGarantidas.add(sourceId);
       }

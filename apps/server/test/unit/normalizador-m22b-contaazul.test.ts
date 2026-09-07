@@ -1,8 +1,8 @@
 /** UNIT M22-B — normalizador Conta Azul (PURO; sem DB/LLM/rede). Prova: record → página PT +
- *  claims determinísticos; o gate REAL (applyRecipeGate) aprova os claims canônicos POR CONSTRUÇÃO
- *  (quote verbatim + valor ancorado), rejeita dimensão fora da receita; datas = data do EVENTO
+ *  claims determinísticos; o gate REAL (applyFilterGate) aprova os claims canônicos POR CONSTRUÇÃO
+ *  (quote verbatim + valor ancorado), rejeita tipo fora das regras; datas = data do EVENTO
  *  (nunca hoje); id_legado nunca vira external_ref; pessoa → claim 'perfil' value_num null; adapter
- *  do seam (contaAzulConnector) mapeia model→dimensão e injeta sourceId. Fixtures dos shapes
+ *  do seam (contaAzulConnector) mapeia model→tipo e injeta sourceId. Fixtures dos shapes
  *  OFICIAIS (§2.1, URLs no _doc dos JSON). */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -10,12 +10,12 @@ import { fileURLToPath } from "node:url";
 import {
   normalizeContaAzulBatch,
   formatBRL,
-  CONTA_AZUL_RECIPE,
+  CONTA_AZUL_FILTER,
   contaAzulConnector,
   type ContaAzulModel,
   type ErpClaim,
 } from "../../src/core/ingestion/connectors/conta-azul.ts";
-import { applyRecipeGate } from "../../src/core/ingestion/golden-rule.ts";
+import { applyFilterGate } from "../../src/core/ingestion/golden-rule.ts";
 
 function fixture(name: string): any {
   const p = fileURLToPath(new URL(`./fixtures/conta-azul/${name}`, import.meta.url));
@@ -53,19 +53,19 @@ describe("M22-B — normalizador (record → página PT + claims)", () => {
     for (const { model, rec } of casos) {
       const { pages } = normalizeContaAzulBatch({ model, records: [rec] });
       const p = pages[0];
-      const gate = applyRecipeGate({ [p.dimension]: p.claims }, CONTA_AZUL_RECIPE, "conta-azul", "pg-teste", p.body);
+      const gate = applyFilterGate({ [p.dimension]: p.claims }, CONTA_AZUL_FILTER, "conta-azul", "pg-teste", p.body);
       expect(gate.rejected, `${model}: ${JSON.stringify(gate.rejected)}`).toHaveLength(0);
       expect(gate.counts.approved).toBe(p.claims.length);
     }
   });
 
-  it("3) dimensão FORA da receita → rejected 'fora_da_receita' (regra de ouro vale pro conector)", () => {
+  it("3) dimensão FORA do filtro → rejected 'fora_do_filtro' (regra de ouro vale pro conector)", () => {
     const { pages } = normalizeContaAzulBatch({ model: "vendas", records: [VENDAS[0]] });
     const p = pages[0];
     const claimFora = p.claims[0];
-    const gate = applyRecipeGate({ precos: [claimFora] }, CONTA_AZUL_RECIPE, "conta-azul", "pg-teste", p.body);
+    const gate = applyFilterGate({ precos: [claimFora] }, CONTA_AZUL_FILTER, "conta-azul", "pg-teste", p.body);
     expect(gate.counts.rejected).toBe(1);
-    expect(gate.rejected[0].reason).toBe("fora_da_receita");
+    expect(gate.rejected[0].reason).toBe("fora_do_filtro");
   });
 
   it("4) tier: vendas 1001 e 1002 do mesmo cliente → tiers diferentes; update da 1001 → MESMO tier", () => {

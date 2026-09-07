@@ -28,7 +28,7 @@ export const textoIngestor: Ingestor = {
       name: "Webhook de texto",
       channel: "webhook",
       type: "texto",
-      recipe: { fields: [] }, // modo livre: extração padrão, sem gate de receita
+      filtro: { fields: [] }, // modo livre: extração padrão, sem gate de filtro
     };
   },
 

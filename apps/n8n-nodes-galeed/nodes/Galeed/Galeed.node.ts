@@ -133,7 +133,7 @@ export class Galeed implements INodeType {
 						name: 'Enviar Planilha/Tabela',
 						value: 'planilha',
 						action: 'Enviar planilha ou tabela',
-						description: 'Cada linha vira um fato carimbado na hora — sem IA',
+						description: 'Cada linha vira um fato na hora — sem IA',
 						routing: { request: { method: 'POST', url: '/v1/ingestors/planilha' } },
 					},
 					{

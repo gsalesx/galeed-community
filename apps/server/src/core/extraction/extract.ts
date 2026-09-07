@@ -15,7 +15,7 @@ import { anchorRoles } from "./role-anchor.ts"; // M11/S2 — pré-passo determi
 // P1-C (mata A8a): a re-extração passa pelo MESMO gate do pipeline. Ciclo de módulo
 // extract.ts ⇄ golden-rule.ts é seguro: ambos exportam FUNCTION DECLARATIONS (hoisted) e só se
 // referenciam dentro de corpos async (call-time) — mesmo padrão já existente em batch-extract.
-import { applyRecipeGate, recipeGuidance, addReviewItemsAndNotify } from "../ingestion/golden-rule.ts";
+import { applyFilterGate, filterGuidance, addReviewItemsAndNotify } from "../ingestion/golden-rule.ts";
 
 export const PROMPT_VERSION = "v3"; // v3: claim tipado (value_num/unit/period/tier) + 6 aprendizados gbrain
 
@@ -39,9 +39,9 @@ export interface ExtractionUnit {
  *  re-exportado aqui pra preservar a API pública de `extract.ts`. O call site não mudou. */
 export { buildExtractionUnits };
 
-/** Semântica de UMA linha por dimensão conhecida — sem isto o modelo adivinha pelo nome da chave
+/** Semântica de UMA linha por tipo conhecido — sem isto o modelo adivinha pelo nome da chave
  *  (e adivinha mal: o baseline A/B mostrou call estratégica rica extraindo ZERO em todas as dims).
- *  Dimensão custom de tenant cai no fallback (nome + guidance do pack orientam). */
+ *  Tipo custom de tenant cai no fallback (nome + guidance do pack orientam). */
 const DIM_SEMANTICS: Record<string, string> = {
   facts: "fatos operacionais e de negócio que valem 'hoje' (capacidades, prazos, resultados de pesquisa, métricas)",
   decisions: "DECISÕES tomadas — o text carrega SEMPRE o porquê quando o texto der ('decidimos X porque Y'); decisão sem porquê é meia decisão",
@@ -174,7 +174,7 @@ export interface ExtractionContext {
   hintBlock: string; // bloco de entidades conhecidas (frequência). "" se não há.
 }
 
-/** M21 — overrides de extração vindos da RECEITA da fonte (DADO do tenant). Aditivo: ausente ⇒
+/** M21 — overrides de extração vindos das regras da fonte (DADO do tenant). Aditivo: ausente ⇒
  *  comportamento byte-idêntico (golden M9 prova). */
 export interface ExtractionOverrides {
   guidance?: string;
@@ -182,8 +182,8 @@ export interface ExtractionOverrides {
 
 /** Monta o ExtractionContext de uma página UMA vez (tool + provider/model + blocos de âncora). Async:
  *  lê pack/contexto/entity-hints (IO). Reusado por extractOne (loop) e exposto p/ o pipeline gatear
- *  unit-a-unit (M15/S3) sem reimplementar o prompt. M21: `overrides.guidance` (receita da fonte) entra
- *  no buildTool COMO o guidance do pack já entra — as dims NÃO mudam (a receita orienta o prompt e o
+ *  unit-a-unit (M15/S3) sem reimplementar o prompt. M21: `overrides.guidance` (regras da fonte) entra
+ *  no buildTool COMO o guidance do pack já entra — as dims NÃO mudam (as regras orientam o prompt e o
  *  gate decide depois; não amputa a extração). Sem overrides ⇒ byte-idêntico (schema.guidance já vem
  *  trimado de getExtractSchema, então o .trim() é no-op no caminho legado). */
 export async function buildExtractionContext(
@@ -272,9 +272,9 @@ export async function extractUnit(
 export async function extractOne(home: string, page: PageRow) {
   if (getCodexBrain() !== home) return withCodexBrain(home, () => extractOne(home, page));
   const e = await getEngine(home);
-  // P1-C (mata A8a): página carimbada por fonte (tag `src:<id>` — MESMA convenção do pipeline e
+  // P1-C (mata A8a): página com source_id da fonte (tag `src:<id>` — MESMA convenção do pipeline e
   // do reparo P0-C) re-extrai SOB o contrato; fail-closed espelho do processBlobJob. Página sem
-  // tag src: ⇒ source=undefined ⇒ recipe null ⇒ gate pass-through BYTE-IDÊNTICO (golden M9 intacto).
+  // tag src: ⇒ source=undefined ⇒ filtro null ⇒ gate pass-through BYTE-IDÊNTICO (golden M9 intacto).
   const srcTag = (page.tags ?? []).find((t) => t.startsWith("src:"));
   const sourceId = srcTag ? srcTag.slice("src:".length) : undefined;
   const source = sourceId ? await e.getSource(sourceId) : undefined;
@@ -285,7 +285,7 @@ export async function extractOne(home: string, page: PageRow) {
   const ctx = await buildExtractionContext(
     home,
     page,
-    source ? { guidance: recipeGuidance(source.recipe) } : undefined, // receita orienta o prompt (M21)
+    source ? { guidance: filterGuidance(source.filtro) } : undefined, // regras orientam o prompt (M21)
   );
   // R9: o corpo da fonte é DADO não-confiável — delimitado, fora das instruções (anti prompt-injection).
   const units = buildExtractionUnits(page);
@@ -299,12 +299,12 @@ export async function extractOne(home: string, page: PageRow) {
   }
 
   // P1-C — o MESMO gate do pipeline/harvest, antes do putExtraction (re-extrair não contorna o
-  // contrato; rejeitado vira hipótese na fila, com id determinístico — re-extração não duplica).
-  const gate = applyRecipeGate(merged, source?.recipe ?? null, source?.id ?? "", page.slug, page.body);
+  // contrato; rejeitado vai pra revisar, com id determinístico — re-extração não duplica).
+  const gate = applyFilterGate(merged, source?.filtro ?? null, source?.id ?? "", page.slug, page.body);
   // C2 — review.pending (mesmo gancho do pipeline/harvest). Fail-soft.
   if (gate.rejected.length) await addReviewItemsAndNotify(home, gate.rejected);
   console.log(
-    `[recipe-gate] brain=${home} page=${page.slug} approved=${gate.counts.approved} ` +
+    `[filtro-gate] brain=${home} page=${page.slug} approved=${gate.counts.approved} ` +
       `rejected=${gate.counts.rejected} source=${source?.id ?? "-"}`,
   );
 

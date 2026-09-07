@@ -9,9 +9,9 @@
  *
  *  Cast por `unknown`: o seam declara `sourceSeed(): ConnectorSourceSeed` (zero-arg) e
  *  `normalize(record, ctx: ConnectorRecordCtx)`. B/C exportam variações estruturalmente usáveis pelo
- *  connectorCreateHandler/webhook (B: sourceSeed() zero-arg → {id,name,channel,type,recipe,sens};
+ *  connectorCreateHandler/webhook (B: sourceSeed() zero-arg → {id,name,channel,type,filtro,sens};
  *  C: sourceSeed(id?,name?) → SourceRow, chamado sem args pelo create handler que lê só
- *  name/channel/type/recipe/sensitivity e gera o próprio id). Compatíveis em runtime; o cast só
+ *  name/channel/type/filtro/sensitivity e gera o próprio id). Compatíveis em runtime; o cast só
  *  reconcilia a assinatura nominal entre worktrees que não se importaram. */
 import { registerConnectorHandler, type ConnectorHandler } from "./connector-ingest.ts";
 import { contaAzulConnector } from "./connectors/conta-azul.ts";

@@ -30,7 +30,7 @@ import {
   type SourceConnectionView,
 } from "../../core/ingestion/connector-ingest.ts";
 import { getEngine, type SourceRow } from "../../core/platform/engine.ts";
-import { mergeRecipeDimsIntoPack } from "../../core/extraction/schema-pack.ts";
+import { mergeFilterDimsIntoPack } from "../../core/extraction/schema-pack.ts";
 import { BffError } from "./bff-common.ts";
 
 const MAX_BODY = 10 * 1024 * 1024; // 10MB
@@ -309,17 +309,17 @@ export async function connectorCreateHandler(home: string, body: ConnectorCreate
   }
 
   const seed = handler.sourceSeed();
-  const recipe = { ...seed.recipe, fields: seed.recipe.fields ?? [] };
-  if (recipe.fields.length) {
-    // MESMO merge receita→pack do createSourceHandler (a dim da receita entra no extractable[type]).
-    await mergeRecipeDimsIntoPack(home, [{ type: seed.type, dims: recipe.fields.map((f) => f.dimension) }]);
+  const filtro = { ...seed.filtro, fields: seed.filtro.fields ?? [] };
+  if (filtro.fields.length) {
+    // MESMO merge filtro→pack do createSourceHandler (a dim do filtro entra no extractable[type]).
+    await mergeFilterDimsIntoPack(home, [{ type: seed.type, dims: filtro.fields.map((f) => f.dimension) }]);
   }
   const row: SourceRow = {
     id: randomUUID(),
     name: seed.name,
     channel: seed.channel,
     type: seed.type,
-    recipe,
+    filtro,
     default_sensitivity: seed.default_sensitivity ?? "restrito",
     status: "ativa",
     last_read_at: null,

@@ -25,7 +25,7 @@ import {
 import { costUsd } from "../../lib/pricing.ts";
 import { recordUsage } from "../platform/usage.ts";
 import { UNTRUSTED_SYS, wrapUntrusted } from "../../lib/prompt-safety.ts";
-import { recipeGuidance } from "./golden-rule.ts";
+import { filterGuidance } from "./golden-rule.ts";
 import { getEngine, type ReviewItemRow, type SourceRow } from "../platform/engine.ts";
 import { getSharedSql, sharedSqlGeneration, closeSharedSql } from "../platform/db-conn.ts";
 import {
@@ -240,13 +240,13 @@ export function buildJudgePrompt(
     "Você é o juiz triador da fila de revisão de um cérebro de conhecimento. Para cada hipótese, " +
     "você RECOMENDA uma triagem — mas você NUNCA decide: só recomenda; o dono decide. Use a tool.";
 
-  // 2. RECEITA da fonte (determinístico) + nome/tipo da fonte.
+  // 2. Regras da fonte (determinístico) + nome/tipo da fonte.
   let blocoFonte: string;
   if (source) {
-    const guia = recipeGuidance(source.recipe ?? null);
+    const guia = filterGuidance(source.filtro ?? null);
     blocoFonte =
       `FONTE: "${source.name}" (tipo: ${source.type})` +
-      (guia ? guia : "\n\n(esta fonte não tem receita declarada.)");
+      (guia ? guia : "\n\n(esta fonte não tem filtro declarada.)");
   } else {
     blocoFonte = "FONTE: item sem fonte (hipótese do sonho).";
   }
@@ -288,7 +288,7 @@ export function buildJudgePrompt(
   // 5. CRITÉRIO.
   const criterio =
     "CRITÉRIO:\n" +
-    "- aprovar = o claim é fiel à fonte e útil sob a receita;\n" +
+    "- aprovar = o claim é fiel à fonte e útil sob o filtro;\n" +
     "- descartar = ruído, duplicado ou sem valor;\n" +
     "- humano = ambíguo, sensível ou sem precedente claro.\n" +
     "Dê um 'motivo' de UMA frase em português e uma 'confianca' entre 0 e 1.";

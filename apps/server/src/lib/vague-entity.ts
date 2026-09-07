@@ -4,7 +4,7 @@
  *  (+ testes), nunca adicionar ramo. Match EXATO sobre a entidade normalizada (lowercase,
  *  trim, espaços colapsados); SEM folding de acento (variantes com/sem acento listadas —
  *  invariante #9: nenhum normalizador à mão). Compartilhada por derivePageFacts (indexer)
- *  e applyRecipeGate (golden-rule) — padrão quoteIsGrounded/valueIsAnchored. */
+ *  e applyFilterGate (golden-rule) — padrão quoteIsGrounded/valueIsAnchored. */
 
 /** Formas pronominais/dêiticas — match EXATO. */
 export const VAGUE_PRONOUNS: ReadonlySet<string> = new Set([

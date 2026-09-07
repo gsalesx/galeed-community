@@ -32,10 +32,10 @@ import {
 } from "../../lib/batch-client.ts";
 import { deriveIncremental } from "../retrieval/indexer.ts";
 import { getEngine, type PageRow } from "../platform/engine.ts";
-// M21/S2 — a REGRA DE OURO no harvest: o MESMO applyRecipeGate do caminho síncrono roda antes do
+// M21/S2 — a REGRA DE OURO no harvest: o MESMO applyFilterGate do caminho síncrono roda antes do
 // putExtraction (sync↔batch equivalentes, LEI II). A fonte vem do JOB dono do lote, resolvido pelo
 // batch_id (getJobByBatchId) — a assinatura pública de harvestExtractionBatch NÃO muda.
-import { applyRecipeGate, addReviewItemsAndNotify } from "./golden-rule.ts";
+import { applyFilterGate, addReviewItemsAndNotify } from "./golden-rule.ts";
 import { getJobByBatchId, markJobError } from "./ingest-queue.ts";
 
 // =====================================================================================================
@@ -277,11 +277,11 @@ export async function harvestExtractionBatch(
     // M21/S2 — o MESMO gate do caminho síncrono, antes do putExtraction (LEI II: sync↔batch equivalentes).
     // Ids de rejeitado são DETERMINÍSTICOS (sha256 por conteúdo) ⇒ re-harvest não duplica a fila
     // (addReviewItems é on-conflict-do-nothing por id).
-    const gate = applyRecipeGate(merged, source?.recipe ?? null, source?.id ?? "", page.slug, page.body);
+    const gate = applyFilterGate(merged, source?.filtro ?? null, source?.id ?? "", page.slug, page.body);
     // C2 — review.pending (mesmo gancho do caminho síncrono; LEI II sync↔batch). Fail-soft.
     if (gate.rejected.length) await addReviewItemsAndNotify(home, gate.rejected);
     console.log(
-      `[recipe-gate] brain=${home} page=${page.slug} approved=${gate.counts.approved} ` +
+      `[filtro-gate] brain=${home} page=${page.slug} approved=${gate.counts.approved} ` +
         `rejected=${gate.counts.rejected} source=${source?.id ?? "-"}`,
     );
     // P1-C (mata A7b): página com unit errored/truncada é PARCIAL — persiste o que chegou (os

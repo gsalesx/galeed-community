@@ -1,15 +1,15 @@
 /** M21/S5 — Tela FONTES (fiel a docs/design-system/fontes.html — fidelidade Tier 1).
  *
- *  De onde a informação entra. Cada fonte tem a sua RECEITA: o cérebro sabe o que
- *  extrair dali, e o resto vira HIPÓTESE na fila de revisão (regra de ouro / ADR-016).
+ *  De onde a informação entra. Cada fonte tem as suas regras: o cérebro sabe o que
+ *  extrair dali, e o resto vai pra revisar (regra de ouro / ADR-016).
  *
  *  Estrutura (ordem EXATA do mockup):
- *   1. page-head  — h1 + parágrafo + "Adicionar manualmente" (popup) + "Organizando" (fila)
+ *   1. page-head  — h1 + parágrafo + "Adicionar manualmente" (popup) + "Processando" (fila)
  *   2. banner     — a regra que evita invenção (texto literal)
  *   3. strip      — "N trechos não casaram…" (só com pendente>0) → /app/revisar
- *   4. lista      — "Ligadas neste cérebro N": cards com receita em chips + stats reais
+ *   4. lista      — "Ligadas neste cérebro N": cards com regras em chips + stats reais
  *   5. catálogo   — reais (Upload/Colar texto) + conectores live "Em breve" (sem mentira)
- *   6. drawer     — receita editável (SourceDrawer)
+ *   6. drawer     — regras editáveis (SourceDrawer)
  *
  *  Honestidade v1: o chip de status diz "ativa"/"pausada" (NÃO "lendo" — não há conector live).
  *  Dados SÓ via api.sources.* / api.hypotheses.count() — zero fetch direto, zero número inventado.
@@ -208,7 +208,7 @@ export default function Fontes() {
   const knownAreas = useMemo(() => {
     const seen: string[] = [];
     for (const s of sources)
-      for (const f of s.recipe?.fields ?? []) {
+      for (const f of s.filtro?.fields ?? []) {
         const a = f.area.trim().toLowerCase();
         if (a && !seen.includes(a)) seen.push(a);
       }
@@ -238,7 +238,7 @@ export default function Fontes() {
   }
 
   function aposSalvar() {
-    setToast({ msg: "Receita salva.", tone: "ok" });
+    setToast({ msg: "Regras salvas.", tone: "ok" });
     sourcesQ.refetch();
     connStatusQ.refetch();
     countsQ.refetch();
@@ -301,12 +301,12 @@ export default function Fontes() {
           <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}>Fontes</h1>
           <p style={{ margin: "3px 0 0", color: "var(--muted)", fontSize: 13.5, maxWidth: "62ch" }}>
             De onde a informação entra. WhatsApp, upload, conectores e webhook alimentam a memória.
-            Cada fonte tem a sua <b>receita</b>: o resto não vira fato.
+            Cada fonte tem as suas <b>regras</b>: o resto não vira fato.
           </p>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 9 }}>
           <Button onClick={() => setFilaOpen(true)}>
-            Organizando
+            Processando
             {ingest.organizando > 0 ? (
               <span className="num" style={{ marginLeft: 6, color: "var(--muted)" }}>
                 {ingest.organizando}
@@ -338,9 +338,9 @@ export default function Fontes() {
           <Icon name="check" size={17} />
         </span>
         <span>
-          <b style={{ fontWeight: 600 }}>A regra que evita invenção:</b> o que a receita reconhece vira{" "}
-          <b style={{ fontWeight: 600 }}>fato carimbado</b>. O que ela não reconhece vira{" "}
-          <b style={{ fontWeight: 600 }}>hipótese</b> e espera você confirmar. O cérebro nunca chuta.
+          <b style={{ fontWeight: 600 }}>A regra que evita invenção:</b> o que as regras reconhecem vira{" "}
+          <b style={{ fontWeight: 600 }}>fato</b>. O que elas não reconhecem vai{" "}
+          <b style={{ fontWeight: 600 }}>pra revisar</b> e espera você confirmar. O cérebro nunca chuta.
         </span>
       </div>
 
@@ -368,7 +368,7 @@ export default function Fontes() {
             <b className="num" style={{ fontWeight: 600 }}>
               {fmtNumber(pendente)}
             </b>{" "}
-            trechos não casaram com nenhuma receita. Estão guardados como <b style={{ fontWeight: 600 }}>hipótese</b>,
+            trechos não casaram com nenhuma regra. Estão guardados como <b style={{ fontWeight: 600 }}>pra revisar</b>,
             esperando você revisar.
           </span>
           <a
@@ -420,10 +420,10 @@ export default function Fontes() {
       ) : sources.length === 0 ? (
         <Card padding="22px 20px">
           <p style={{ color: "var(--muted)", fontSize: 14, margin: 0 }}>
-            Nenhuma fonte ligada ainda. Ligue a primeira — é a receita dela que deixa os fatos certos.
+            Nenhuma fonte ligada ainda. Adicione a primeira — são as regras dela que deixam os fatos certos.
           </p>
           <Button variant="primary" icon={<Icon name="plus" size={15} />} onClick={irAoCatalogo} style={{ marginTop: 12 }}>
-            Ligar uma fonte
+            Adicionar fonte
           </Button>
         </Card>
       ) : (
@@ -446,7 +446,7 @@ export default function Fontes() {
       {/* 5. catálogo */}
       <div ref={catRef}>
         <SecHeader>
-          Ligar uma fonte nova{" "}
+          Adicionar uma fonte{" "}
           <span className="num" style={{ color: "var(--muted)" }}>
             catálogo
           </span>
@@ -528,7 +528,7 @@ export default function Fontes() {
       <Modal
         open={filaOpen}
         onClose={() => setFilaOpen(false)}
-        title={`Organizando${ingest.fila.length > 0 ? ` (${ingest.fila.length})` : ""}`}
+        title={`Processando${ingest.fila.length > 0 ? ` (${ingest.fila.length})` : ""}`}
         width={640}
         footer={
           <Button variant="ghost" onClick={() => setFilaOpen(false)}>
@@ -641,7 +641,7 @@ function SecHeader({ children }: { children: ReactNode }) {
   );
 }
 
-/** card .src do mockup: ícone tintado · nome+status · meta · chips da receita · stats */
+/** card .src do mockup: ícone tintado · nome+status · meta · chips do filtro · stats */
 function SourceCard({
   source,
   aguardando,
@@ -656,7 +656,7 @@ function SourceCard({
   onRemove: () => void;
 }) {
   const tint = tintDaFonte(source);
-  const fields = source.recipe?.fields ?? [];
+  const fields = source.filtro?.fields ?? [];
   const areas: string[] = [];
   for (const f of fields) {
     const a = f.area.trim().toLowerCase();
@@ -835,7 +835,7 @@ function SourceCard({
         <span className="num" style={{ display: "block", fontSize: 16, fontWeight: 600, marginTop: 5 }}>
           {fmtNumber(source.facts_count)}
         </span>
-        <small style={{ display: "block", fontSize: 11, color: "var(--faint)" }}>fatos com selo</small>
+        <small style={{ display: "block", fontSize: 11, color: "var(--faint)" }}>fatos</small>
         <span className="num" style={{ display: "block", fontSize: 10.5, color: "var(--faint)", marginTop: 5 }}>
           última: {source.last_read_at ? relativeTime(source.last_read_at) : "—"}
         </span>

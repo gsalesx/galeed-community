@@ -1,12 +1,12 @@
-/** M21/S5 — Drawer da RECEITA da fonte (fiel a docs/design-system/fontes.html).
+/** M21/S5 — Drawer das regras da fonte (fiel a docs/design-system/fontes.html).
  *
  *  Seções na ORDEM do mockup:
- *   1. header (ícone tintado + nome + "Filtro desta fonte" + X)
+ *   1. header (ícone tintado + nome + "O que guardar" + X)
  *   2. "O que guardar das mensagens?" — fieldrows (Informação / Pergunta / Setor)
- *   3. preview do carimbo — selo visual + texto de formato (não LLM)
+ *   3. preview do formato — status visual + texto de formato (não LLM)
  *   4. "Como funciona" — 3 bullets + sigilo (select permanece)
  *   5. "Alimenta as áreas" — chips derivados (read-only)
- *   6. rodapé — "Salvar receita" (espera o 200; sem otimismo).
+ *   6. rodapé — "Salvar regras" (espera o 200; sem otimismo).
  *      Pausar/Retomar e Remover moram no card da lista, não aqui.
  *
  *  Modo "criar": nome + tipo editáveis no header; a fonte nasce em POST /api/sources.
@@ -20,14 +20,14 @@ import { ApiError, api } from "../../lib/api";
 import { relativeTime } from "../../lib/format";
 import { descricaoDaSync, ehConector, erroLegivel, estadoDaConexao, rotuloDoEstado } from "./connector";
 import type { EstadoConexao } from "./connector";
-import type { Source, SourceRecipeField } from "./types";
+import type { Source, SourceFilterField } from "./types";
 
 export interface SourceDrawerProps {
   mode: "editar" | "criar";
   source: Source | null; // null em modo criar
   presetChannel?: "upload" | "paste";
   onClose: () => void;
-  onSaved: () => void; // pai refaz as queries + mostra "Receita salva."
+  onSaved: () => void; // pai refaz as queries + mostra "Filtro salvo."
   /** áreas já usadas nas outras fontes (datalist do input de área) */
   knownAreas?: string[];
   /** M22-D — dispara o fluxo de conexão da fonte aberta (só p/ fontes-conector). */
@@ -138,7 +138,7 @@ export function SourceDrawer({
   // estado editável (snapshot do source no open; em criar começa vazio)
   const [name, setName] = useState(source?.name ?? "");
   const [type, setType] = useState(source?.type ?? "");
-  const [fields, setFields] = useState<SourceRecipeField[]>(source?.recipe?.fields ?? []);
+  const [fields, setFields] = useState<SourceFilterField[]>(source?.filtro?.fields ?? []);
   const [sens, setSens] = useState(source?.default_sensitivity ?? "restrito");
   const [salvando, setSalvando] = useState(false);
   const [toast, setToast] = useState<{ msg: string; tone: ToastTone } | null>(null);
@@ -170,15 +170,15 @@ export function SourceDrawer({
 
   const valido = name.trim().length > 0 && type.trim().length > 0 && fields.every((f) => f.dimension.trim().length > 0);
 
-  function setField(i: number, patch: Partial<SourceRecipeField>) {
+  function setField(i: number, patch: Partial<SourceFilterField>) {
     setFields((cur) => cur.map((f, j) => (j === i ? { ...f, ...patch } : f)));
   }
 
   async function salvar() {
     if (!valido || salvando) return;
     setSalvando(true);
-    const recipe = {
-      ...(source?.recipe ?? {}),
+    const filtro = {
+      ...(source?.filtro ?? {}),
       fields: fields.map((f) => ({
         dimension: f.dimension.trim().toLowerCase(),
         label: f.label,
@@ -191,21 +191,21 @@ export function SourceDrawer({
           name: name.trim(),
           channel,
           type: type.trim(),
-          recipe,
+          filtro,
           defaultSensitivity: sens,
         });
       } else if (source) {
         await api.sources.update(source.id, {
           name: name.trim(),
           type: type.trim(),
-          recipe,
+          filtro,
           defaultSensitivity: sens,
         });
       }
-      onSaved(); // pai: Toast "Receita salva." + refetch
+      onSaved(); // pai: Toast "Filtro salvo." + refetch
       onClose();
     } catch (e) {
-      setToast({ msg: msgDeErro(e, "Não deu pra salvar a receita."), tone: "warn" });
+      setToast({ msg: msgDeErro(e, "Não deu pra salvar as regras."), tone: "warn" });
     } finally {
       setSalvando(false);
     }
@@ -232,7 +232,7 @@ export function SourceDrawer({
       {/* drawer */}
       <aside
         role="dialog"
-        aria-label="Filtro desta fonte"
+        aria-label="O que guardar desta fonte"
         aria-modal="true"
         style={{
           position: "fixed",
@@ -301,7 +301,7 @@ export function SourceDrawer({
               </b>
             )}
             <small className="mono" style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 2 }}>
-              Filtro desta fonte
+              O que guardar
             </small>
           </div>
           <button
@@ -332,7 +332,7 @@ export function SourceDrawer({
           {/* 2. O que guardar das mensagens? */}
           <div style={{ ...LBL_STYLE, marginTop: 0 }}>O que guardar das mensagens?</div>
           <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
-            Cada linha é como um filtro do que será guardado como fato. Sem linhas, o cérebro guarda o que achar.
+            Cada linha é uma regra do que será guardado como fato. Sem linhas, o cérebro guarda o que achar.
           </p>
           <div>
             {fields.map((f, i) => (
@@ -471,14 +471,14 @@ export function SourceDrawer({
               </span>
             </div>
             <div style={{ padding: "12px 13px", fontSize: 13, lineHeight: 1.55, color: "var(--muted)" }}>
-              Este é só o formato. Fato de verdade só aparece depois da primeira linha. Lista vazia = sem filtro.
+              Este é só o formato. Fato de verdade só aparece depois da primeira linha. Lista vazia = sem regras.
             </div>
           </div>
 
           {/* 4. Como funciona */}
           <div style={LBL_STYLE}>Como funciona</div>
           <Rule icon="check">A mensagem sempre chega {chegaPor}.</Rule>
-          <Rule icon="check">O que casar com o filtro vai para o cérebro como fato com selo e fonte.</Rule>
+          <Rule icon="check">O que casar com as regras vai para o cérebro como fato.</Rule>
           <Rule icon="info" hyp>
             O que não casar vai para Revisar. Você aprova ou descarta. Nada vira fato sozinho.
           </Rule>
@@ -536,7 +536,7 @@ export function SourceDrawer({
               ))
             ) : (
               <span style={{ fontSize: 12.5, color: "var(--faint)" }}>
-                as áreas aparecem quando a receita tiver campos com área.
+                as áreas aparecem quando as regras tiverem campos com área.
               </span>
             )}
           </div>
@@ -598,12 +598,12 @@ export function SourceDrawer({
         {/* 6. rodapé */}
         <div style={{ padding: "14px 18px", borderTop: "1px solid var(--border)", display: "flex", gap: 9 }}>
           <Button variant="primary" onClick={salvar} disabled={!valido || salvando} style={{ flex: 1 }}>
-            {salvando ? "Salvando…" : "Salvar receita"}
+            {salvando ? "Salvando…" : "Salvar regras"}
           </Button>
         </div>
       </aside>
 
-      {/* toast local (status / erro de salvar — o "Receita salva." é do pai, que fecha o drawer) */}
+      {/* toast local (status / erro de salvar — o "Filtro salvo." é do pai, que fecha o drawer) */}
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 80 }}>
           <Toast tone={toast.tone} onClose={() => setToast(null)}>

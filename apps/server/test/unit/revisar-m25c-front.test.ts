@@ -4,15 +4,15 @@
  *  galeed-db :5434, brain `accelera360-mentoria`, em 2026-06-12). Os números abaixo são a fila
  *  REAL que a tela vai encarar:
  *    1.086 pendentes · 11 grupos (reason × dimension × source_id):
- *      fora_da_receita × claims       × Calls e reuniões transcritas   832  ← o grupão
- *      fora_da_receita × objecoes     × Calls e reuniões transcritas   130
- *      fora_da_receita × precos       × Calls e reuniões transcritas    41
+ *      fora_do_filtro × claims       × Calls e reuniões transcritas   832  ← o grupão
+ *      fora_do_filtro × objecoes     × Calls e reuniões transcritas   130
+ *      fora_do_filtro × precos       × Calls e reuniões transcritas    41
  *      nao_ancorado    × facts        × Grupos de WhatsApp              36
- *      fora_da_receita × relacoes     × Vídeos do YouTube               13
+ *      fora_do_filtro × relacoes     × Vídeos do YouTube               13
  *      conexao_sugerida× conexao      × (source_id = "")                10  ← SEM fonte (sonho)
  *      nao_ancorado    × decisoes     × Calls e reuniões transcritas     7
  *      nao_ancorado    × facts        × Vídeos do YouTube                7
- *      fora_da_receita × compromissos × Vídeos do YouTube                4
+ *      fora_do_filtro × compromissos × Vídeos do YouTube                4
  *      nao_ancorado    × relacoes     × Grupos de WhatsApp               4
  *      nao_ancorado    × decisoes     × Grupos de WhatsApp               2
  *  fontes: a43a3687 "Grupos de WhatsApp" · c7347150 "Vídeos do YouTube"
@@ -48,7 +48,7 @@ const SRC_YT = "c7347150";
 // --- helpers de fixture ---
 function grupo(over: Partial<HypothesisGroup> = {}): HypothesisGroup {
   return {
-    reason: "fora_da_receita",
+    reason: "fora_do_filtro",
     dimension: "claims",
     source_id: SRC_CALLS,
     source_name: "Calls e reuniões transcritas",
@@ -67,25 +67,25 @@ function hip(over: Partial<Hypothesis> = {}): Hypothesis {
     dimension: "claims",
     text: "André está no ramo de clínicas",
     quote: "Eh, eu tenho brevemente assim lembrança…",
-    reason: "fora_da_receita",
+    reason: "fora_do_filtro",
     status: "pendente",
     decided_by: "",
     ...over,
   };
 }
 
-/** Os 11 grupos reais do corpus (§3.0), counts carimbados. */
+/** Os 11 grupos reais do corpus (§3.0), counts fixos. */
 function gruposReais(): HypothesisGroup[] {
   return [
-    grupo({ reason: "fora_da_receita", dimension: "claims", source_id: SRC_CALLS, count: 832 }),
-    grupo({ reason: "fora_da_receita", dimension: "objecoes", source_id: SRC_CALLS, count: 130 }),
-    grupo({ reason: "fora_da_receita", dimension: "precos", source_id: SRC_CALLS, count: 41 }),
+    grupo({ reason: "fora_do_filtro", dimension: "claims", source_id: SRC_CALLS, count: 832 }),
+    grupo({ reason: "fora_do_filtro", dimension: "objecoes", source_id: SRC_CALLS, count: 130 }),
+    grupo({ reason: "fora_do_filtro", dimension: "precos", source_id: SRC_CALLS, count: 41 }),
     grupo({ reason: "nao_ancorado", dimension: "facts", source_id: SRC_WHATS, source_name: "Grupos de WhatsApp", count: 36 }),
-    grupo({ reason: "fora_da_receita", dimension: "relacoes", source_id: SRC_YT, source_name: "Vídeos do YouTube", count: 13 }),
+    grupo({ reason: "fora_do_filtro", dimension: "relacoes", source_id: SRC_YT, source_name: "Vídeos do YouTube", count: 13 }),
     grupo({ reason: "conexao_sugerida", dimension: "conexao", source_id: "", source_name: "", count: 10 }),
     grupo({ reason: "nao_ancorado", dimension: "decisoes", source_id: SRC_CALLS, count: 7 }),
     grupo({ reason: "nao_ancorado", dimension: "facts", source_id: SRC_YT, source_name: "Vídeos do YouTube", count: 7 }),
-    grupo({ reason: "fora_da_receita", dimension: "compromissos", source_id: SRC_YT, source_name: "Vídeos do YouTube", count: 4 }),
+    grupo({ reason: "fora_do_filtro", dimension: "compromissos", source_id: SRC_YT, source_name: "Vídeos do YouTube", count: 4 }),
     grupo({ reason: "nao_ancorado", dimension: "relacoes", source_id: SRC_WHATS, source_name: "Grupos de WhatsApp", count: 4 }),
     grupo({ reason: "nao_ancorado", dimension: "decisoes", source_id: SRC_WHATS, source_name: "Grupos de WhatsApp", count: 2 }),
   ];
@@ -106,16 +106,16 @@ describe("abaInicial", () => {
 // 2. acoesDoGrupo — tabela de verdade completa
 // ---------------------------------------------------------------------------
 describe("acoesDoGrupo", () => {
-  it("grupão real (fora_da_receita, sem recomendacoes) → receita, descartar, um_a_um", () => {
-    const g = grupo({ reason: "fora_da_receita", dimension: "claims", source_id: SRC_CALLS, count: 832 });
-    expect(acoesDoGrupo(g)).toEqual(["receita", "descartar", "um_a_um"]);
+  it("grupão real (fora_do_filtro, sem recomendacoes) → filtro, descartar, um_a_um", () => {
+    const g = grupo({ reason: "fora_do_filtro", dimension: "claims", source_id: SRC_CALLS, count: 832 });
+    expect(acoesDoGrupo(g)).toEqual(["filtro", "descartar", "um_a_um"]);
   });
   it("grupão com recomendacoes.aprovar>0 → + aprovar_recomendados", () => {
     const g = grupo({
-      reason: "fora_da_receita", dimension: "claims", source_id: SRC_CALLS, count: 832,
+      reason: "fora_do_filtro", dimension: "claims", source_id: SRC_CALLS, count: 832,
       recomendacoes: { aprovar: 230, descartar: 500, humano: 102, sem_recomendacao: 0 },
     });
-    expect(acoesDoGrupo(g)).toEqual(["receita", "aprovar_recomendados", "descartar", "um_a_um"]);
+    expect(acoesDoGrupo(g)).toEqual(["filtro", "aprovar_recomendados", "descartar", "um_a_um"]);
   });
   it("nao_ancorado (facts × WhatsApp) sem rec → descartar, um_a_um", () => {
     const g = grupo({ reason: "nao_ancorado", dimension: "facts", source_id: SRC_WHATS, count: 36 });
@@ -135,8 +135,8 @@ describe("acoesDoGrupo", () => {
     });
     expect(acoesDoGrupo(g)).toEqual(["um_a_um", "descartar"]);
   });
-  it("fora_da_receita com source_id='' (defensivo) → SEM receita (cai no caminho sem fonte)", () => {
-    const g = grupo({ reason: "fora_da_receita", dimension: "claims", source_id: "", source_name: "", count: 5 });
+  it("fora_do_filtro com source_id='' (defensivo) → SEM filtro (cai no caminho sem fonte)", () => {
+    const g = grupo({ reason: "fora_do_filtro", dimension: "claims", source_id: "", source_name: "", count: 5 });
     expect(acoesDoGrupo(g)).toEqual(["um_a_um", "descartar"]);
   });
 });
@@ -149,9 +149,9 @@ describe("decisaoDoGrupo", () => {
     const g = grupo({ decisao: "frase pronta do A" });
     expect(decisaoDoGrupo(g)).toBe("frase pronta do A");
   });
-  it("fora_da_receita → fallback com source_name e dimension", () => {
-    const g = grupo({ reason: "fora_da_receita", dimension: "claims", source_name: "Calls e reuniões transcritas", decisao: "" });
-    expect(decisaoDoGrupo(g)).toBe('A receita da fonte "Calls e reuniões transcritas" não tem a dimensão "claims".');
+  it("fora_do_filtro → fallback com source_name e dimension", () => {
+    const g = grupo({ reason: "fora_do_filtro", dimension: "claims", source_name: "Calls e reuniões transcritas", decisao: "" });
+    expect(decisaoDoGrupo(g)).toBe('As regras da fonte "Calls e reuniões transcritas" não têm o tipo "claims".');
   });
   it("nao_ancorado → fallback EXATO", () => {
     expect(decisaoDoGrupo(grupo({ reason: "nao_ancorado", decisao: "" }))).toBe(
@@ -214,11 +214,11 @@ describe("filtraGrupo", () => {
     expect(filtraGrupo(itens, null)).toBe(itens);
   });
   it("filtro do grupão → só itens com a tripla exata", () => {
-    const dentro = hip({ id: "in", reason: "fora_da_receita", dimension: "claims", source_id: SRC_CALLS });
-    const foraDim = hip({ id: "d2", reason: "fora_da_receita", dimension: "objecoes", source_id: SRC_CALLS });
-    const foraSrc = hip({ id: "s2", reason: "fora_da_receita", dimension: "claims", source_id: SRC_WHATS });
+    const dentro = hip({ id: "in", reason: "fora_do_filtro", dimension: "claims", source_id: SRC_CALLS });
+    const foraDim = hip({ id: "d2", reason: "fora_do_filtro", dimension: "objecoes", source_id: SRC_CALLS });
+    const foraSrc = hip({ id: "s2", reason: "fora_do_filtro", dimension: "claims", source_id: SRC_WHATS });
     const out = filtraGrupo([dentro, foraDim, foraSrc], {
-      reason: "fora_da_receita", dimension: "claims", source_id: SRC_CALLS,
+      reason: "fora_do_filtro", dimension: "claims", source_id: SRC_CALLS,
     });
     expect(out.map((h) => h.id)).toEqual(["in"]);
   });
@@ -258,7 +258,7 @@ describe("rotuloRecomendacao", () => {
 // ---------------------------------------------------------------------------
 describe("rotuloAcerto", () => {
   const seg = (over: Partial<JudgeCalibrationSegment>): JudgeCalibrationSegment => ({
-    dimension: "claims", source_id: SRC_CALLS, reason: "fora_da_receita",
+    dimension: "claims", source_id: SRC_CALLS, reason: "fora_do_filtro",
     decididos: 0, acertos: 0, acerto: 0, ...over,
   });
   it("undefined → ''", () => expect(rotuloAcerto(undefined)).toBe(""));
@@ -277,17 +277,17 @@ describe("rotuloAcerto", () => {
 describe("segmentoDoGrupo", () => {
   const cal: JudgeCalibration = {
     segmentos: [
-      { dimension: "claims", source_id: SRC_CALLS, reason: "fora_da_receita", decididos: 140, acertos: 136, acerto: 0.97 },
-      { dimension: "objecoes", source_id: SRC_CALLS, reason: "fora_da_receita", decididos: 10, acertos: 8, acerto: 0.8 },
+      { dimension: "claims", source_id: SRC_CALLS, reason: "fora_do_filtro", decididos: 140, acertos: 136, acerto: 0.97 },
+      { dimension: "objecoes", source_id: SRC_CALLS, reason: "fora_do_filtro", decididos: 10, acertos: 8, acerto: 0.8 },
     ],
     total: { decididos: 150, acertos: 144, acerto: 0.96 },
   };
   it("match pela tripla", () => {
-    const g = grupo({ dimension: "claims", source_id: SRC_CALLS, reason: "fora_da_receita" });
+    const g = grupo({ dimension: "claims", source_id: SRC_CALLS, reason: "fora_do_filtro" });
     expect(segmentoDoGrupo(cal, g)?.decididos).toBe(140);
   });
   it("sem match → undefined", () => {
-    const g = grupo({ dimension: "precos", source_id: SRC_CALLS, reason: "fora_da_receita" });
+    const g = grupo({ dimension: "precos", source_id: SRC_CALLS, reason: "fora_do_filtro" });
     expect(segmentoDoGrupo(cal, g)).toBeUndefined();
   });
   it("calibração null → undefined", () => {

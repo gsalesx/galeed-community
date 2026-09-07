@@ -1,5 +1,5 @@
 /** SMOKE M-PAY-H (auditoria R3 #7) — gate HTTP de crédito/entitlement nas BORDAS pagas, ponta-a-ponta.
- *  Sobe o web-server REAL (helpers/bff.ts) e prova a AMARRAÇÃO motor↔borda que protege a receita:
+ *  Sobe o web-server REAL (helpers/bff.ts) e prova a AMARRAÇÃO motor↔borda que protege o filtro:
  *   (a) conta com carteira e saldo ZERADO → /api/ask → 402 {reason:'balance'} (ação paga não é servida);
  *   (b) conta com assinatura 'canceled' → /api/ask → 402 {reason:'entitlement'} (inadimplente bloqueia);
  *   (c) ENTITLEMENT é avaliado ANTES do crédito (cancelada COM saldo ainda dá 'entitlement', não 'balance');

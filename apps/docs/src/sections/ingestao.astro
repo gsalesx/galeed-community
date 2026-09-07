@@ -64,7 +64,7 @@ const rows = [
     name: "source",
     type: "string",
     required: "obrigatório" as const,
-    desc: 'O slug da fonte que define a receita de extração (ex.: <code class="ic">call_vendas</code>). É ele que decide o que vira fato.',
+    desc: 'O slug da fonte que define as regras de extração (ex.: <code class="ic">call_vendas</code>). É ele que decide o que vira fato.',
   },
   {
     name: "content",
@@ -88,7 +88,7 @@ const rows = [
     name: "sensitivity",
     type: "enum",
     required: "opcional" as const,
-    desc: 'Força um nível de sigilo de entrada. Se omitir, a receita decide; sem receita, entra como <code class="ic">secret</code>.',
+    desc: 'Força um nível de sigilo de entrada. Se omitir, as regras decidem; sem regras, entra como <code class="ic">secret</code>.',
   },
 ];
 
@@ -111,7 +111,7 @@ const statusResponse = `{
   id="ingestao"
   ix="07"
   title="Ingestão"
-  intro="Manda conteúdo cru pro cérebro. Você não estrutura nada: a receita da fonte cuida disso."
+  intro="Manda conteúdo cru pro cérebro. Você não estrutura nada: as regras da fonte cuidam disso."
 >
   <Endpoint method="post" path="/ingest" scope="requer can_ingest" scopeIcon="lock" />
 
@@ -125,7 +125,7 @@ const statusResponse = `{
     <p>
       A ingestão é assíncrona. A API confirma o recebimento na hora com um <code
         class="ic">202</code
-      > e um <code class="ic">batch_id</code>; a organização acontece logo depois e dispara o
+      > e um <code class="ic">batch_id</code>; o processamento acontece logo depois e dispara o
       webhook <code class="ic">ingest.organized</code>.
     </p>
   </div>

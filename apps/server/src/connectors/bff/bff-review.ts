@@ -20,7 +20,7 @@ import { getRecommendations } from "../../core/ingestion/review-judge.ts"; // M2
 import { BffError } from "./bff-common.ts";
 
 const REASONS: ReadonlySet<string> = new Set([
-  "fora_da_receita", "nao_ancorado", "entidade_vaga", "conexao_sugerida",
+  "fora_do_filtro", "nao_ancorado", "entidade_vaga", "conexao_sugerida",
 ]);
 
 /** Um grupo-decisão da fila: todos os pendentes que a MESMA frase decide. */
@@ -33,7 +33,7 @@ export interface HypothesisGroupView {
   paginas: number;              // source_slugs distintos no grupo
   amostra: HypothesisView[];    // 3 itens mais recentes (listReview já vem desc)
   decisao: string;              // a frase da decisão que o grupo representa (PT)
-  dimensao_na_receita: boolean; // a receita ATUAL da fonte já cobre a dimensão?
+  dimensao_no_filtro: boolean; // as regras ATUAIS da fonte já cobrem o tipo?
   // M25-B reconcile (adendo §9): rollup das recomendações do juiz no grupo. Ausente quando o juiz
   // ainda não passou por nenhum item — o front trata via `?? 0`. O lote `apenas_recomendados`
   // depende de recomendacoes.aprovar (gateado em A; o juiz NUNCA aprova — invariante #5).
@@ -44,12 +44,12 @@ export interface HypothesisGroupView {
 export type JuizRecs = Record<string, { recomendacao: string; motivo: string; confianca: number; judged_at: string }>;
 
 /** A frase da DECISÃO que o grupo representa. TEMPLATE dirigido por dado — zero literal de
- *  domínio (invariante III/ADR-002): dimensão e fonte vêm do banco. */
+ *  domínio (invariante III/ADR-002): tipo e fonte vêm do banco. */
 export function decisaoDoGrupo(reason: ReviewReason, dimension: string, sourceName: string): string {
   const fonte = sourceName || "(sem fonte)";
   switch (reason) {
-    case "fora_da_receita":
-      return `a receita da fonte "${fonte}" não tem a dimensão "${dimension}".`;
+    case "fora_do_filtro":
+      return `As regras da fonte "${fonte}" não têm o tipo "${dimension}".`;
     case "nao_ancorado":
       return `itens de "${dimension}" da fonte "${fonte}" sem âncora verificável no texto original.`;
     case "entidade_vaga":
@@ -64,7 +64,7 @@ export function decisaoDoGrupo(reason: ReviewReason, dimension: string, sourceNa
 export function groupHypotheses(items: ReviewItemRow[], sources: SourceRow[], recs?: JuizRecs): HypothesisGroupView[] {
   const nameOf = new Map(sources.map((s) => [s.id, s.name]));
   const recipeDims = new Map(
-    sources.map((s) => [s.id, new Set(s.recipe.fields.map((f) => f.dimension))]),
+    sources.map((s) => [s.id, new Set(s.filtro.fields.map((f) => f.dimension))]),
   );
   const grupos = new Map<string, { view: HypothesisGroupView; slugs: Set<string> }>();
   for (const it of items) {
@@ -83,7 +83,7 @@ export function groupHypotheses(items: ReviewItemRow[], sources: SourceRow[], re
           paginas: 0,
           amostra: [],
           decisao: decisaoDoGrupo(it.reason, it.dimension, source_name),
-          dimensao_na_receita: recipeDims.get(sourceId)?.has(it.dimension) ?? false,
+          dimensao_no_filtro: recipeDims.get(sourceId)?.has(it.dimension) ?? false,
           // só materializa o rollup quando o juiz foi rodado (recs presente) — senão fica ausente.
           ...(recs ? { recomendacoes: { aprovar: 0, descartar: 0, humano: 0, sem_recomendacao: 0 } } : {}),
         },
@@ -135,7 +135,7 @@ function validateGroupKey(body: GroupKeyBody): { reason: ReviewReason; dimension
   const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
   if (!REASONS.has(reason)) throw new BffError(400, "motivo de grupo inválido.");
   const dimension = typeof body?.dimension === "string" ? body.dimension.trim().toLowerCase() : "";
-  if (!dimension) throw new BffError(400, "diga a dimensão do grupo.");
+  if (!dimension) throw new BffError(400, "diga o tipo do grupo.");
   const source_id = typeof body?.source_id === "string" ? body.source_id.trim() : "";
   return { reason: reason as ReviewReason, dimension, source_id };
 }
@@ -185,35 +185,35 @@ export async function discardGroupHandler(
 export interface AddDimensionBody {
   source_id: string;
   dimension: string;
-  label?: string; // rótulo legível do campo novo da receita; default = a própria dimension
+  label?: string; // rótulo legível do campo novo das regras (`filtro`); default = a própria dimension
   area?: string;  // slug da área destino; default ""
 }
 
-/** POST /api/hypotheses/groups/add-dimension — ação (c): a receita da fonte GANHA a dimensão
- *  (updateSourceHandler EXISTENTE — que também faz o merge receita→pack, ADR-016/fix-1) e os
- *  pendentes fora_da_receita do grupo são re-gateados SEM LLM (o claim está salvo no item;
- *  com a dim agora na receita, o que resta da cadeia é exatamente gateClaimAnchoring — os que
- *  passam são aprovados pelo MESMO caminho da ação (a)). Idempotente: dim já na receita ⇒
- *  receita_atualizada=false e segue pro lote; repetir tudo ⇒ no-op. */
+/** POST /api/hypotheses/groups/add-dimension — ação (c): as regras da fonte GANHAM o tipo
+ *  (updateSourceHandler EXISTENTE — que também faz o merge regras (`filtro`)→pack, ADR-016/fix-1) e os
+ *  pendentes fora_do_filtro do grupo são re-gateados SEM LLM (o claim está salvo no item;
+ *  com o tipo agora nas regras, o que resta da cadeia é exatamente gateClaimAnchoring — os que
+ *  passam são aprovados pelo MESMO caminho da ação (a)). Idempotente: tipo já nas regras ⇒
+ *  filtro_atualizado=false e segue pro lote; repetir tudo ⇒ no-op. */
 export async function addDimensionGroupHandler(
   home: string,
   body: AddDimensionBody,
   decidedBy: string,
-): Promise<{ ok: true; receita_atualizada: boolean } & LoteAprovacao> {
+): Promise<{ ok: true; filtro_atualizado: boolean } & LoteAprovacao> {
   const source_id = typeof body?.source_id === "string" ? body.source_id.trim() : "";
-  if (!source_id) throw new BffError(400, "esse grupo não tem fonte — não há receita pra atualizar.");
+  if (!source_id) throw new BffError(400, "esse grupo não tem fonte — não há regras pra atualizar.");
   const dimension = typeof body?.dimension === "string" ? body.dimension.trim().toLowerCase() : "";
-  if (!dimension) throw new BffError(400, "diga a dimensão pra adicionar à receita.");
+  if (!dimension) throw new BffError(400, "diga o tipo pra adicionar às regras.");
   const e = await getEngine(home);
   const source = await e.getSource(source_id);
   if (!source) throw new BffError(404, "fonte não encontrada.");
 
-  const jaTem = source.recipe.fields.some((f) => f.dimension === dimension);
+  const jaTem = source.filtro.fields.some((f) => f.dimension === dimension);
   if (!jaTem) {
-    const recipe = {
-      ...source.recipe,
+    const filtro = {
+      ...source.filtro,
       fields: [
-        ...source.recipe.fields,
+        ...source.filtro.fields,
         {
           dimension,
           label: (typeof body?.label === "string" && body.label.trim()) || dimension,
@@ -221,10 +221,10 @@ export async function addDimensionGroupHandler(
         },
       ],
     };
-    // caminho EXISTENTE (validateRecipe + upsert + mergeRecipeDimsIntoPack) — nada duplicado.
-    await updateSourceHandler(home, source_id, { recipe });
+    // caminho EXISTENTE (validateFilter + upsert + mergeFilterDimsIntoPack) — nada duplicado.
+    await updateSourceHandler(home, source_id, { filtro });
   }
-  const ids = await idsDoGrupo(home, { reason: "fora_da_receita", dimension, source_id });
+  const ids = await idsDoGrupo(home, { reason: "fora_do_filtro", dimension, source_id });
   const r = await approveReviewItemsLote(home, ids, decidedBy);
-  return { ok: true, receita_atualizada: !jaTem, ...r };
+  return { ok: true, filtro_atualizado: !jaTem, ...r };
 }

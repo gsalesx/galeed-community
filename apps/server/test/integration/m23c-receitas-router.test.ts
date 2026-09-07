@@ -1,6 +1,6 @@
 /** INTEGRAÇÃO M23-C/S4 — "o que foi combinado com X?" respondível por FATO via router (DB real, SEM LLM).
  *  Prova o gate BRIEF §6.6 de forma determinística: um compromisso da convenção §2.1, semeado pelo
- *  MOTOR (não INSERT direto), é roteado por factsForQuery e aparece no bloco de fatos com selo de fonte.
+ *  MOTOR (não INSERT direto), é roteado por factsForQuery e aparece no bloco de fatos com status de fonte.
  *  A síntese fim-a-fim (Sonnet) é o e2e manual §4.4. Brain descartável `__m23c_router` — NUNCA Accelera. */
 import { describe, it, expect, afterAll } from "vitest";
 import { hasDb, rawConnect, wipeBrain } from "./helpers/db.ts";

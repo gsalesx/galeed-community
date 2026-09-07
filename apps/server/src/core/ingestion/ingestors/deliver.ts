@@ -4,7 +4,7 @@
  *  fonte↔ingestor usa provider_config_key = "ingestor:<slug>" (mesmas colunas da migração 29). */
 import { randomUUID } from "node:crypto";
 import { getEngine, type SourceRow } from "../../platform/engine.ts";
-import { mergeRecipeDimsIntoPack } from "../../extraction/schema-pack.ts";
+import { mergeFilterDimsIntoPack } from "../../extraction/schema-pack.ts";
 import {
   deliverConnectorPayload,
   finalizeConnectorDeliveries,
@@ -26,17 +26,17 @@ export async function resolveIngestorSource(brain: string, ing: Ingestor): Promi
   if (existing) return existing.sourceId;
 
   const seed = ing.sourceSeed();
-  const recipe = { ...seed.recipe, fields: seed.recipe.fields ?? [] };
-  if (recipe.fields.length) {
-    // mesmo merge receita→pack do createSourceHandler (a dim da receita entra no extractable[type]).
-    await mergeRecipeDimsIntoPack(brain, [{ type: seed.type, dims: recipe.fields.map((f) => f.dimension) }]);
+  const filtro = { ...seed.filtro, fields: seed.filtro.fields ?? [] };
+  if (filtro.fields.length) {
+    // mesmo merge filtro→pack do createSourceHandler (a dim do filtro entra no extractable[type]).
+    await mergeFilterDimsIntoPack(brain, [{ type: seed.type, dims: filtro.fields.map((f) => f.dimension) }]);
   }
   const row: SourceRow = {
     id: randomUUID(),
     name: seed.name,
     channel: seed.channel,
     type: seed.type,
-    recipe,
+    filtro,
     default_sensitivity: seed.default_sensitivity ?? "restrito",
     status: "ativa",
     last_read_at: null,

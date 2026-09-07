@@ -85,7 +85,7 @@ O desenviesamento anterior (prompts) resolveu o prompt; sobrava viés **estrutur
   qualitativos "registrados" sem triple.
 
 ### E — Consistência de tags e capture
-- Tipo custom de fonte não colapsa mais pra "notas" (o merge receita→pack usa a chave efetiva).
+- Tipo custom de fonte não colapsa mais pra "notas" (o merge filtro→pack usa a chave efetiva).
 - `area` do webhook normaliza com o mesmo `slugify` dos grants (antes a página sumia pra token
   escopado por diferença de caixa/acento).
 - Tags técnicas (`src:<uuid>`, `doc:<hash>`, `canal:`, `area:`) saíram do vocabulário vivo, do
@@ -125,7 +125,7 @@ Depois da revisão, atacamos os dois itens que eram furos reais de integridade (
    espelho). Armar a 2ª camada exige `engine.withScope` transacional + policy em `galeed_facts`
    e `deny_types` — mudança de arquitetura, documentada no cabeçalho de `scope.ts`.
 4. **Data-fix de instalações existentes**: fontes notetaker já gravadas mantêm `type='call'`; e
-   fontes gmail já conectadas mantêm a receita com a área antiga. São `UPDATE`s pontuais — não
+   fontes gmail já conectadas mantêm o filtro com a área antiga. São `UPDATE`s pontuais — não
    entram no código, ficam como nota de operação para quando houver base instalada.
 5. **Ecos de `dim` / motor do Dossiê**: o `?dim=` foi propagado para OpenAPI e MCP público; o fix
    preferido do Dossiê (preservar `entity` no fato registrado, em `indexer.ts`) ficou como

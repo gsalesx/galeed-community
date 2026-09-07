@@ -341,9 +341,9 @@ export async function saveSchemaPack(home: string, pack: Partial<SchemaPack>): P
 }
 
 /** Expande cada entry pro PAR de chaves {type CRU, tipo EFETIVO}. capture.ts:36 colapsa type custom
- *  via resolveTipo ('email'/'erp'/'tabela'/'call' → 'notas'), então gravar a receita SÓ sob o cru
+ *  via resolveTipo ('email'/'erp'/'tabela'/'call' → 'notas'), então gravar o filtro SÓ sob o cru
  *  deixa a chave que a extração LÊ (getExtractSchema(home, page.type)) sem as dims — a dim vira
- *  fisicamente inemissível e o gate rejeita fora_da_receita ou perde o campo EM SILÊNCIO (a mesma
+ *  fisicamente inemissível e o gate rejeita fora_do_filtro ou perde o campo EM SILÊNCIO (a mesma
  *  causa-3 do 09b5e16, reaberta pelos caminhos fora do wizard). O wizardConfirm já fazia esse par
  *  por fora (effectiveExtractType); aqui é o ponto ÚNICO — conserta bff-connectors, ingestors/
  *  deliver e bff-sources de uma vez. Trade-off aceito por construção (igual ao wizard): tipos
@@ -358,14 +358,14 @@ export function expandRecipeEntries(
   });
 }
 
-/** M21/fix-1 (ADR-016 "receita ⊆ extractable") — UNIÃO das dims de receita em `extractable[type]`.
- *  Regra de DOMÍNIO única, reusada por bff-wizard (confirm) e bff-sources (create/update): campo de
- *  receita que o pack não declara vira dimensão INCLUÍDA — a receita especializa, nunca forka. Sem
- *  isso a extração nunca emite a dim e 100% do campo vira hipótese `fora_da_receita` (approved=0).
+/** M21/fix-1 (ADR-016 "regras (`filtro`) ⊆ extractable") — UNIÃO das dims das regras em `extractable[type]`.
+ *  Regra de DOMÍNIO única, reusada por bff-wizard (confirm) e bff-sources (create/update): campo das
+ *  regras que o pack não declara vira tipo INCLUÍDO — as regras especializam, nunca forka. Sem
+ *  isso a extração nunca emite a dim e 100% do campo vai pra revisar `fora_do_filtro` (approved=0).
  *  Grava sob o type CRU e TAMBÉM sob o tipo EFETIVO de extração (expandRecipeEntries acima).
  *  Idempotente: todas as dims já declaradas → NÃO grava (versão não bumpa). NUNCA remove dim nem
  *  outro campo do pack (união, não substituição). Retorna true se persistiu mudança. */
-export async function mergeRecipeDimsIntoPack(
+export async function mergeFilterDimsIntoPack(
   home: string,
   entries: { type: string; dims: string[] }[],
 ): Promise<boolean> {

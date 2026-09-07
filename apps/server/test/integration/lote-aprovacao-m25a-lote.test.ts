@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { hasDb, wipeBrain, rawConnect } from "./helpers/db.ts";
 
-/** conta os fatos 'registrado' com selo (source_id + meta.review_id) destas páginas — claims sem
+/** conta os fatos 'sem prova' (`registrado`) com source_id da fonte + meta.review_id destas páginas — claims sem
  *  triple viram status='registrado' (entity ''), fora do currentFacts(); a leitura é direta. */
 async function selados(brain: string, slugs: string[]): Promise<{ count: number; source_ids: Set<string> }> {
   const sql = await rawConnect();
@@ -55,7 +55,7 @@ const BODY_B = `na call: ${QUOTE_B1}, segundo ele mesmo confirmou.`;
 
 const SOURCE: SourceRow = {
   id: SOURCE_ID, name: "Fonte M25A", channel: "upload", type: "nota",
-  recipe: { fields: [{ dimension: "decisoes", label: "Decisões", area: "" }], guidance: "" },
+  filtro: { fields: [{ dimension: "decisoes", label: "Decisões", area: "" }], guidance: "" },
   default_sensitivity: "restrito", status: "ativa", last_read_at: null,
 };
 
@@ -130,7 +130,7 @@ describe.skipIf(!hasDb())("M25-A — aprovar/descartar em lote (DB real)", () =>
     expect(r.paginas_derivadas).toBe(2);
 
     const e = await getEngine(BRAIN);
-    // pág A: os 2 claims na MESMA dimensão/array, UM putExtraction
+    // pág A: os 2 claims no MESMO tipo/array, UM putExtraction
     const exA = await e.getExtraction(SLUG_A);
     const arrA = exA!.extractions!.decisoes as any[];
     expect(arrA).toHaveLength(2);
@@ -138,7 +138,7 @@ describe.skipIf(!hasDb())("M25-A — aprovar/descartar em lote (DB real)", () =>
     expect(new Set(arrA.map((c) => c.review_id))).toEqual(new Set([ANCORA_A1.id, ANCORA_A2.id]));
     expect(arrA.every((c) => c.source_id === SOURCE_ID)).toBe(true);
 
-    // fatos 'registrado' com selo (source_id carimbado + meta.review_id) — claims sem triple
+    // fatos 'sem prova' (`registrado`) com source_id da fonte + meta.review_id — claims sem triple
     const sel = await selados(BRAIN, [SLUG_A, SLUG_B]);
     expect(sel.count).toBe(3); // 3 ancorados aprovados
     expect(sel.source_ids).toEqual(new Set([SOURCE_ID]));

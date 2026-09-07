@@ -139,7 +139,7 @@ export function useIngestFila(opts?: { onToast?: (t: ToastIngest) => void }) {
           sourceId: fonteId || undefined,
         });
         ligaJob(id, r.jobId, r.status);
-        onToast?.({ msg: "Na fila — organizando em background.", tone: "neutral" });
+        onToast?.({ msg: "Na fila — processando em background.", tone: "neutral" });
       } catch (e) {
         aplicaErroEnvio(id, e);
       }
@@ -155,7 +155,7 @@ export function useIngestFila(opts?: { onToast?: (t: ToastIngest) => void }) {
       try {
         const r = await api.ingest.text({ type: tipo, text: t, sourceId: fonteId || undefined });
         ligaJob(id, r.jobId, r.status);
-        onToast?.({ msg: "Na fila — organizando em background.", tone: "neutral" });
+        onToast?.({ msg: "Na fila — processando em background.", tone: "neutral" });
       } catch (e) {
         aplicaErroEnvio(id, e);
       }
@@ -395,7 +395,7 @@ export function IngestForm({ ingest }: { ingest: ReturnType<typeof useIngestFila
 
       <Secao
         titulo="Entra por qual fonte"
-        hint="Com fonte, só a receita dela vira fato — o resto vai pra revisão."
+        hint="Com fonte, só o que as regras guardam vira fato — o resto vai pra revisar."
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <label htmlFor="ingest-fonte" className="mono" style={{ fontSize: 11, color: "var(--faint)", fontWeight: 600 }}>

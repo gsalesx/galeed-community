@@ -95,7 +95,7 @@ export const evolutionWhatsappIngestor: Ingestor = {
       name: "WhatsApp",
       channel: "whatsapp",
       type: "conversa",
-      recipe: { fields: [] }, // modo livre; receita pode ser criada depois na tela Fontes
+      filtro: { fields: [] }, // modo livre; filtro pode ser criada depois na tela Fontes
     };
   },
 

@@ -90,7 +90,7 @@ export function numberWordForms(n: number): string[] {
  *  ("sim"/"ok"/valor só-dígitos NÃO ancoram — dígito sem value_num continua no caminho numérico/C4,
  *  onde substring curta casaria timestamp por acaso). Honestidade epistêmica: negação/contexto NÃO
  *  são checados — exatamente o MESMO nível já aceito pro número ancorado. Puro, sem IO.
- *  Usado nos 3 espelhos do C4 (applyRecipeGate, gateClaimAnchoring, derivePageFacts) — mudou num,
+ *  Usado nos 3 espelhos do C4 (applyFilterGate, gateClaimAnchoring, derivePageFacts) — mudou num,
  *  muda nos três JUNTOS (disciplina C4/fix-1). */
 export function textValueIsAnchored(value: string, body: string): boolean {
   const norm = (s: string) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();

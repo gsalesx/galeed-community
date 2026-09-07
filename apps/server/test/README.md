@@ -24,7 +24,7 @@ npm run test:all       # unit + integração
 | Arquivo | Invariante | Por quê |
 |---|---|---|
 | `supersession.test.ts` | `applyBitemporal` — supersessão, corroboração, duplicata, não-verificado fora da cadeia, sem-data ordena antigo | **O coração da verdade.** Como o cérebro "muda de ideia". |
-| `reconcile-integrity.test.ts` | hard gate de papel: opostos (gasto≠receita) NUNCA fundem; precedência sobre sinonímia errada | Trava a **regressão crítica** ad_spend→ticket (R$2.700 vs R$15k). |
+| `reconcile-integrity.test.ts` | hard gate de papel: opostos (gasto≠filtro) NUNCA fundem; precedência sobre sinonímia errada | Trava a **regressão crítica** ad_spend→ticket (R$2.700 vs R$15k). |
 | `normalize.test.ts` | `normalizeValue` — formas de moeda/número colapsam na mesma chave | Sem isso, supersessão cria crenças concorrentes espúrias. |
 | `recency.test.ts` | `recencyFactor` — evergreen, piso, monotonicidade | Decaimento de score determinístico. |
 | `confidence-decay.test.ts` | `effectiveConfidence`/`salienceScore` — nunca sobe, respeita piso, identidade não decai | Decay de leitura não pode inventar confiança. |

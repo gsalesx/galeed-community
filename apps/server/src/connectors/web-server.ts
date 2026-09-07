@@ -46,7 +46,7 @@ import { listJobsHandler, getJobHandler } from "./bff/bff-jobs.ts"; // M12 — s
 import { deleteManualIngestHandler } from "./bff/bff-ingest-delete.ts"; // exclusão de upload/colar manual
 import { saudeHandler } from "./bff/bff-saude.ts"; // saúde real: sono + armazenamento + fila por status
 import { lixeiraHandler, restaurarHandler } from "./bff/bff-lixeira.ts"; // lixeira de páginas (ver + restaurar)
-// M21/S3 — fontes com receita + fila de revisão (regra de ouro). Handlers PUROS; o BFF só roteia.
+// M21/S3 — fontes com filtro + fila de revisão (regra de ouro). Handlers PUROS; o BFF só roteia.
 import {
   listSourcesHandler, createSourceHandler, updateSourceHandler, setSourceStatusHandler,
   listHypothesesHandler, hypothesesCountHandler, approveHypothesisHandler, discardHypothesisHandler,
@@ -1084,7 +1084,7 @@ export function startWebServer() {
             // chave do cliente daria asks grátis (claim vazio não debita, mas o LLM roda).
             const credit = await gateAndDebit(home, CREDIT_COST.ask, "ask", undefined, { onlyTopup: entAsk.onlyTopup });
             if (!credit.ok) return send(res, 402, creditDeniedBody(credit, CREDIT_COST.ask));
-            // M10/S2: handler enriquecido — { answer, citations (com selo), facts: FactItem[], gaps? }.
+            // M10/S2: handler enriquecido — { answer, citations (com status), facts: FactItem[], gaps? }.
             return send(res, 200, await askHandler(home, q, k ?? 8));
           }
           default:

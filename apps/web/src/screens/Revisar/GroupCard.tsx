@@ -14,7 +14,7 @@ import {
 } from "./logic";
 import type { HypothesisGroup, JudgeCalibrationSegment, Hypothesis } from "./types";
 
-/** Chip mono neutro da dimensão (mesma anatomia do DimensionChip do HypothesisCard — local). */
+/** Chip mono neutro do tipo (mesma anatomia do DimensionChip do HypothesisCard — local). */
 function DimensionChip({ dimension }: { dimension: string }) {
   if (!dimension) return null;
   return (
@@ -56,7 +56,7 @@ export function GroupCard(props: GroupCardProps): ReactElement {
   const rec = group.recomendacoes;
   const temRec = !!rec && rec.aprovar + rec.descartar + rec.humano > 0;
   const linhaAcerto = rotuloAcerto(segmento);
-  const temReceita = acoes.includes("receita");
+  const temFiltro = acoes.includes("filtro");
 
   return (
     <article
@@ -67,7 +67,7 @@ export function GroupCard(props: GroupCardProps): ReactElement {
         padding: "14px 16px",
       }}
     >
-      {/* 1 — linha-selo */}
+      {/* 1 — linha-status */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <StatusChip variant="hypo" size="sm" label="Grupo" />
         <DimensionChip dimension={group.dimension} />
@@ -138,10 +138,10 @@ export function GroupCard(props: GroupCardProps): ReactElement {
         }}
       >
         {acoes.map((acao) => {
-          if (acao === "receita") {
+          if (acao === "filtro") {
             return (
               <Button key={acao} size="sm" variant="primary" disabled={busy} onClick={() => onAcao(acao)}>
-                {`Adicionar "${group.dimension}" à receita e aprovar os ancorados`}
+                {`Adicionar "${group.dimension}" às regras e aprovar os ancorados`}
               </Button>
             );
           }
@@ -150,7 +150,7 @@ export function GroupCard(props: GroupCardProps): ReactElement {
               <Button
                 key={acao}
                 size="sm"
-                variant={temReceita ? "secondary" : "primary"}
+                variant={temFiltro ? "secondary" : "primary"}
                 disabled={busy}
                 onClick={() => onAcao(acao)}
               >

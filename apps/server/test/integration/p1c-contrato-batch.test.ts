@@ -21,7 +21,7 @@ const RECIPE = { fields: [{ dimension: "facts", label: "Fatos", area: "" }], gui
 const BODY = "A Accelera cobra R$ 30 mil por mês no plano enterprise.";
 
 function srcRow(id: string, status = "ativa"): SourceRow {
-  return { id, name: `Fonte ${id}`, channel: "upload", type: "nota", recipe: RECIPE,
+  return { id, name: `Fonte ${id}`, channel: "upload", type: "nota", filtro: RECIPE,
     default_sensitivity: "restrito", status, last_read_at: null };
 }
 

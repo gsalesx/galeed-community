@@ -12,7 +12,7 @@ import type { WizardPanel } from "./types";
 
 const LOGO_SRC = "/galeed-logo.png";
 
-/** ícone "nó" do mockup (fonte/receita + CTA fontes). */
+/** ícone "nó" do mockup (fonte/filtro + CTA fontes). */
 function NodeIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -85,7 +85,7 @@ export function Panel(props: {
       </div>
 
       <div className="pgroup">
-        <Pl label="Fontes e receitas" ok={sources.length ? String(sources.length) : null} />
+        <Pl label="Fontes e regras" ok={sources.length ? String(sources.length) : null} />
         {sources.length ? (
           <div className="pcard">
             {sources.map((f) => (
@@ -117,7 +117,7 @@ export function Panel(props: {
                     <path d="M8 11V7a4 4 0 0 1 8 0v4" />
                   </svg>
                 ) : (
-                  // alerta âmbar — a regra de ouro (hipótese espera revisão)
+                  // alerta âmbar — a regra de ouro (item pra revisar espera confirmação)
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"
@@ -135,7 +135,7 @@ export function Panel(props: {
           </div>
         ) : (
           <div className="pcard empty">
-            Sigilo padrão e o que fazer com o que a receita não reconhecer.
+            Sigilo padrão e o que fazer com o que as regras não reconhecerem.
           </div>
         )}
       </div>

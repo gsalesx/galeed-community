@@ -11,7 +11,7 @@
  *    id           ← FactItem não tem id estável → derivado determinístico de (slug|entity|predicate|
  *                   tier|valid_from|value) com prefixo "fact_". Estável entre chamadas p/ o mesmo fato.
  *    status       ← natureza/status interno (fato|hipotese|arquivado|registrado) → público
- *                   (fact|hypothesis|archived). "registrado"/desconhecido → "fact" (registro vira fato).
+ *                   (fact|hypothesis|archived). "sem prova" (`registrado`)/desconhecido → "fact" (vira fato).
  *    text         ← FactItem.text (conteúdo do fato; "" se vazio).
  *    confidence   ← FactItem.confidence (0–1). null se ausente (não fabrica 1.0).
  *    sensitivity  ← sensibilidade da PÁGINA-FONTE (publico|interno|sensivel|restrito) →
@@ -36,10 +36,10 @@ export interface SourcePageCtx {
 }
 
 /** status público desta rota (fase 1). hypothesis NÃO é prometido por /v1/facts (parte de
- *  dim:"decisions", que não contém hipóteses) — fica como roadmap. Ver publicStatus/LIMITAÇÕES. */
+ *  dim:"decisions", que não contém itens pra revisar) — fica como roadmap. Ver publicStatus/LIMITAÇÕES. */
 export type PublicStatus = "fact" | "archived";
 
-/** Selo público de uma fonte (o JSON exato de perguntar.astro / fatos.astro / conceitos.astro). */
+/** Status público de um fato (o JSON exato de perguntar.astro / fatos.astro / conceitos.astro). */
 export interface PublicFact {
   id: string;
   status: PublicStatus;
@@ -61,7 +61,7 @@ export interface PublicFact {
  *  independentemente do status interno. Sem valid_until (vigente) ou com valid_until no futuro ⇒
  *  "fact". O status interno "arquivado" também mapeia "archived" (consistência).
  *
- *  hypothesis NÃO é prometido por esta rota (dim:"decisions" não traz hipóteses) — "hipotese" e
+ *  hypothesis NÃO é prometido por esta rota (dim:"decisions" não traz itens pra revisar) — "hipotese" e
  *  qualquer desconhecido caem em "fact". Ver PublicStatus / contrato (fatos.astro).
  *
  *  LIMITAÇÃO/HONESTIDADE: claims 'nao-verificado' (quote NÃO ancorado na fonte — suspeitos de
@@ -95,9 +95,9 @@ export function publishable(facts: FactItem[]): FactItem[] {
   return facts.filter((f) => (f.status || "").toLowerCase() !== "nao-verificado");
 }
 
-/** Formato aceito pro parâmetro público `dim` do /v1/facts: nome de dimensão minúsculo (a..z,
- *  0-9, _), até 40 chars. NÃO é allowlist de valores — as dimensões reais são definidas por
- *  receita/pack do tenant (inclusive em PT: "decisoes", "compromissos"…), então validamos só o
+/** Formato aceito pro parâmetro público `dim` do /v1/facts: nome de tipo (`dimension`) minúsculo (a..z,
+ *  0-9, _), até 40 chars. NÃO é allowlist de valores — os tipos reais são definidos por
+ *  regras (`filtro`)/pack do tenant (inclusive em PT: "decisoes", "compromissos"…), então validamos só o
  *  FORMATO (o SQL a jusante é parametrizado; dim inexistente devolve [] honesto). */
 export const DIM_RE = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -140,7 +140,7 @@ function nullIfEmpty(v: string | undefined): string | null {
   return v && v.length ? v : null;
 }
 
-/** Traduz UM FactItem interno + o contexto da página-fonte para o selo PÚBLICO. Função pura.
+/** Traduz UM FactItem interno + o contexto da página-fonte para o status PÚBLICO. Função pura.
  *  `asOf` (opcional, do /v1/facts?as_of=) é o ponto temporal usado pra decidir se o fato está
  *  SUPERADO (valid_until < asOf → archived); ausente = hoje. */
 export function toPublicFact(f: FactItem, page: SourcePageCtx | undefined, asOf?: string): PublicFact {

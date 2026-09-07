@@ -1,7 +1,7 @@
 /** M24-A — tipos do signal-engine (BRIEF M24 §3, D1–D3 + priorizador). PURO: zero imports do
  *  projeto, zero IO, zero LLM. Todo limiar é SignalConfig com default (invariante III/ADR-002
  *  — nada de número mágico espalhado; os defaults "compromisso"/"prazo" são a convenção M23-C,
- *  que é DADO de receita, por isso configuráveis). */
+ *  que é DADO das regras (`filtro`), por isso configuráveis). */
 
 /** Referência ESTÁVEL a um fato-base. galeed_facts.id (bigserial) NÃO é estável — a
  *  re-derivação (write-path incremental do M14) faz DELETE+INSERT e troca
@@ -46,7 +46,7 @@ export interface Signal {
   numeros: Record<string, number>;
   janela: SignalWindow;
   /** 1 linha PT determinística com os números (templates exatos em §2.3-§2.5). NÃO é a
-   *  verbalização LLM do M24-C — é o fallback/selo imprimível do detector. */
+   *  verbalização LLM do M24-C — é o fallback/status imprimível do detector. */
   resumo: string;
 }
 
@@ -87,7 +87,7 @@ export interface SignalConfig {
     refRatio: number;         // (gap/mediana − 1) ÷ refRatio = efeito (clamp 0..1)
   };
   d3: {
-    predicado: string;        // predicado FIXO da classe compromisso (M23-C — DADO de receita)
+    predicado: string;        // predicado FIXO da classe compromisso (M23-C — DADO das regras (`filtro`))
     metaPrazo: string;        // chave do prazo em meta (M23-C: "prazo")
     metaConcluido: string;    // seam forward-compat: meta[chave] truthy → compromisso fechado
     refDias: number;          // diasVencidos ÷ refDias = efeito (clamp 0..1)
@@ -142,7 +142,7 @@ export interface SignalFact {
   valid_from: string;
   valid_to: string;   // "" = vigente
   confidence: number;
-  status: string;     // "fato" | "registrado" | ...
+  status: string;     // "fato" | "registrado" (sem prova) | ...
   source_slug: string;
   meta: any;          // item cru da extração (jsonb) — M23-C: prazo/com_quem viajam aqui
 }

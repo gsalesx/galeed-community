@@ -1,4 +1,4 @@
-/** FIX-A/BUG 1 (lado wizard): a receita NASCE das dims REAIS do tipo EFETIVO (mesmo funil
+/** FIX-A/BUG 1 (lado wizard): o filtro NASCE das dims REAIS do tipo EFETIVO (mesmo funil
  *  resolveTipo da captura/extração), NUNCA do nome da fonte. A IA não inventa dim (vocabulário
  *  fechado): dim fora do vocabulário é DROPADA com rastro. Funções puras — sem DB, sem IA. */
 // IA desligada + pack-env global isolado ANTES dos imports que cacheiam pack.
@@ -17,7 +17,7 @@ import { resolveTipo } from "../../src/core/platform/brain.ts";
 import { DEFAULT_EXTRACT_DIMS } from "../../src/core/extraction/extractable.ts";
 import { clearSchemaPackCache } from "../../src/core/extraction/schema-pack.ts";
 
-const PACK_FIXTURE = new URL("./fixtures/wizard-receita-pack-fixa-motor.json", import.meta.url).pathname;
+const PACK_FIXTURE = new URL("./fixtures/wizard-filtro-pack-fixa-motor.json", import.meta.url).pathname;
 
 function draft(over: Partial<WizardDraft> = {}): WizardDraft {
   return {
@@ -79,7 +79,7 @@ describe("FIX-A/§6.2-b — realRecipeDims resolve dims do tipo EFETIVO, nunca d
 });
 
 describe("FIX-A/§6.2-d/e — mergeSourcesIntoDraft com IA: dim inventada DROPADA, IA só enriquece", () => {
-  it("(d) IA emite 'mensagens_whatsapp' (eco do nome) → DROPADA; receita = dims reais", () => {
+  it("(d) IA emite 'mensagens_whatsapp' (eco do nome) → DROPADA; filtro = dims reais", () => {
     clearSchemaPackCache();
     const d = draft();
     const ai = {
@@ -94,7 +94,7 @@ describe("FIX-A/§6.2-d/e — mergeSourcesIntoDraft com IA: dim inventada DROPAD
     };
     const added = mergeSourcesIntoDraft(d, "", ai);
     expect(added).toEqual(["Mensagens WhatsApp"]);
-    const fields = d.sources[0].recipe.fields;
+    const fields = d.sources[0].filtro.fields;
     expect(fields.map((f) => f.dimension)).toEqual(DEFAULT_EXTRACT_DIMS);
     expect(fields.some((f) => f.dimension === "mensagens_whatsapp")).toBe(false);
   });
@@ -113,7 +113,7 @@ describe("FIX-A/§6.2-d/e — mergeSourcesIntoDraft com IA: dim inventada DROPAD
       ],
     };
     mergeSourcesIntoDraft(d, "", ai);
-    const fields = d.sources[0].recipe.fields;
+    const fields = d.sources[0].filtro.fields;
     expect(fields.map((f) => f.dimension)).toEqual(DEFAULT_EXTRACT_DIMS);
     const facts = fields.find((f) => f.dimension === "facts")!;
     expect(facts.label).toBe("Fatos do negócio");
@@ -125,10 +125,10 @@ describe("FIX-A/§6.2-d/e — mergeSourcesIntoDraft com IA: dim inventada DROPAD
 });
 
 describe("FIX-A/§6.2-f — degrade sem IA (toggle/free-text): makeSourceDraft", () => {
-  it("makeSourceDraft('Calls de vendas') → recipe.fields = DEFAULT_EXTRACT_DIMS", () => {
+  it("makeSourceDraft('Calls de vendas') → filtro.fields = DEFAULT_EXTRACT_DIMS", () => {
     clearSchemaPackCache();
     const s = makeSourceDraft("Calls de vendas", draft());
-    expect(s.recipe.fields.map((f) => f.dimension)).toEqual(DEFAULT_EXTRACT_DIMS);
+    expect(s.filtro.fields.map((f) => f.dimension)).toEqual(DEFAULT_EXTRACT_DIMS);
   });
 
   it("mergeSourcesIntoDraft degrade (ai=null) parseia nome e usa dims reais", () => {
@@ -136,6 +136,6 @@ describe("FIX-A/§6.2-f — degrade sem IA (toggle/free-text): makeSourceDraft",
     const d = draft();
     const added = mergeSourcesIntoDraft(d, "WhatsApp", null);
     expect(added).toContain("WhatsApp");
-    expect(d.sources[0].recipe.fields.map((f) => f.dimension)).toEqual(DEFAULT_EXTRACT_DIMS);
+    expect(d.sources[0].filtro.fields.map((f) => f.dimension)).toEqual(DEFAULT_EXTRACT_DIMS);
   });
 });

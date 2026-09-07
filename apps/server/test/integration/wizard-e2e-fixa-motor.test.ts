@@ -1,7 +1,7 @@
 /** FIX-A/BUG 1 — GATE E2E do wizard, fim a fim e determinístico: brain criado via wizard (degrade,
- *  sem IA) → fonte com receita = dims REAIS → captura página real sob a fonte → extração emite
- *  EXATAMENTE as dims que a receita conhece (por construção: o mock devolve claims nas dims do
- *  próprio tool.required) → 0 fora_da_receita → fatos NASCEM. DB real :5434 + llm.ts mocado. */
+ *  sem IA) → fonte com regras = dims REAIS → captura página real sob a fonte → extração emite
+ *  EXATAMENTE as dims que as regras conhecem (por construção: o mock devolve claims nas dims do
+ *  próprio tool.required) → 0 fora_do_filtro → fatos NASCEM. DB real :5434 + llm.ts mocado. */
 // IA desligada no wizard (degrade determinístico) + pack-env global isolado ANTES dos imports.
 process.env.GALEED_PROVIDER = "";
 process.env.GALEED_SCHEMA_PACK = "";
@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { hasDb, wipeBrain, rawConnect } from "./helpers/db.ts";
 
 // mock de structured: devolve claims NAS DIMS que o tool.input_schema.required declara (por
-// construção — o que o tool emite, a receita conhece) com context_quote verbatim do corpo.
+// construção — o que o tool emite, as regras conhecem) com context_quote verbatim do corpo.
 const mock = vi.hoisted(() => ({ tool: null as any, body: "" }));
 vi.mock("../../src/lib/llm.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/lib/llm.ts")>();
@@ -21,7 +21,7 @@ vi.mock("../../src/lib/llm.ts", async (importOriginal) => {
       mock.tool = args?.tool ?? null;
       const dims: string[] = args?.tool?.input_schema?.required ?? args?.dims ?? [];
       const out: Record<string, any[]> = {};
-      // 1 claim REGISTRADO por dim (sem entity/predicate → registrado), com quote verbatim do corpo.
+      // 1 claim sem prova por dim (sem entity/predicate → registrado), com quote verbatim do corpo.
       for (const d of dims) {
         out[d] = [{ text: `observação de ${d}`, context_quote: "Kelvin usa Claude Code no dia a dia da operação" }];
       }
@@ -70,7 +70,7 @@ describe.skipIf(!hasDb())("FIX-A/BUG 1 — gate E2E do wizard (DB real, LLM moca
     await closeAccounts();
   });
 
-  it("brain do wizard → captura real → extração → 0 fora_da_receita → fatos NASCEM", async () => {
+  it("brain do wizard → captura real → extração → 0 fora_do_filtro → fatos NASCEM", async () => {
     clearSchemaPackCache();
     // 1. wizard: purpose → areas → sources (toggle 'Calls de vendas') → go → sensitivity → review
     let t: WizardTurn = await wizardStart();
@@ -90,12 +90,12 @@ describe.skipIf(!hasDb())("FIX-A/BUG 1 — gate E2E do wizard (DB real, LLM moca
     const r = await wizardConfirm(ACCT, { state: t.state });
     expect(r.brain.id).toBe(BRAIN);
 
-    // assert: receita da fonte = DEFAULT_EXTRACT_DIMS; pack tem AMBAS as chaves (source.type E efetiva).
+    // assert: regras da fonte = DEFAULT_EXTRACT_DIMS; pack tem AMBAS as chaves (source.type E efetiva).
     const e = await getEngine(BRAIN);
     const srcs = await e.listSources();
     expect(srcs.length).toBe(1);
     const source = srcs[0];
-    const recipeDims = source.recipe.fields.map((f) => f.dimension);
+    const recipeDims = source.filtro.fields.map((f) => f.dimension);
     // criacao-de-fatos #8: "action_items" entrou no DEFAULT_EXTRACT_DIMS (compromisso é universal).
     expect(recipeDims).toEqual(["facts", "decisions", "action_items", "entities", "open_questions", "quotes"]);
 
@@ -121,13 +121,13 @@ describe.skipIf(!hasDb())("FIX-A/BUG 1 — gate E2E do wizard (DB real, LLM moca
     // page.type = funil EFETIVO (resolveTipo) — capture.ts:36
     expect(page.type).toBe(effectiveExtractType(source.type));
 
-    // 3. extração (mock emite claims nas dims do tool.required = o que a receita conhece)
+    // 3. extração (mock emite claims nas dims do tool.required = o que as regras conhecem)
     await extractOne(BRAIN, page);
 
-    // 4. GATE: 0 itens fora_da_receita; extrações aprovadas; fatos NASCEM
+    // 4. GATE: 0 itens fora_do_filtro; extrações aprovadas; fatos NASCEM
     const pend = await e.listReview({ status: "pendente", limit: 999 });
-    const foraReceita = pend.filter((p) => p.reason === "fora_da_receita");
-    expect(foraReceita.length).toBe(0);
+    const foraFiltro = pend.filter((p) => p.reason === "fora_do_filtro");
+    expect(foraFiltro.length).toBe(0);
 
     const ex = await e.getExtraction(slug);
     const totalClaims = Object.values(ex!.extractions ?? {}).reduce((n, arr: any) => n + (Array.isArray(arr) ? arr.length : 0), 0);

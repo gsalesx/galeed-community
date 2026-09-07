@@ -91,18 +91,18 @@ export interface ExtractionRow {
   extractions: any; // { dimension: item[] }
 }
 
-/** Um campo da receita: a dimensão de extração reconhecida + área destino. `dimension` referencia
- *  `extractable[type].eval_dimensions` (M13) ou as DEFAULT_EXTRACT_DIMS — a receita ESPECIALIZA o
+/** Um campo do filtro: a dimensão de extração reconhecida + área destino. `dimension` referencia
+ *  `extractable[type].eval_dimensions` (M13) ou as DEFAULT_EXTRACT_DIMS — o filtro ESPECIALIZA o
  *  extractable, nunca o substitui (ADR-016). */
-export interface SourceRecipeField {
+export interface SourceFilterField {
   dimension: string; // chave da dimensão (ex.: "decisoes") — ⊆ dims do extractable do tipo
   label: string;     // rótulo legível pro front ("decisão tomada"). Cosmético.
   area: string;      // slug da área destino ("produto"). "" = sem área.
 }
 
-/** Receita de uma fonte — 100% DADO (jsonb). O core nunca ramifica por formato/canal. */
-export interface SourceRecipe {
-  fields: SourceRecipeField[];
+/** Filtro de uma fonte — 100% DADO (jsonb). O core nunca ramifica por formato/canal. */
+export interface SourceFilter {
+  fields: SourceFilterField[];
   /** orientação extra pro prompt de extração (entra via seam do S2). "" / ausente = sem extra. */
   guidance?: string;
   /** chave do perfil de triagem M15 ("default" | "<canal>:<tipo>"). ""/ausente = resolução padrão. */
@@ -116,7 +116,7 @@ export interface SourceRow {
   name: string;                // nome legível da fonte (dado do tenant)
   channel: string;             // canal de ingestão v1: "upload" | "paste"
   type: string;                // tipo de página (casa com page.type / extractable[type])
-  recipe: SourceRecipe;
+  filtro: SourceFilter;
   default_sensitivity: string; // SensitivityLevel; default 'restrito' (falha-fechado)
   status: string;              // 'ativa' | 'pausada'
   last_read_at: string | null; // ISO; atualizado por touchSourceRead
@@ -125,10 +125,10 @@ export interface SourceRow {
   facts_count?: number;        // só na LEITURA — galeed_facts.source_id = id
 }
 
-export type ReviewReason = "fora_da_receita" | "nao_ancorado" | "entidade_vaga" | "conexao_sugerida";
+export type ReviewReason = "fora_do_filtro" | "nao_ancorado" | "entidade_vaga" | "conexao_sugerida";
 export type ReviewStatus = "pendente" | "aprovada" | "descartada";
 
-/** Item da fila de revisão: um claim extraído que NÃO casou com a receita (regra de ouro, M21).
+/** Item da fila de revisão: um claim extraído que NÃO casou com o filtro (regra de ouro, M21).
  *  Nunca deletado — descartar muda status (invariante #5). */
 export interface ReviewItemRow {
   id: string;          // uuid (gerado por quem cria — S2)
@@ -230,7 +230,7 @@ export interface GraphQueryHit {
   valid_to: string; // "" = vigente
 }
 
-/** Hipótese gerada pelo SONHO (dream) — substitui hipoteses/<slug>.md. */
+/** Item pra revisar gerado pelo SONHO (dream) — substitui hipoteses/<slug>.md. */
 export interface HypothesisRow {
   slug: string;
   a: string;
@@ -617,7 +617,7 @@ export interface UsageStore {
   recentLlmUsage(limit?: number): Promise<LlmUsageRow[]>;
 }
 
-/** Store de FONTES (`galeed_sources`) — M21. Fonte é DADO; receita em jsonb. */
+/** Store de FONTES (`galeed_sources`) — M21. Fonte é DADO; filtro em jsonb. */
 export interface SourceStore {
   upsertSource(row: SourceRow): Promise<void>;
   getSource(id: string): Promise<SourceRow | undefined>;
@@ -654,7 +654,7 @@ export interface PercepcaoCite {
 
 export type PercepcaoEstado = "viva" | "stale" | "arquivada";
 
-/** Uma PERCEPÇÃO da reflexão v2 (M24-C): texto verbalizado VERIFICADO + proveniência + selo. */
+/** Uma PERCEPÇÃO da reflexão v2 (M24-C): texto verbalizado VERIFICADO + proveniência + status. */
 export interface PercepcaoRow {
   id: string;                       // hash determinístico do sinal (percepcaoId/combinacaoId — §2.3)
   classe: string;                   // SignalClasse | "combinacao"
@@ -664,7 +664,7 @@ export interface PercepcaoRow {
   texto: string;                    // 2-4 frases PT, aprovadas pelo verificador de âncora
   severidade: "alta" | "media" | "baixa" | "info";
   cites: PercepcaoCite[];           // jsonb — NUNCA vazio numa percepção de fato (nasce ancorada)
-  numbers: Record<string, number | string>; // números do detector + magnitude (o selo)
+  numbers: Record<string, number | string>; // números do detector + magnitude (o status)
   estado: PercepcaoEstado;
   created_at?: string;              // preenchido pelo banco
   validated_at?: string | null;     // última validação (nascimento/revalidação)

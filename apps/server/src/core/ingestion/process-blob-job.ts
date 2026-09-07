@@ -37,9 +37,9 @@ import type { ExtractionContext, ExtractionUnit } from "../extraction/extract.ts
 import { buildEmbeddings } from "../retrieval/embeddings.ts";
 import { getEngine } from "../platform/engine.ts";
 import type { PageRow, SourceRow } from "../platform/engine.ts";
-// M21/S2 — a REGRA DE OURO (ADR-016): gate puro PÓS-extração (receita reconhece+ancora → fato carimbado;
-// resto → fila de revisão) + guidance da receita no prompt. Job SEM sourceId ⇒ pass-through byte-idêntico.
-import { applyRecipeGate, recipeGuidance, addReviewItemsAndNotify } from "./golden-rule.ts";
+// M21/S2 — a REGRA DE OURO (ADR-016): gate puro PÓS-extração (regras reconhecem+ancoram → fato;
+// resto → fila pra revisar) + guidance das regras no prompt. Job SEM sourceId ⇒ pass-through byte-idêntico.
+import { applyFilterGate, filterGuidance, addReviewItemsAndNotify } from "./golden-rule.ts";
 import { slugify } from "../../lib/slug.ts";
 
 /** Callback de progresso PURO (0..1 + mensagem). O worker (S4) o liga a updateJobProgress.
@@ -114,12 +114,12 @@ export async function processBlobJob(
     throw new Error(`a fonte "${source.name}" está pausada — retome a leitura pra ingerir.`);
   // tags do CONTRATO: src:<id> + canal:<channel da fonte> (B10 — a proveniência de canal chega à
   // página; `fonte:paste|upload` segue sendo o MECANISMO de entrada, intocado: repair/triagem
-  // dependem dele) + áreas DISTINTAS da receita como area:<slug>.
+  // dependem dele) + áreas DISTINTAS do filtro como area:<slug>.
   const sourceTags = source
     ? [
         `src:${source.id}`,
         ...(source.channel?.trim() ? [`canal:${slugify(source.channel)}`] : []),
-        ...[...new Set(source.recipe.fields.map((f) => (f.area || "").trim()).filter(Boolean))].map(
+        ...[...new Set(source.filtro.fields.map((f) => (f.area || "").trim()).filter(Boolean))].map(
           (a) => `area:${slugify(a)}`,
         ),
       ]
@@ -324,10 +324,10 @@ async function selectWorthy(
     // sem LLM) via classify (DESIGN-SPEC §2, caminho (a)): perfil específico SÓ quando classify.confident.
     const confident = classify(page.body, { source: channel, type: page.type }).confident;
     // perfil resolvido UMA vez por página (canal + tipo + confiança) — não por unit (evita N leituras de config).
-    // M21/S2 — fonte com `recipe.triage_profile` não-vazio: o perfil resolve pela CHAVE da fonte
+    // M21/S2 — fonte com `filtro.triage_profile` não-vazio: o perfil resolve pela CHAVE da fonte
     // (`<canal-da-fonte>:<tipo-da-fonte>`, mecanismo M15 existente — confident=true porque o tenant
     // DECLAROU; nada de mecanismo novo). Sem fonte/sem triage_profile ⇒ resolução idêntica à de hoje.
-    const profile = source?.recipe?.triage_profile
+    const profile = source?.filtro?.triage_profile
       ? await resolveTriageProfile(job.brain, source.channel, source.type, true)
       : await resolveTriageProfile(job.brain, channel, page.type, confident);
 
@@ -351,12 +351,12 @@ async function selectWorthy(
     // Página com ≥1 unit worthy: monta o ctx 1×/página (S1) e entra no worthyByPage (consumido pelo caminho
     // sync OU batch). Página com 0 worthy → NÃO entra (sem ctx, sem chamada; segue encontrável da Fase A).
     if (worthy.length > 0) {
-      // M21/S2 — com fonte, a RECEITA orienta o prompt (seam aditivo do extract.ts §4); sem fonte,
-      // overrides ausentes ⇒ ctx byte-idêntico ao M20. As dims NÃO mudam (a receita não amputa).
+      // M21/S2 — com fonte, as regras orientam o prompt (seam aditivo do extract.ts §4); sem fonte,
+      // overrides ausentes ⇒ ctx byte-idêntico ao M20. Os tipos NÃO mudam (as regras não amputam).
       const ctx = await buildExtractionContext(
         job.brain,
         page,
-        source ? { guidance: recipeGuidance(source.recipe) } : undefined,
+        source ? { guidance: filterGuidance(source.filtro) } : undefined,
       ); // 1×/página (tool/dims/provider/blocos)
       worthyByPage.push({ page, ctx, units: worthy.map((x) => x.unit) });
     }
@@ -428,14 +428,14 @@ async function extractWorthyUnitsSync(
       if (unit.date) lastDate = unit.date;
     }
     // M21/S2 — REGRA DE OURO (ADR-016): gate PURO pós-extração ANTES do putExtraction. Sem fonte ⇒
-    // recipe=null ⇒ pass-through byte-idêntico (approved = merged, zero itens na fila). Rejeitados NUNCA
+    // filtro=null ⇒ pass-through byte-idêntico (approved = merged, zero itens na fila). Rejeitados NUNCA
     // somem em silêncio: viram linha em galeed_ingest_review + log estruturado (espelho do [triage-skip]).
-    const gate = applyRecipeGate(merged, source?.recipe ?? null, source?.id ?? "", page.slug, page.body);
+    const gate = applyFilterGate(merged, source?.filtro ?? null, source?.id ?? "", page.slug, page.body);
     // C2 — review.pending: addReviewItemsAndNotify substitui o addReviewItems cru (storage + webhook
     // agregado por reason). Fail-soft: a emissão nunca derruba a ingestão (a regra de ouro garante).
     if (gate.rejected.length) await addReviewItemsAndNotify(job.brain, gate.rejected);
     console.log(
-      `[recipe-gate] brain=${job.brain} page=${page.slug} approved=${gate.counts.approved} ` +
+      `[filtro-gate] brain=${job.brain} page=${page.slug} approved=${gate.counts.approved} ` +
         `rejected=${gate.counts.rejected} source=${source?.id ?? "-"}`,
     );
     await e.putExtraction({
@@ -479,7 +479,7 @@ async function extractWorthyUnits(
     await markJobBatchSubmitted(job.id, handle.id, customMap); // S2 — RESUMÍVEL via batch_id persistido
     await report(0.55, `digestão em lote enviada (${requests.length} chamadas)…`);
     return "batch_submitted"; // ← processBlobJob RETORNA sem derivar (harvest do S4 re-resolve a fonte
-    // pelo batch_id e aplica o MESMO applyRecipeGate antes do putExtraction — LEI II preservada)
+    // pelo batch_id e aplica o MESMO applyFilterGate antes do putExtraction — LEI II preservada)
   }
 
   // 3) FALLBACK SÍNCRONO (M15 intacto).

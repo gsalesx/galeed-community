@@ -78,7 +78,7 @@ const response = `{
   id="perguntar"
   ix="08"
   title="Perguntar"
-  intro="A leitura principal. Você pergunta em português e recebe uma síntese mais os fatos que a sustentam, cada um carimbado com a fonte."
+  intro="A leitura principal. Você pergunta em português e recebe uma síntese mais os fatos que a sustentam, cada um com a fonte."
 >
   <Endpoint method="post" path="/ask" scope="filtrado pelo escopo" scopeIcon="search" />
 
@@ -95,12 +95,12 @@ const response = `{
   <div class="prose">
     <p>
       A resposta traz três coisas: a <code class="ic">answer</code> (a síntese pronta pra ler),
-      a lista <code class="ic">facts</code> (cada fato com o selo completo que o sustenta) e
+      a lista <code class="ic">facts</code> (cada fato com o status completo que o sustenta) e
       <code class="ic">withheld</code> (quantos fatos ficaram de fora do seu acesso).
     </p>
   </div>
 
-  <CodeBlock lang="json" filename="resposta · síntese + selos" code={response} />
+  <CodeBlock lang="json" filename="resposta · síntese + status" code={response} />
 
   <Admonition type="note" flush>
     <b>O campo <code class="ic">withheld</code> é honestidade, não erro.</b> Quando o escopo da

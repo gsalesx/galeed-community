@@ -303,14 +303,14 @@ export function derivePageFacts(
           !textValueIsAnchored(value, bodyBySlug.get(ex.source_slug) || "");
         // ── M23-B/LEI II: fato sem dono claro NÃO é fato. ──────────────────────────────
         // CADEIA DE GATES (ordem CRAVADA M23-B — motivo mais ESPECÍFICO primeiro):
-        //   1. fora_da_receita (só no gate M21) → 2. entidade_vaga → 3. nao_ancorado/C4
+        //   1. fora_do_filtro (só no gate M21) → 2. entidade_vaga → 3. nao_ancorado/C4
         //   (evidência NENHUMA) → 4. nao_ancorado/ancoragem (evidência não confere).
         // Entidade pronominal/genérica (lista tenant-neutra de LÍNGUA — src/lib/vague-entity.ts)
         // que NÃO resolveu pelo entityMap (a canonicalização já rodou acima) → nunca 'fato'.
         // Exceção ÚNICA: marcador review='aprovada' (posto por approveReviewItem — decisão
         // humana da fila M21; o humano É o resolvedor do referente). A exceção NUNCA se aplica
         // à ancoragem (grounded/numAnchored/semEvidencia continuam mandando — aprovação não
-        // inventa âncora). ESPELHADO no golden-rule (applyRecipeGate) SEM a exceção (lá o
+        // inventa âncora). ESPELHADO no golden-rule (applyFilterGate) SEM a exceção (lá o
         // claim é PRÉ-decisão) — mudou aqui, muda LÁ JUNTO (mesma disciplina do C4/fix-1).
         const entidadeVaga = hasTriple && it?.review !== "aprovada" && entityIsVague(entity);
         const anchored = grounded && numAnchored && !semEvidencia && !entidadeVaga; // S3 + C4 + M23-B

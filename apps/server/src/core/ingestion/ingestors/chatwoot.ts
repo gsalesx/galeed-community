@@ -63,7 +63,7 @@ export const chatwootIngestor: Ingestor = {
       name: "Chatwoot",
       channel: "chatwoot",
       type: "conversa",
-      recipe: { fields: [] },
+      filtro: { fields: [] },
     };
   },
 

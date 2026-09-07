@@ -1,7 +1,7 @@
 /** M24-A · D3 — compromisso vencido (BRIEF §3-D3): join determinístico sobre a classe M23-C.
- *  Shape REAL (docs/M23-receitas-nao-numericas-CONVENCAO.md, verificado no gate
- *  test/integration/m23c-receitas-fila.test.ts): predicate FIXO "compromisso" (vem da
- *  RECEITA), entity = quem se comprometeu, value = o que prometeu, valid_from = quando
+ *  Shape REAL (docs/M23-filtros-nao-numericas-CONVENCAO.md, verificado no gate
+ *  test/integration/m23c-filtros-fila.test.ts): predicate FIXO "compromisso" (vem das
+ *  regras), entity = quem se comprometeu, value = o que prometeu, valid_from = quando
  *  COMBINOU, e o PRAZO viaja em meta.prazo (ISO, só quando ancorável no texto) — derivePageFacts
  *  grava o item cru inteiro em galeed_facts.meta. Os nomes "compromisso"/"prazo"/"concluido"
  *  são config com default (são convenção de DADO, não literal de core).

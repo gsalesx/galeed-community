@@ -1,8 +1,8 @@
 /** M8 — Tela Painel (Início). O console do dia a dia.
  *  Spec: specs/slots/M8/_design/painel.md · tokens: _design/00-foundation.md
  *
- *  Mostra que o cérebro está vivo e organizando sozinho: saudação + slug do tenant,
- *  banner FTS condicional, 4 KPIs (/api/stats), "Organizando agora" (dois tempos),
+ *  Mostra que o cérebro está vivo e processando sozinho: saudação + slug do tenant,
+ *  banner FTS condicional, 4 KPIs (/api/stats), "Processando agora" (dois tempos),
  *  feed "O que entrou", AskCard (atalho → /app/perguntar), e a assinatura
  *  "Última busca" com o componente Seal (hits reais de /api/retrieve).
  *
@@ -53,7 +53,7 @@ export default function Painel() {
   // --- dados ----------------------------------------------------------------
   const stats = useQuery<Stats>("painel:stats", (signal) => fetchStats(signal), [current?.id]);
   const graph = useQuery("painel:graph-top", (signal) => fetchGraphTop(signal), [current?.id]);
-  // fila de ingestão REAL (mesmo endpoint da tela Adicionar) — alimenta "Organizando agora"
+  // fila de ingestão REAL (mesmo endpoint da tela Adicionar) — alimenta "Processando agora"
   // e "O que entrou". Re-consulta a cada 5s enquanto o Painel está aberto.
   const jobs = useQuery<IngestJob[]>("painel:jobs", () => api.ingest.jobs(), [current?.id]);
   useEffect(() => {
@@ -120,10 +120,10 @@ export default function Painel() {
             {slug ? (
               <>
                 O cérebro <b className="mono" style={{ color: "var(--muted)" }}>{slug}</b> está vivo e
-                organizando sozinho.
+                processando sozinho.
               </>
             ) : (
-              "O cérebro está vivo e organizando sozinho."
+              "O cérebro está vivo e processando sozinho."
             )}
           </p>
         </div>
@@ -151,7 +151,7 @@ export default function Painel() {
       {/* ERRO de stats — banner útil, mantém o resto navegável --------------- */}
       {stats.error && <ErrorBanner message="Não consegui carregar os números do cérebro." onRetry={stats.refetch} />}
 
-      {/* CÉREBRO NOVO / VAZIO → CTA de onboarding (substitui grid + selo) ---- */}
+      {/* CÉREBRO NOVO / VAZIO → CTA de onboarding (substitui grid + status) ---- */}
       {isEmptyBrain ? (
         <EmptyBrainCta onStart={() => navigate("/app/adicionar")} />
       ) : (
@@ -171,7 +171,7 @@ export default function Painel() {
               : (
                   <>
                     <KpiTile label="Coisas que você jogou" value={fmtNumber(stats.data?.pages)} />
-                    <KpiTile label="Fatos organizados" value={fmtNumber(stats.data?.facts)} />
+                    <KpiTile label="Fatos" value={fmtNumber(stats.data?.facts)} />
                     <KpiTile label="Conexões entre coisas" value={fmtNumber(stats.data?.edges)} />
                     {/* entidades: derivado do grafo (nº de nós). oculta se a API não der. */}
                     {graph.data != null && (
@@ -356,7 +356,7 @@ function EmptyBrainCta({ onStart }: { onStart: () => void }) {
         Seu cérebro está pronto pra começar
       </h2>
       <p className="muted" style={{ fontSize: 15, lineHeight: 1.5, marginBottom: 22 }}>
-        Você joga as coisas dentro. Ele organiza sozinho. Aí é só perguntar.
+        Você joga as coisas dentro. Ele processa sozinho. Aí é só perguntar.
       </p>
       <Button variant="primary" icon={<Icon name="plus" size={15} />} onClick={onStart}>
         Jogar algo dentro
@@ -365,7 +365,7 @@ function EmptyBrainCta({ onStart }: { onStart: () => void }) {
   );
 }
 
-// --- 5a. Organizando agora (dois tempos: fila → fato) ----------------------
+// --- 5a. Processando agora (dois tempos: fila → fato) ----------------------
 
 function OrganizandoAgora({
   facts,
@@ -391,7 +391,7 @@ function OrganizandoAgora({
                 animation: "skeleton-pulse 1.6s ease-in-out infinite",
               }}
             />
-            Organizando agora
+            Processando agora
           </span>
           <span className="mono faint" style={{ fontSize: 11 }}>
             tempo real
@@ -404,7 +404,7 @@ function OrganizandoAgora({
         <Stage
           colorVar="--st-reg"
           value={loading ? null : fila}
-          label="na fila pra organizar"
+          label="na fila pra processar"
           honest="nada na fila agora"
         />
         <span aria-hidden style={{ color: "var(--faint)" }}>
@@ -665,7 +665,7 @@ function AskCard({
 }
 
 
-// --- 6. Última busca + selo (assinatura do produto) ------------------------
+// --- 6. Última busca + status (assinatura do produto) ------------------------
 
 function UltimaBusca({
   query,
@@ -743,7 +743,7 @@ function UltimaBusca({
   );
 }
 
-/** Mapeia o hit do retrieve para o shape de selo do componente Ui. */
+/** Mapeia o hit do retrieve para o shape de status (`Selo`) do componente Ui. */
 function toUiSelo(h: RetrieveHit): UiSelo {
   const s = h.selo;
   return {
@@ -791,8 +791,8 @@ function EmptySearch({ onSuggest, query }: { onSuggest: () => void; query: strin
 function Legend() {
   const items: Array<{ label: string; hint: string; dot: string }> = [
     { label: "Fato", hint: "confirmado", dot: "var(--st-fact)" },
-    { label: "Hipótese", hint: "ainda um palpite", dot: "var(--st-hypo)" },
-    { label: "Organizando", hint: "chegando agora", dot: "var(--st-reg)" },
+    { label: "Pra revisar", hint: "ainda sem confirmação", dot: "var(--st-hypo)" },
+    { label: "Processando", hint: "chegando agora", dot: "var(--st-reg)" },
     { label: "Arquivado", hint: "guardado", dot: "var(--st-arch)" },
   ];
   return (

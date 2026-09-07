@@ -37,7 +37,7 @@ const BODY = "ata da call: o preço ficou em 5000 por mês, conforme combinado c
 
 const SOURCE: SourceRow = {
   id: SRC, name: "Fonte Reextract", channel: "upload", type: "nota",
-  recipe: { fields: [{ dimension: "decisions", label: "Decisões", area: "" }], guidance: "" },
+  filtro: { fields: [{ dimension: "decisions", label: "Decisões", area: "" }], guidance: "" },
   default_sensitivity: "restrito", status: "ativa", last_read_at: null,
 };
 

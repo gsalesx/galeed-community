@@ -5,7 +5,7 @@
  *   - Adamic-Adar (Σ 1/ln grau) + Resource Allocation (Σ 1/grau): vizinho RARO em comum vale
  *     mais que hub; score = média das normalizações (calibrado no corpus — ver DESIGN-SPEC §2.1.3);
  *   - cap por grau (hub não vira ponta de par) + anti-hub estrutural (≥1 justificativa não-hub);
- *   - comunidades por label propagation DETERMINÍSTICO (sinal informativo — NÃO vira hipótese);
+ *   - comunidades por label propagation DETERMINÍSTICO (sinal informativo — NÃO vai pra revisar);
  *   - destino: fila de revisão M21 (motivo 'conexao_sugerida', id determinístico por par —
  *     re-sono não duplica); aprovar → ARESTA tipada no entityGraph, NUNCA fato (LEI III).
  *  100% determinístico — ZERO LLM (LEI I). NOOP é saída válida (LEI VI). */
@@ -17,7 +17,7 @@ import { getEngine, type GraphData, type ReviewItemRow } from "../platform/engin
 export const DREAM_DEFAULTS = {
   maxDegree: 60,     // grau > maxDegree ⇒ HUB: não vira ponta de par nem justificativa única
   minShared: 2,      // mínimo de vizinhos em comum pra um par ser candidato
-  topK: 10,          // orçamento de hipóteses por sono (LEI V)
+  topK: 10,          // orçamento de itens pra revisar por sono (LEI V)
   minClusterSize: 3, // comunidade só vira sinal com ≥ 3 membros
   lpaMaxIter: 20,    // teto de iterações do label propagation
 } as const;
@@ -241,7 +241,7 @@ export function detectClusters(g: GraphData, opts?: DreamV2Options): EntityClust
 function toReviewItem(h: DreamHypothesis): ReviewItemRow {
   return {
     id: h.id,                 // determinístico por par (§2.1.2-7)
-    source_id: "",            // hipótese do SONO — não nasce de fonte M21
+    source_id: "",            // item pra revisar do SONO — não nasce de fonte M21
     source_slug: "",          // nem de página (colunas NOT NULL default '' — verificado no schema)
     dimension: "conexao",
     text: h.text,
@@ -254,8 +254,8 @@ function toReviewItem(h: DreamHypothesis): ReviewItemRow {
   };
 }
 
-/** O sono v2 do brain: lê o entityGraph, prevê links, detecta clusters e enfileira as
- *  hipóteses na fila M21. NOOP (LEI VI): hypotheses vazio ⇒ NENHUMA escrita (addReviewItems
+/** O sono v2 do brain: lê o entityGraph, prevê links, detecta clusters e enfileira os
+ *  itens pra revisar na fila M21. NOOP (LEI VI): hypotheses vazio ⇒ NENHUMA escrita (addReviewItems
  *  nem é chamado). */
 export async function dreamV2(home: string, opts: DreamV2Options = {}): Promise<DreamV2Result> {
   const e = await getEngine(home);

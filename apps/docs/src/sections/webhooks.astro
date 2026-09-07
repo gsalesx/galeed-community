@@ -8,11 +8,11 @@ import Admonition from "../components/Admonition.astro";
 const events = [
   {
     name: "ingest.organized",
-    desc: "Um lote terminou de ser organizado. Traz as contagens (fatos criados, itens que foram pra revisão).",
+    desc: "Um lote terminou de ser processado. Traz as contagens (fatos criados, itens que foram pra revisão).",
   },
   {
     name: "review.pending",
-    desc: 'Trechos não casaram com a receita e entraram na fila de revisão como <code class="ic">hipótese</code>, esperando alguém.',
+    desc: 'Trechos não casaram com as regras e entraram na fila pra revisar (<code class="ic">hipotese</code> na API), esperando alguém.',
   },
   {
     name: "fact.superseded",
@@ -64,7 +64,7 @@ if (esperada !== req.headers["x-galeed-signature"]) {
   id="webhooks"
   ix="13"
   title="Webhooks"
-  intro="A ingestão é assíncrona, então o Galeed avisa o seu app por HTTP quando algo é organizado ou muda de estado. Você registra uma URL com a sua chave, recebe um secret, e valida a assinatura de cada entrega."
+  intro="A ingestão é assíncrona, então o Galeed avisa o seu app por HTTP quando algo é processado ou muda de estado. Você registra uma URL com a sua chave, recebe um secret, e valida a assinatura de cada entrega."
 >
   <div class="sub">Registrar</div>
   <Endpoint method="post" path="/webhooks" scope="requer can_ingest" scopeIcon="lock" />

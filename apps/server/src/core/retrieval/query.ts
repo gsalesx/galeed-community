@@ -46,7 +46,7 @@ export async function search(home: string, q: string, k = 8, type?: string, scop
  *  epistêmicos plenos (confidence + valid_to + supersede + tags semânticas) entram com a
  *  camada de FATOS bitemporal. Ver ARQUITETURA-MEMORIA-v0.3.md §Selo Epistêmico. */
 export interface Selo {
-  /** estado epistêmico. Trecho de FONTE = "registrado" (é registro, não juízo).
+  /** estado epistêmico. Trecho de FONTE = "sem prova" (`registrado` — é registro, não juízo).
    *  "fato"/"hipotese"/"arquivado" passam a valer quando o hit vier da camada de fatos. */
   status: "registrado" | "fato" | "hipotese" | "arquivado";
   natureza: string; // o que é: reuniao, decisao, cliente, conceito, nota...
@@ -68,7 +68,7 @@ const FONTE_POR_TIPO: Record<string, string> = {
   notas: "nota",
 };
 
-/** exportado p/ teste unit (função pura). Só tags SEMÂNTICAS entram no selo: as técnicas
+/** exportado p/ teste unit (função pura). Só tags SEMÂNTICAS entram no status (`Selo`): as técnicas
  *  (src:<uuid>, doc:<sha16>, canal:, area:, fonte: — isTechTag) são proveniência/escopo, não
  *  semântica do negócio — `[#src:3f2a…]` no header seria ruído apresentado à LLM como significado. */
 export function montarSelo(type: string, date: string, slug: string, via: Selo["via"], tags: string[]): Selo {
@@ -83,7 +83,7 @@ export function montarSelo(type: string, date: string, slug: string, via: Selo["
   };
 }
 
-/** Cabeçalho legível do selo (modo humano/texto).
+/** Cabeçalho legível do status (`Selo`) (modo humano/texto).
  *  Ex.: `[registrado · reunião/call] [12/jun] [#pricing #estrategia] [via:vec] [cite:slug]` */
 export function seloHeader(s: Selo): string {
   const parts = [`[${s.status} · ${s.fonte}]`];
@@ -169,14 +169,14 @@ export async function retrieve(home: string, q: string, k = 6, opts?: { explain?
       const p = pages.get(slug);
       // vizinho fantasma (wikilink sem página) OU ARQUIVADO — ignora na expansão. As arestas pra
       // página arquivada persistem em galeed_edges (setArchived não as toca), então sem o check de
-      // p.archived a lixeira voltava via 'grafo' com selo 'registrado' (achado decaimento-lixeira#2).
+      // p.archived a lixeira voltava via 'grafo' com status 'sem prova' (achado decaimento-lixeira#2).
       if (!p || p.archived) continue;
       // peso de vizinho: equivalente a um rank baixo (entra só se sobrar espaço)
       acc.set(slug, { slug, type: p.type, title: p.title, date: p.date, excerpt: (p.body || "").slice(0, 220), text: (p.body || "").slice(0, 800), score: 1 / (RRF_K + pool + 5), via: "grafo" });
     }
   }
 
-  // páginas dos candidatos (uma query): salience (boost) + tags (selo). Antes do sort p/ o boost rankear.
+  // páginas dos candidatos (uma query): salience (boost) + tags (status). Antes do sort p/ o boost rankear.
   const candPages = await e.pagesBySlug([...acc.keys()]).catch(() => new Map());
 
   // --- FILTRO ESPELHO (camada 2 / S2): least-privilege fail-closed. ---
@@ -258,7 +258,7 @@ export async function timeline(home: string, entity: string, opts: { predicate?:
   return e.timeline(canonical, opts);
 }
 
-/** Cabeçalho de selo para um FATO bitemporal (mais rico que o de fonte): inclui status real,
+/** Cabeçalho de status para um FATO bitemporal (mais rico que o de fonte): inclui status real,
  *  confiança e janela de validade. Ex.: `[FATO · conf 0.92 · decisoes] [válido 2026-06-12 → agora]` */
 export function factSeloHeader(f: FactHit): string {
   const status = (f.status || "fato").toUpperCase();

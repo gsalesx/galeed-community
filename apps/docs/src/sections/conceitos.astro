@@ -22,12 +22,12 @@ import Admonition from "../components/Admonition.astro";
     </p>
   </div>
 
-  <div class="sub">O Selo: fato, hipótese, arquivado</div>
+  <div class="sub">O status: fato, pra revisar, arquivado</div>
   <div class="prose">
     <p>
-      O objeto central. Todo trecho que entra recebe um <strong>selo</strong>, e
-      a API nunca devolve um fato sem ele. É o que impede a alucinação: uma
-      hipótese jamais é apresentada como se fosse fato.
+      O objeto central. Todo trecho que entra recebe um <strong>status</strong>
+      (<code class="ic">selo</code> na API), e a API nunca devolve um fato sem ele.
+      É o que impede a alucinação: um item pra revisar jamais é apresentado como se fosse fato.
     </p>
   </div>
   <Fields>
@@ -41,7 +41,7 @@ import Admonition from "../components/Admonition.astro";
     </Field>
     <Field key="confidence" sub="0.0 – 1.0">
       O quanto o Galeed confia neste trecho. Abaixo de
-      <code class="ic">0.6</code> normalmente entra como hipótese, não como fato.
+      <code class="ic">0.6</code> normalmente vai pra revisar, não vira fato.
     </Field>
     <Field key="sensitivity">
       O nível de sigilo &mdash; o cadeado. Controla quem, pelo escopo da chave,
@@ -68,8 +68,8 @@ import Admonition from "../components/Admonition.astro";
   </Fields>
 
   <Admonition type="tip">
-    <b>O selo na interface é o mesmo objeto da API.</b> Os chips coloridos que
-    você vê no produto &mdash; fato em azul, hipótese em âmbar, o cadeado de
+    <b>O status na interface é o mesmo objeto da API.</b> Os chips coloridos que
+    você vê no produto &mdash; fato em azul, pra revisar em âmbar, o cadeado de
     sigilo &mdash; são uma renderização 1:1 deste JSON. Mesmo vocabulário, mesma
     fonte da verdade.
   </Admonition>
@@ -84,16 +84,16 @@ import Admonition from "../components/Admonition.astro";
     </p>
   </div>
 
-  <div class="sub">Fonte e Receita</div>
+  <div class="sub">Fonte e regras</div>
   <div class="prose">
     <p>
       Uma <strong>fonte</strong> é um canal de entrada &mdash; uma call de
-      vendas, um grupo de WhatsApp, uma planilha. Cada fonte carrega uma
-      <strong>receita</strong>: o contrato que diz o que extrair daquele tipo de
+      vendas, um grupo de WhatsApp, uma planilha. Cada fonte carrega as
+      <strong>regras</strong>: o contrato que diz o que extrair daquele tipo de
       conteúdo e o que conta como fato. É a peça que mantém os fatos
       estruturados, detalhada na seção
       <a href="#fontes" style="color:var(--accent-ink);font-weight:600"
-        >Fontes e receitas</a
+        >Fontes e regras</a
       >.
     </p>
   </div>

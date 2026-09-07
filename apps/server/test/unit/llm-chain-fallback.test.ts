@@ -15,7 +15,7 @@ describe("isTransientLlmError", () => {
     expect(isTransientLlmError("OpenAI timeout")).toBe(true);
     expect(isTransientLlmError("Anthropic 429: rate")).toBe(true);
     expect(isTransientLlmError("Todas as IAs da cadeia falharam. chatgpt: 503")).toBe(true);
-    expect(isTransientLlmError("a receita tem um campo sem nome.")).toBe(false);
+    expect(isTransientLlmError("o filtro tem um campo sem nome.")).toBe(false);
   });
 });
 

@@ -91,7 +91,7 @@ export async function ensurePostgresSchema(sql: any, dims: number): Promise<void
       name text not null,
       channel text not null default 'upload',
       type text not null default '',
-      recipe jsonb not null default '{"fields":[]}'::jsonb,
+      filtro jsonb not null default '{"fields":[]}'::jsonb,
       default_sensitivity text not null default 'restrito',
       status text not null default 'ativa',
       last_read_at timestamptz,

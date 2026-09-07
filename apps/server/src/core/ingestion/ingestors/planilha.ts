@@ -20,7 +20,7 @@ import { createHash } from "node:crypto";
 import type { ConnectorClaim } from "../connector-ingest.ts";
 import type { Ingestor, IngestorItem } from "./types.ts";
 
-/** dimensão dos claims — TEM que existir na receita da fonte (sourceSeed abaixo), senão o gate
+/** tipo dos claims — TEM que existir nas regras da fonte (sourceSeed abaixo), senão o gate
  *  manda tudo pra fila de revisão. */
 const DIM = "planilha";
 
@@ -139,7 +139,7 @@ export function parseCsv(texto: string): Record<string, string>[] {
 export const planilhaIngestor: Ingestor = {
   slug: "planilha",
   nome: "Planilha / tabela (fatos direto, sem IA)",
-  descricao: "Tabela de preços, catálogo, comissões: cada linha vira um fato carimbado na hora — zero LLM.",
+  descricao: "Tabela de preços, catálogo, comissões: cada linha vira um fato na hora — zero LLM.",
   exemplo: `{ "titulo": "Tabela de preços — agosto", "data": "2026-08-01", "linhas": [ { "entidade": "Limpeza de pele", "atributo": "preço", "valor": 180, "unidade": "BRL" } ] }`,
 
   sourceSeed() {
@@ -147,8 +147,8 @@ export const planilhaIngestor: Ingestor = {
       name: "Planilhas e tabelas",
       channel: "planilha",
       type: "tabela",
-      // a receita PRECISA conter a dimensão dos claims — é ela que o gate aprova.
-      recipe: { fields: [{ dimension: DIM, label: "Linha da tabela", area: "" }] },
+      // o filtro PRECISA conter a dimensão dos claims — é ela que o gate aprova.
+      filtro: { fields: [{ dimension: DIM, label: "Linha da tabela", area: "" }] },
     };
   },
 

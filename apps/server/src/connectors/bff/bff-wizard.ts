@@ -7,9 +7,9 @@ import { createHash } from "node:crypto";
 import { config } from "../../core/platform/config.ts";
 import { resolveProvider, structured, type Provider } from "../../lib/llm.ts";
 import type { Tool } from "../../lib/anthropic.ts";
-import { getEngine, SENSITIVITY_LEVELS, type SourceRecipe, type SourceRow } from "../../core/platform/engine.ts";
+import { getEngine, SENSITIVITY_LEVELS, type SourceFilter, type SourceRow } from "../../core/platform/engine.ts";
 import { saveBrainContext } from "../../core/extraction/brain-context.ts";
-import { mergeRecipeDimsIntoPack, loadSchemaPack } from "../../core/extraction/schema-pack.ts";
+import { mergeFilterDimsIntoPack, loadSchemaPack } from "../../core/extraction/schema-pack.ts";
 import { extractableDims, DEFAULT_EXTRACT_DIMS } from "../../core/extraction/extractable.ts";
 import { resolveTipo } from "../../core/platform/brain.ts";
 import { claimBrainSlug, removeBrainOwnership } from "../../core/access/accounts.ts";
@@ -24,7 +24,7 @@ export interface WizardSourceDraft {
   name: string;                // nome legível da fonte (dado do tenant)
   channel: "upload" | "paste"; // v1: só os caminhos reais
   type: string;                // slug do tipo (vira page.type / extractable key)
-  recipe: SourceRecipe;        // fields sugeridos {dimension,label,area}
+  filtro: SourceFilter;        // fields sugeridos {dimension,label,area}
   default_sensitivity: string; // preenchido no passo 'sensitivity'
 }
 
@@ -77,7 +77,7 @@ export interface WizardTurn {
 const QUESTIONS: Record<Exclude<WizardStep, "review" | "done">, string> = {
   purpose:     "O que esse cérebro vai cuidar? (ex.: vendas e clientes, financeiro, a empresa inteira)",
   areas:       "Essas são as áreas que eu sugiro — as gavetas do cérebro. Pode tirar ou acrescentar.",
-  sources:     "De onde vem a informação hoje? Cada fonte tem a sua receita — é isso que deixa o fato certo.",
+  sources:     "De onde vem a informação hoje? Cada fonte tem as suas regras — é isso que deixa o fato certo.",
   sensitivity: "Última coisa: tem informação sensível aí dentro? Preço, salário, contrato…",
 };
 
@@ -112,7 +112,7 @@ const GO_CHIP_LABEL = "Pronto →"; // único chip que AVANÇA o passo de coleç
  *  num chip conhecido não precisa de IA, a resposta já é previsível por construção. */
 /** Presets REVISADOS pelo PO (decisão do fundador: "empresa vai além de preço"): todo preset de
  *  negócio carrega o núcleo transversal de conhecimento — estrategia/mercado/aprendizados — além
- *  do operacional. Teto 8 áreas (área é gaveta de guarda + unidade de RBAC + alvo de receita;
+ *  do operacional. Teto 8 áreas (área é gaveta de guarda + unidade de RBAC + alvo de filtro;
  *  sobrando vira ruído triplo). "decisoes" NÃO é área: decisão é dimensão de extração e mora na
  *  área do assunto dela. Slugs canônicos entre presets (concorrencia/concorrentes → mercado). */
 const PURPOSE_PRESETS: Record<string, { purpose: string; name: string; label: string; areas: string[] }> = {
@@ -198,16 +198,16 @@ function cloneDraft(d: WizardDraft | undefined | null): WizardDraft {
           name: String(s?.name ?? ""),
           channel: s?.channel === "paste" ? "paste" as const : "upload" as const,
           type: String(s?.type ?? ""),
-          recipe: {
-            fields: Array.isArray(s?.recipe?.fields)
-              ? s.recipe.fields.map((f: any) => ({
+          filtro: {
+            fields: Array.isArray(s?.filtro?.fields)
+              ? s.filtro.fields.map((f: any) => ({
                   dimension: String(f?.dimension ?? ""),
                   label: String(f?.label ?? ""),
                   area: String(f?.area ?? ""),
                 }))
               : [],
-            ...(s?.recipe?.guidance ? { guidance: String(s.recipe.guidance) } : {}),
-            ...(s?.recipe?.triage_profile ? { triage_profile: String(s.recipe.triage_profile) } : {}),
+            ...(s?.filtro?.guidance ? { guidance: String(s.filtro.guidance) } : {}),
+            ...(s?.filtro?.triage_profile ? { triage_profile: String(s.filtro.triage_profile) } : {}),
           },
           default_sensitivity: String(s?.default_sensitivity ?? ""),
         }))
@@ -273,7 +273,7 @@ const TOOLS: Record<Exclude<WizardStep, "review" | "done">, Tool> = {
     name: "normalizar_fontes",
     description:
       "Extrai as fontes de informação citadas. name = nome legível. type = slug do tipo de página. " +
-      "channel = 'upload' ou 'paste' (v1 só tem esses). fields = campos da receita: dimension = chave " +
+      "channel = 'upload' ou 'paste' (v1 só tem esses). fields = campos do filtro: dimension = chave " +
       "da dimensão de extração, label = rótulo legível, area = slug de UMA das áreas do cérebro " +
       "(lista no contexto) onde o campo guarda.",
     input_schema: {
@@ -378,7 +378,7 @@ async function normalize(
   const tool = TOOLS[step];
   const system =
     "Você normaliza a resposta livre de um usuário em campos estruturados pra montar a estrutura de um " +
-    "cérebro de memória (propósito, áreas, fontes com receita, sigilo). Use SOMENTE a informação da " +
+    "cérebro de memória (propósito, áreas, fontes com filtro, sigilo). Use SOMENTE a informação da " +
     "resposta e do contexto — nunca invente domínio. Responda em português.";
   const ctx = stepContext(step, draft);
   try {
@@ -415,14 +415,14 @@ export function realRecipeDims(home: string, type: string): string[] {
   }
 }
 
-/** fields da receita a partir das dims REAIS do tipo: {dimension:d, label:d, area:1ª área}.
+/** fields do filtro a partir das dims REAIS do tipo: {dimension:d, label:d, area:1ª área}.
  *  Substitui defaultFields (que passava o slug do NOME como type). */
-function realRecipeFields(home: string, type: string, areas: string[]): SourceRecipe["fields"] {
+function realFilterFields(home: string, type: string, areas: string[]): SourceFilter["fields"] {
   return realRecipeDims(home, type).map((d) => ({ dimension: d, label: d, area: areas[0] ?? "" }));
 }
 
 /** monta uma WizardSourceDraft determinística a partir de um nome (toggle / degrade / free-text
- *  sem IA). A receita vem das dims REAIS do tipo EFETIVO — IGUAL ao funil capture/extração. */
+ *  sem IA). O filtro vem das dims REAIS do tipo EFETIVO — IGUAL ao funil capture/extração. */
 export function makeSourceDraft(name: string, draft: WizardDraft): WizardSourceDraft {
   const clean = name.trim();
   const type = slugify(clean);
@@ -430,7 +430,7 @@ export function makeSourceDraft(name: string, draft: WizardDraft): WizardSourceD
     name: clean,
     channel: "upload",
     type,
-    recipe: { fields: realRecipeFields(draft.name, type, draft.areas) },
+    filtro: { fields: realFilterFields(draft.name, type, draft.areas) },
     default_sensitivity: draft.sensitivity || "",
   };
 }
@@ -519,7 +519,7 @@ export function mergeSourcesIntoDraft(draft: WizardDraft, msg: string, ai: any |
       const name = String(s?.name ?? "").trim();
       if (!name || findSourceIndex(draft, name) >= 0) continue;
       const type = slugify(String(s?.type ?? "")) || slugify(name);
-      // FIX-A (§3.1.3): a IA NÃO escolhe dims (v1 = vocabulário FECHADO). A receita = EXATAMENTE
+      // FIX-A (§3.1.3): a IA NÃO escolhe dims (v1 = vocabulário FECHADO). O filtro = EXATAMENTE
       // as dims REAIS do tipo (ordem do pack); a IA só ENRIQUECE label/area das que citou. Dim
       // inventada (eco do nome) é DROPADA com rastro (invariante #5).
       const real = realRecipeDims(draft.name, type);
@@ -532,7 +532,7 @@ export function mergeSourcesIntoDraft(draft: WizardDraft, msg: string, ai: any |
         if (!realSet.has(dim)) { dropadas.push(dim); continue; } // dim inventada → DROPA (com rastro)
         aiFields.set(dim, {
           label: String(f?.label ?? dim),
-          // área fora do draft → "" (a receita nunca aponta gaveta que não existe).
+          // área fora do draft → "" (o filtro nunca aponta gaveta que não existe).
           area: draft.areas.includes(slugify(String(f?.area ?? ""))) ? slugify(String(f.area)) : "",
         });
       }
@@ -542,12 +542,12 @@ export function mergeSourcesIntoDraft(draft: WizardDraft, msg: string, ai: any |
         area: aiFields.get(d)?.area ?? (draft.areas[0] ?? ""),
       }));
       if (dropadas.length)
-        console.log(`[wizard-receita] dims fora do vocabulário do tipo '${type}' dropadas: ${dropadas.join(", ")}`);
+        console.log(`[wizard-filtro] dims fora do vocabulário do tipo '${type}' dropadas: ${dropadas.join(", ")}`);
       draft.sources.push({
         name,
         channel: s?.channel === "paste" ? "paste" : "upload",
         type,
-        recipe: { fields },
+        filtro: { fields },
         default_sensitivity: draft.sensitivity || "",
       });
       added.push(name);
@@ -621,7 +621,7 @@ function renderPanel(step: WizardStep, d: WizardDraft): WizardPanel {
   if (d.sensitivity) {
     rules.push(
       `Tudo entra como ${sensitivityLabel(d.sensitivity)} por padrão. Você abre pra quem quiser em Acesso.`,
-      "O que a receita não reconhecer vira hipótese e espera revisão. Nunca vira fato sozinho.",
+      "O que as regras não reconhecerem vai pra revisar. Nunca vira fato sozinho.",
     );
   }
   return {
@@ -631,8 +631,8 @@ function renderPanel(step: WizardStep, d: WizardDraft): WizardPanel {
     areas: [...d.areas],
     sources: d.sources.map((s) => ({
       name: s.name,
-      fields: s.recipe.fields.map((f) => f.label || f.dimension),
-      areas: [...new Set(s.recipe.fields.map((f) => f.area).filter(Boolean))],
+      fields: s.filtro.fields.map((f) => f.label || f.dimension),
+      areas: [...new Set(s.filtro.fields.map((f) => f.area).filter(Boolean))],
     })),
     rules,
   };
@@ -646,8 +646,8 @@ function renderCard(d: WizardDraft): string {
   const nivel = sensitivityLabel(d.sensitivity || "restrito");
   return (
     `O cérebro ${d.label || d.name || "novo"} nasceu com estrutura: ${d.areas.length} áreas (${areas}), ` +
-    `${d.sources.length} fontes com receita (${fontes}), e tudo entra como ${nivel} por padrão. ` +
-    `O que a receita não reconhecer vira hipótese e espera a sua revisão — nunca vira fato sozinho.`
+    `${d.sources.length} fontes com regras (${fontes}), e tudo entra como ${nivel} por padrão. ` +
+    `O que as regras não reconhecerem vai pra revisar — nunca vira fato sozinho.`
   );
 }
 
@@ -805,7 +805,7 @@ export async function wizardReply(
     const added = mergeSourcesIntoDraft(draft, message, ai);
     const note =
       added.length > 0
-        ? `Anotei ${added.join(", ")} — sugiro a receita assim que você conectar.`
+        ? `Anotei ${added.join(", ")} — sugiro as regras assim que você conectar.`
         : message.trim() && draft.sources.length === before
           ? "Não consegui identificar uma fonte aí — marca os chips ou escreve o nome da fonte."
           : "";
@@ -920,10 +920,10 @@ export async function wizardConfirm(
     // d. schema-pack M13 — MERGE (ADR-016) sob DUAS chaves: s.type (retrocompat: /api/sources e o
     //    teste m21-wizard leem extractable[s.type]) E o tipo EFETIVO (a chave que a extração LÊ —
     //    é o que fecha o gate por construção). União idempotente; nunca remove.
-    await mergeRecipeDimsIntoPack(
+    await mergeFilterDimsIntoPack(
       slug,
       d.sources.flatMap((s) => {
-        const dims = s.recipe.fields.map((f) => f.dimension);
+        const dims = s.filtro.fields.map((f) => f.dimension);
         const eff = effectiveExtractType(s.type);
         return eff === s.type
           ? [{ type: s.type, dims }]
@@ -941,7 +941,7 @@ export async function wizardConfirm(
         name: s.name,
         channel: s.channel,
         type: s.type,
-        recipe: s.recipe,
+        filtro: s.filtro,
         default_sensitivity: s.default_sensitivity || d.sensitivity || "restrito",
         status: "ativa",
         last_read_at: null,

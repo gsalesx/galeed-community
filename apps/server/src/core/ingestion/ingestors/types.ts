@@ -3,7 +3,7 @@
  *  Conceito (a cadeia inteira):
  *    canal externo (webhook/poller) → Ingestor.normalize()  ← o "MIDDLEWARE": prepara o dado
  *    → seam único (deliverConnectorPayload: dedupe + fila)  ← nada entra por fora dele
- *    → extração de fatos → receita/regra de ouro → fatos com selo.
+ *    → extração de fatos → regras/regra de ouro → fatos com status.
  *
  *  Um ingestor é UM módulo com duas funções:
  *    - sourceSeed(): a FONTE que o material desse canal cria no cérebro (auto-criada na 1ª entrega).
@@ -51,7 +51,7 @@ export interface Ingestor {
   descricao: string;
   /** payload de exemplo (JSON string) pro curl dos docs/painel. */
   exemplo?: string;
-  /** a fonte deste canal (auto-criada na 1ª entrega; recipe.fields [] = modo livre). */
+  /** a fonte deste canal (auto-criada na 1ª entrega; filtro.fields [] = modo livre). */
   sourceSeed(): ConnectorSourceSeed;
   /** o MIDDLEWARE: payload cru do canal → itens prontos. PURA; [] = ignora o evento. */
   normalize(body: unknown, ctx: IngestorCtx): IngestorItem[];

@@ -26,12 +26,12 @@ export function abaInicial(pendentes: number | null): AbaRevisar {
   return pendentes > GRUPOS_DEFAULT_MIN ? "grupos" : "pendente";
 }
 
-export type AcaoDeGrupo = "receita" | "aprovar_recomendados" | "descartar" | "um_a_um";
+export type AcaoDeGrupo = "filtro" | "aprovar_recomendados" | "descartar" | "um_a_um";
 
 /** Tabela de decisão dos botões do card de grupo (a ORDEM do array é a ordem visual):
  *  - conexao_sugerida (ou source_id===""): ["um_a_um", "descartar"]  // SEM lote de aprovação:
  *        conexão não tem âncora de quote/valor — aprovar cria CONEXÃO no mapa, decisão um a um.
- *  - fora_da_receita com source_id ≠ "":  ["receita", ...(rec>0 ? ["aprovar_recomendados"] : []), "descartar", "um_a_um"]
+ *  - fora_do_filtro com source_id ≠ "":  ["filtro", ...(rec>0 ? ["aprovar_recomendados"] : []), "descartar", "um_a_um"]
  *  - nao_ancorado | entidade_vaga:        [...(rec>0 ? ["aprovar_recomendados"] : []), "descartar", "um_a_um"]
  *  onde rec = group.recomendacoes?.aprovar ?? 0. */
 export function acoesDoGrupo(g: HypothesisGroup): AcaoDeGrupo[] {
@@ -41,8 +41,8 @@ export function acoesDoGrupo(g: HypothesisGroup): AcaoDeGrupo[] {
   }
   const rec = g.recomendacoes?.aprovar ?? 0;
   const recomendados: AcaoDeGrupo[] = rec > 0 ? ["aprovar_recomendados"] : [];
-  if (g.reason === "fora_da_receita") {
-    return ["receita", ...recomendados, "descartar", "um_a_um"];
+  if (g.reason === "fora_do_filtro") {
+    return ["filtro", ...recomendados, "descartar", "um_a_um"];
   }
   // nao_ancorado | entidade_vaga
   return [...recomendados, "descartar", "um_a_um"];
@@ -52,8 +52,8 @@ export function acoesDoGrupo(g: HypothesisGroup): AcaoDeGrupo[] {
 export function decisaoDoGrupo(g: HypothesisGroup): string {
   if (g.decisao && g.decisao.trim() !== "") return g.decisao;
   switch (g.reason) {
-    case "fora_da_receita":
-      return `A receita da fonte "${g.source_name}" não tem a dimensão "${g.dimension}".`;
+    case "fora_do_filtro":
+      return `As regras da fonte "${g.source_name}" não têm o tipo "${g.dimension}".`;
     case "nao_ancorado":
       return "O número ou a citação destes itens não confere com o texto original.";
     case "entidade_vaga":

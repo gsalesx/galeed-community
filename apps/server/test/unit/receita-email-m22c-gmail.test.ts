@@ -1,30 +1,30 @@
-/** UNIT M22-C — EMAIL_RECIPE + emailSourceSeed (DADO) + aditividade do pack a360.json.
- *  PURO (sem DB/LLM). Espelho do m23c-receitas-pack.test.ts: o pack ganha extractable["email"] SEM
- *  mudar NENHUM byte dos existentes; a receita tem as 4 dims (sem facts); o seed crava canal/tipo/sigilo. */
+/** UNIT M22-C — EMAIL_FILTER + emailSourceSeed (DADO) + aditividade do pack a360.json.
+ *  PURO (sem DB/LLM). Espelho do m23c-filtros-pack.test.ts: o pack ganha extractable["email"] SEM
+ *  mudar NENHUM byte dos existentes; o filtro tem as 4 dims (sem facts); o seed crava canal/tipo/sigilo. */
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { EMAIL_RECIPE, emailSourceSeed } from "../../src/core/ingestion/connectors/gmail.ts";
+import { EMAIL_FILTER, emailSourceSeed } from "../../src/core/ingestion/connectors/gmail.ts";
 
 const packPath = fileURLToPath(new URL("../../schema-packs/a360.json", import.meta.url));
 const packDir = fileURLToPath(new URL("../../schema-packs/", import.meta.url));
 const pack = JSON.parse(readFileSync(packPath, "utf8"));
 
-describe("M22-C — EMAIL_RECIPE (DADO)", () => {
-  it("1. fields EXATOS (4 dims, na ordem); sem 'facts' na receita", () => {
-    expect(EMAIL_RECIPE.fields).toEqual([
+describe("M22-C — EMAIL_FILTER (DADO)", () => {
+  it("1. fields EXATOS (4 dims, na ordem); sem 'facts' no filtro", () => {
+    expect(EMAIL_FILTER.fields).toEqual([
       { dimension: "relacoes", label: "vínculo declarado (cliente, fornecedor, parceiro)", area: "comercial" },
       { dimension: "decisoes", label: "decisão tomada ou descartada", area: "comercial" },
       { dimension: "compromissos", label: "promessa assumida (com prazo)", area: "comercial" },
       { dimension: "precos", label: "preço, valor ou proposta", area: "comercial" },
     ]);
-    expect(EMAIL_RECIPE.fields.some((f) => f.dimension === "facts")).toBe(false);
+    expect(EMAIL_FILTER.fields.some((f) => f.dimension === "facts")).toBe(false);
   });
 
   it("1b. M7 — toda field declara área NÃO-VAZIA (área já em forma de slug): sem área a página de " +
      "e-mail nasce sem tag `area:` e fica invisível a QUALQUER token escopado (scope.ts: item sem " +
      "área só passa com acesso total '*')", () => {
-    for (const f of EMAIL_RECIPE.fields) {
+    for (const f of EMAIL_FILTER.fields) {
       expect(f.area).toBeTruthy();
       expect(f.area).toBe(f.area.toLowerCase());
       expect(f.area).toMatch(/^[a-z0-9-]+$/);
@@ -41,7 +41,7 @@ describe("M22-C — emailSourceSeed", () => {
     expect(s.default_sensitivity).toBe("interno");
     expect(s.status).toBe("ativa");
     expect(s.last_read_at).toBeNull();
-    expect(s.recipe).toBe(EMAIL_RECIPE);
+    expect(s.filtro).toBe(EMAIL_FILTER);
   });
 });
 

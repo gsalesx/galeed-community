@@ -13,7 +13,7 @@ function item(p: Partial<ReviewItemRow>): ReviewItemRow {
     text: p.text ?? "t",
     quote: p.quote ?? "",
     claim: p.claim ?? {},
-    reason: p.reason ?? "fora_da_receita",
+    reason: p.reason ?? "fora_do_filtro",
     status: "pendente",
     decided_by: "",
     decided_at: null,
@@ -22,12 +22,12 @@ function item(p: Partial<ReviewItemRow>): ReviewItemRow {
 
 const FONTE_A: SourceRow = {
   id: "fa", name: "Calls", channel: "upload", type: "transcricoes",
-  recipe: { fields: [{ dimension: "facts", label: "Fatos", area: "" }], guidance: "" },
+  filtro: { fields: [{ dimension: "facts", label: "Fatos", area: "" }], guidance: "" },
   default_sensitivity: "restrito", status: "ativa", last_read_at: null,
 };
 const FONTE_B: SourceRow = {
   id: "fb", name: "WhatsApp", channel: "upload", type: "mensagens",
-  recipe: { fields: [{ dimension: "facts", label: "Fatos", area: "" }], guidance: "" },
+  filtro: { fields: [{ dimension: "facts", label: "Fatos", area: "" }], guidance: "" },
   default_sensitivity: "restrito", status: "ativa", last_read_at: null,
 };
 
@@ -70,8 +70,8 @@ describe("M25-A — groupHypotheses / decisaoDoGrupo (puro)", () => {
   });
 
   it("4. decisaoDoGrupo — as 4 strings EXATAS (snapshot literal)", () => {
-    expect(decisaoDoGrupo("fora_da_receita", "claims", "Calls")).toBe(
-      'a receita da fonte "Calls" não tem a dimensão "claims".',
+    expect(decisaoDoGrupo("fora_do_filtro", "claims", "Calls")).toBe(
+      'As regras da fonte "Calls" não têm o tipo "claims".',
     );
     expect(decisaoDoGrupo("nao_ancorado", "facts", "WhatsApp")).toBe(
       'itens de "facts" da fonte "WhatsApp" sem âncora verificável no texto original.',
@@ -83,24 +83,24 @@ describe("M25-A — groupHypotheses / decisaoDoGrupo (puro)", () => {
       "conexões sugeridas pelo sono — aprovar registra a decisão e a aresta entra no grafo.",
     );
     // sem fonte → "(sem fonte)" no template
-    expect(decisaoDoGrupo("fora_da_receita", "claims", "")).toBe(
-      'a receita da fonte "(sem fonte)" não tem a dimensão "claims".',
+    expect(decisaoDoGrupo("fora_do_filtro", "claims", "")).toBe(
+      'As regras da fonte "(sem fonte)" não têm o tipo "claims".',
     );
   });
 
-  it("5. dimensao_na_receita: true quando a receita tem a dim; false senão; false p/ fonte desconhecida", () => {
-    const naReceita = groupHypotheses(
+  it("5. dimensao_no_filtro: true quando o filtro tem a dim; false senão; false p/ fonte desconhecida", () => {
+    const naFiltro = groupHypotheses(
       [item({ source_id: "fa", dimension: "facts" })], [FONTE_A],
     );
-    expect(naReceita[0].dimensao_na_receita).toBe(true);
+    expect(naFiltro[0].dimensao_no_filtro).toBe(true);
     const fora = groupHypotheses(
       [item({ source_id: "fa", dimension: "claims" })], [FONTE_A],
     );
-    expect(fora[0].dimensao_na_receita).toBe(false);
+    expect(fora[0].dimensao_no_filtro).toBe(false);
     const desconhecida = groupHypotheses(
       [item({ source_id: "zzz", dimension: "facts" })], [FONTE_A],
     );
-    expect(desconhecida[0].dimensao_na_receita).toBe(false);
+    expect(desconhecida[0].dimensao_no_filtro).toBe(false);
     expect(desconhecida[0].source_name).toBe("");
   });
 

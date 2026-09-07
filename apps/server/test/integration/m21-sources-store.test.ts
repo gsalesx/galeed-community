@@ -23,7 +23,7 @@ const source = (id: string, extra: Partial<SourceRow> = {}): SourceRow => ({
   name: `Fonte ${id}`,
   channel: "upload",
   type: "reunioes",
-  recipe: { fields: [{ dimension: "decisoes", label: "decisão", area: "reunioes" }] },
+  filtro: { fields: [{ dimension: "decisoes", label: "decisão", area: "reunioes" }] },
   default_sensitivity: "interno",
   status: "ativa",
   last_read_at: null,
@@ -56,7 +56,7 @@ const review = (id: string, extra: Partial<ReviewItemRow> = {}): ReviewItemRow =
   text: `hipótese ${id}`,
   quote: `trecho ${id}`,
   claim: { text: `hipótese ${id}` },
-  reason: "fora_da_receita",
+  reason: "fora_do_filtro",
   status: "pendente",
   decided_by: "",
   ...extra,
@@ -124,7 +124,7 @@ describe("M21/S1 — SourceStore + ReviewStore", () => {
       const got = await ea.getSource("f1");
       expect(got).toBeDefined();
       expect(got!.name).toBe("Fonte f1");
-      expect(got!.recipe.fields[0].dimension).toBe("decisoes");
+      expect(got!.filtro.fields[0].dimension).toBe("decisoes");
       expect(got!.default_sensitivity).toBe("interno");
       expect(got!.status).toBe("ativa");
       expect(got!.last_read_at).toBeNull();

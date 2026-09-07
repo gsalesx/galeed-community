@@ -160,7 +160,7 @@ export default function Dossie() {
           )}
           <span style={{ flex: 1 }} />
           <Chip active={comSuspeitos} onToggle={() => setComSuspeitos((v) => !v)}>
-            Incluir fatos de baixa certeza
+            Incluir sem prova
           </Chip>
         </div>
       </header>

@@ -8,7 +8,7 @@
  *  Postgres serve N empresas, isoladas por esse filtro. */
 import { config } from "../platform/config.ts";
 import { ensurePostgresSchema } from "./postgres-schema.ts";
-import type { Engine, PageRow, FactRow, FactGroupKey, EdgeRow, VecRow, ExtractionRow, Hit, SemHit, FactHit, FactsOpts, Stats, StorageStats, GraphData, GraphNode, GraphEdge, GraphQueryHit, ContradictionRow, GoldenRow, EvalRunRow, PrincipalRow, GrantRow, TokenRow, AccessLogRow, ExtractReceiptRow, LlmUsageRow, LlmUsageRollup, SourceRow, SourceRecipe, ReviewItemRow, ReviewStatus, PercepcaoRow, PercepcaoCite, PercepcaoEstado, WebhookRow, WebhookEvent, WebhookStatus, WebhookDeliveryRow, WebhookDeliveryInput, WebhookDeliveryPatch } from "../platform/engine.ts";
+import type { Engine, PageRow, FactRow, FactGroupKey, EdgeRow, VecRow, ExtractionRow, Hit, SemHit, FactHit, FactsOpts, Stats, StorageStats, GraphData, GraphNode, GraphEdge, GraphQueryHit, ContradictionRow, GoldenRow, EvalRunRow, PrincipalRow, GrantRow, TokenRow, AccessLogRow, ExtractReceiptRow, LlmUsageRow, LlmUsageRollup, SourceRow, SourceFilter, ReviewItemRow, ReviewStatus, PercepcaoRow, PercepcaoCite, PercepcaoEstado, WebhookRow, WebhookEvent, WebhookStatus, WebhookDeliveryRow, WebhookDeliveryInput, WebhookDeliveryPatch } from "../platform/engine.ts";
 import { randomUUID } from "node:crypto";
 
 /** slug de entidade → rótulo legível: "kelvin-cleto" → "Kelvin Cleto", "accelera" → "Accelera". */
@@ -513,7 +513,7 @@ export class PostgresEngine implements Engine {
       const candN = Math.max(k * 20, 150);
       // coalesce(p.archived,false)=false (achado decaimento-lixeira#2): página arquivada FORA da
       // recuperação semântica — alinhado com FTS (search) e graphAll, senão arquivada volta via
-      // 'vec' com selo 'registrado'. Filtro PÓS-ANN (não afeta o índice HNSW; candN é generoso).
+      // 'vec' com status 'sem prova'. Filtro PÓS-ANN (não afeta o índice HNSW; candN é generoso).
       // LEFT JOIN preservado: vetor órfão sem página tem p.archived NULL → coalesce false → passa.
       const rows = await this.sql`
         select v.slug, v.chunk_idx, v.text, v.score, p.type, p.title, p.date
@@ -995,7 +995,7 @@ export class PostgresEngine implements Engine {
     }));
   }
 
-  // ---------- hipóteses ----------
+  // ---------- itens pra revisar ----------
 
   async replaceHypotheses(rows: { slug: string; a: string; b: string; shared: string[]; surprise: number; status: string; confidence: string; text: string }[]): Promise<void> {
     await this.sql`delete from galeed_hypotheses where brain = ${this.brain}`;
@@ -1377,24 +1377,24 @@ export class PostgresEngine implements Engine {
 
   // ---------- fontes (M21) ----------
 
-  /** Normaliza a `recipe` defensivamente: jsonb pode voltar como string; `fields` não-array → []. */
+  /** Normaliza a `filtro` defensivamente: jsonb pode voltar como string; `fields` não-array → []. */
   private rowToSource(r: any): SourceRow {
-    let recipe: any = r.recipe;
-    if (typeof recipe === "string") {
+    let filtro: any = r.filtro ?? r.recipe;
+    if (typeof filtro === "string") {
       try {
-        recipe = JSON.parse(recipe);
+        filtro = JSON.parse(filtro);
       } catch {
-        recipe = {};
+        filtro = {};
       }
     }
-    if (!recipe || typeof recipe !== "object") recipe = {};
-    if (!Array.isArray(recipe.fields)) recipe = { ...recipe, fields: [] };
+    if (!filtro || typeof filtro !== "object") filtro = {};
+    if (!Array.isArray(filtro.fields)) filtro = { ...filtro, fields: [] };
     return {
       id: r.id,
       name: r.name || "",
       channel: r.channel || "upload",
       type: r.type || "",
-      recipe: recipe as SourceRecipe,
+      filtro: filtro as SourceFilter,
       default_sensitivity: r.default_sensitivity || "restrito",
       status: r.status || "ativa",
       last_read_at: r.last_read_at ? (r.last_read_at instanceof Date ? r.last_read_at.toISOString() : String(r.last_read_at)) : null,
@@ -1404,19 +1404,18 @@ export class PostgresEngine implements Engine {
 
   async upsertSource(row: SourceRow): Promise<void> {
     await this.sql`
-      insert into galeed_sources (brain, id, name, channel, type, recipe, default_sensitivity, status)
+      insert into galeed_sources (brain, id, name, channel, type, filtro, default_sensitivity, status)
       values (${this.brain}, ${row.id}, ${row.name}, ${row.channel}, ${row.type},
-        ${this.sql.json(row.recipe ?? { fields: [] })}, ${row.default_sensitivity}, ${row.status})
+        ${this.sql.json(row.filtro ?? { fields: [] })}, ${row.default_sensitivity}, ${row.status})
       on conflict (brain, id) do update set
         name = excluded.name, channel = excluded.channel, type = excluded.type,
-        recipe = excluded.recipe, default_sensitivity = excluded.default_sensitivity,
+        filtro = excluded.filtro, default_sensitivity = excluded.default_sensitivity,
         status = excluded.status`;
   }
 
   async getSource(id: string): Promise<SourceRow | undefined> {
     const rows = (await this.sql`
-      select id, name, channel, type, recipe, default_sensitivity, status, last_read_at, created_at
-      from galeed_sources where brain = ${this.brain} and id = ${id} limit 1`) as any[];
+      select * from galeed_sources where brain = ${this.brain} and id = ${id} limit 1`) as any[];
     if (!rows[0]) return undefined;
     return this.rowToSource(rows[0]);
   }

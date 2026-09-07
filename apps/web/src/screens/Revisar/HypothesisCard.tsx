@@ -1,7 +1,7 @@
-/** M21/S7 — card de uma hipótese na fila de revisão.
+/** M21/S7 — card de um item pra revisar.
  *
  *  Família visual da tela Fontes (fontes.html: paleta âmbar --st-hypo/--st-hypo-soft) no
- *  padrão de card do console. Selo-linha → trecho → citação (de onde saiu) → motivo LEGÍVEL
+ *  padrão de card do console. Status-linha → trecho → citação (de onde saiu) → motivo LEGÍVEL
  *  (REASON_LABEL; o enum nunca aparece cru) → ações (só em pendente) ou rodapé de decisão
  *  (quem/quando — a prova do invariante #5: nada descartado em silêncio).
  *
@@ -13,7 +13,7 @@ import { fmtConfidence, fmtDateFull, relativeTime } from "../../lib/format";
 import { rotuloRecomendacao } from "./logic";
 import { REASON_LABEL, type Hypothesis } from "./types";
 
-/** Chip mono neutro da dimensão da receita (ex.: "pedido", "preco_falado"). */
+/** Chip mono neutro do tipo das regras (ex.: "pedido", "preco_falado"). */
 function DimensionChip({ dimension }: { dimension: string }) {
   if (!dimension) return null;
   return (
@@ -59,9 +59,9 @@ export function HypothesisCard(props: {
         padding: "14px 16px",
       }}
     >
-      {/* 1 — linha-selo */}
+      {/* 1 — linha-status */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <StatusChip variant="hypo" label="Hipótese" size="sm" />
+        <StatusChip variant="hypo" label="Pra revisar" size="sm" />
         <DimensionChip dimension={item.dimension} />
         <span className="mono" style={{ fontSize: 11.5, color: "var(--muted)" }}>
           via <b style={{ color: "var(--fg)" }}>{item.source_name || "fonte removida"}</b>

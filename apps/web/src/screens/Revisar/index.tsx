@@ -1,9 +1,9 @@
-/** M25-C — Revisar: a fila de hipóteses da regra de ouro, agora em ESCALA.
+/** M25-C — Revisar: a fila pra revisar da regra de ouro, agora em ESCALA.
  *
  *  A fila REAL (corpus accelera360-mentoria) tem 1.086 pendentes — irrevisável um a um. Esta tela
  *  vira uma mesa de decisão em escala:
  *    - Por grupos (default >30 pendentes): um card por grupo-decisão (reason × dimension × fonte),
- *      com contagem, amostra, recomendações do juiz, e os botões da decisão (receita / aprovar
+ *      com contagem, amostra, recomendações do juiz, e os botões da decisão (filtro / aprovar
  *      recomendados / descartar / um a um). Resultado de lote SEMPRE com números.
  *    - JudgeBar: o juiz RECOMENDA, nunca aprova (LEI I). Triar mostra custo ANTES.
  *    - Esperando você / Decididas: o fluxo M21 individual, intacto (com badge de recomendação).
@@ -51,7 +51,7 @@ export default function Revisar() {
   const [grupoExpandido, setGrupoExpandido] = useState<string | null>(null);
   const [grupoBusy, setGrupoBusy] = useState<string | null>(null);
   const [confirmacao, setConfirmacao] = useState<
-    null | { tipo: "descartar" | "triar" | "receita"; grupo?: HypothesisGroup }
+    null | { tipo: "descartar" | "triar" | "filtro"; grupo?: HypothesisGroup }
   >(null);
   const [resultadoLote, setResultadoLote] = useState<BatchApproveResult | null>(null);
   const [triando, setTriando] = useState(false);
@@ -131,7 +131,7 @@ export default function Revisar() {
       return;
     }
     if (acao === "descartar") { setConfirmacao({ tipo: "descartar", grupo: g }); return; }
-    if (acao === "receita") { setConfirmacao({ tipo: "receita", grupo: g }); return; }
+    if (acao === "filtro") { setConfirmacao({ tipo: "filtro", grupo: g }); return; }
     void executa(g, acao); // aprovar_recomendados dispara direto (gate decide; nada cego)
   }
 
@@ -139,7 +139,7 @@ export default function Revisar() {
     const key = chaveGrupo(g);
     setGrupoBusy(key);
     try {
-      if (acao === "receita") {
+      if (acao === "filtro") {
         const r = await api.hypotheses.addDimToRecipe({ source_id: g.source_id, dimension: g.dimension });
         setResultadoLote(r);
         setToast({ msg: resumoLote(r), tone: "ok" });
@@ -204,7 +204,7 @@ export default function Revisar() {
       setDecididas((prev) => new Set(prev).add(id));
       setToast(
         kind === "approve"
-          ? { msg: "Virou fato com selo.", tone: "ok" }
+          ? { msg: "Virou fato.", tone: "ok" }
           : { msg: "Descartado — fica registrado.", tone: "neutral" },
       );
     } catch (e) {
@@ -230,7 +230,7 @@ export default function Revisar() {
       <header style={{ marginBottom: 18 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-.02em", margin: 0 }}>Revisar</h1>
         <p style={{ fontSize: 14, color: "var(--muted)", margin: "6px 0 0", maxWidth: "68ch", lineHeight: 1.55 }}>
-          Trechos que nenhuma receita reconheceu. Você decide: o que aprovar vira fato com selo; o
+          Trechos que nenhuma regra reconheceu. Você decide: o que aprovar vira fato; o
           que descartar fica registrado — nada some em silêncio.
         </p>
       </header>
@@ -292,11 +292,11 @@ export default function Revisar() {
           onConfirm={() => { const g = confirmacao.grupo!; setConfirmacao(null); void executa(g, "descartar"); }}
         />
       )}
-      {confirmacao?.tipo === "receita" && confirmacao.grupo && (
-        <ModalReceita
+      {confirmacao?.tipo === "filtro" && confirmacao.grupo && (
+        <ModalFiltro
           grupo={confirmacao.grupo}
           onCancel={() => setConfirmacao(null)}
-          onConfirm={() => { const g = confirmacao.grupo!; setConfirmacao(null); void executa(g, "receita"); }}
+          onConfirm={() => { const g = confirmacao.grupo!; setConfirmacao(null); void executa(g, "filtro"); }}
         />
       )}
       {confirmacao?.tipo === "triar" && (
@@ -489,13 +489,13 @@ function ModalDescartar({ grupo, onCancel, onConfirm }: { grupo: HypothesisGroup
   );
 }
 
-function ModalReceita({ grupo, onCancel, onConfirm }: { grupo: HypothesisGroup; onCancel: () => void; onConfirm: () => void }) {
+function ModalFiltro({ grupo, onCancel, onConfirm }: { grupo: HypothesisGroup; onCancel: () => void; onConfirm: () => void }) {
   const n = fmtNumber(grupo.count);
   return (
     <Modal
       open
       onClose={onCancel}
-      title="Adicionar à receita"
+      title="Adicionar às regras"
       footer={
         <>
           <Button variant="secondary" onClick={onCancel}>Cancelar</Button>
@@ -504,9 +504,9 @@ function ModalReceita({ grupo, onCancel, onConfirm }: { grupo: HypothesisGroup; 
       }
     >
       <p style={{ fontSize: 14, lineHeight: 1.55, margin: 0 }}>
-        A dimensão "{grupo.dimension}" entra na receita da fonte "{grupo.source_name}". Os {n} itens do
+        O tipo "{grupo.dimension}" entra nas regras da fonte "{grupo.source_name}". Os {n} itens do
         grupo passam por uma verificação: só os que têm citação e número ancorados no texto
-        original viram fato com selo — os demais ficam retidos, cada um com o porquê.
+        original viram fato — os demais ficam retidos, cada um com o porquê.
       </p>
     </Modal>
   );
@@ -619,7 +619,7 @@ function VazioPendente() {
         <span style={{ fontSize: 17, fontWeight: 600 }}>Nada esperando revisão.</span>
       </div>
       <p style={{ fontSize: 14, color: "var(--muted)", margin: "8px 0 0", lineHeight: 1.55 }}>
-        Tudo que entrou casou com as receitas.
+        Tudo que entrou casou com as regras.
       </p>
     </Card>
   );
@@ -633,7 +633,7 @@ function VazioDecididas() {
         <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg)" }}>Nenhuma decisão ainda.</span>
       </div>
       <p style={{ fontSize: 14, color: "var(--muted)", margin: "8px 0 0", lineHeight: 1.55 }}>
-        Quando você aprovar ou descartar uma hipótese, a decisão fica registrada aqui — com quem
+        Quando você aprovar ou descartar um item pra revisar, a decisão fica registrada aqui — com quem
         decidiu e quando.
       </p>
     </Card>

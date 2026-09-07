@@ -38,21 +38,21 @@ const sourceRow = (extra: Partial<SourceRow> = {}): SourceRow => ({
   name: "Conta Azul (webhook)",
   channel: "conta azul",
   type: "registro",
-  recipe: { fields: [{ dimension: "vendas", label: "venda", area: "comercial" }] },
+  filtro: { fields: [{ dimension: "vendas", label: "venda", area: "comercial" }] },
   default_sensitivity: "interno",
   status: "ativa",
   last_read_at: null,
   ...extra,
 });
 
-/** handler de TESTE: normaliza um record sintético em 1 payload com 1 claim DENTRO da receita. */
+/** handler de TESTE: normaliza um record sintético em 1 payload com 1 claim DENTRO do filtro. */
 const testHandler: ConnectorHandler = {
   providerConfigKey: PCK,
   sourceSeed: () => ({
     name: "Conta Azul (webhook)",
     channel: "conta azul",
     type: "registro",
-    recipe: { fields: [{ dimension: "vendas", label: "venda", area: "comercial" }] },
+    filtro: { fields: [{ dimension: "vendas", label: "venda", area: "comercial" }] },
   }),
   normalize: (record: LibNangoRecord, ctx): any[] => {
     const cliente = String((record as any).cliente ?? "");

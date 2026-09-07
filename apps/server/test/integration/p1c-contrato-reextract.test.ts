@@ -1,5 +1,5 @@
-/** P1-C/item 4 — extractOne re-extrai SOB o contrato (mata A8a): MESMO gate do pipeline, source_id
- *  carimbado, fail-closed se a fonte sumiu/pausou, pass-through byte-idêntico sem tag src:. DB real
+/** P1-C/item 4 — extractOne re-extrai SOB o contrato (mata A8a): MESMO gate do pipeline, com
+ *  source_id da fonte, fail-closed se a fonte sumiu/pausou, pass-through byte-idêntico sem tag src:. DB real
  *  :5434 + llm.ts mocado PARCIAL (vi.mock + vi.hoisted: structured fixo + resolveExtractionProvider). */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { hasDb, wipeBrain, rawConnect } from "./helpers/db.ts";
@@ -34,10 +34,10 @@ const SRC = "fonte-p1c-reex";
 const SLUG = "pag-p1c-reex";
 const BODY = "ata: o status do contrato é fechado, conforme combinado.";
 
-// receita SÓ com 'decisions' (dim default extractable → entra no ctx.dims sem merge de pack).
+// regras SÓ com 'decisions' (dim default extractable → entra no ctx.dims sem merge de pack).
 const SOURCE: SourceRow = {
   id: SRC, name: "Fonte Reex", channel: "upload", type: "nota",
-  recipe: { fields: [{ dimension: "decisions", label: "Decisões", area: "" }], guidance: "" },
+  filtro: { fields: [{ dimension: "decisions", label: "Decisões", area: "" }], guidance: "" },
   default_sensitivity: "restrito", status: "ativa", last_read_at: null,
 };
 
@@ -66,15 +66,15 @@ describe.skipIf(!hasDb())("P1-C item 4 — extractOne gateado + fail-closed (DB 
     await e.upsertSource({ ...SOURCE, status: "ativa" });
   });
 
-  it("1. gate na re-extração: source_id carimbado em decisions; dim fora da receita vai pra fila", async () => {
+  it("1. gate na re-extração: source_id carimbado em decisions; dim fora do filtro vai pra fila", async () => {
     const page = await seedPage(SLUG, [`src:${SRC}`]);
     await extractOne(BRAIN, page);
     const e = await getEngine(BRAIN);
     const ex = await e.getExtraction(SLUG);
     expect(ex!.extractions!.decisions[0].source_id).toBe(SRC);
-    expect((ex!.extractions!.facts ?? [])).toHaveLength(0); // fora da receita → não aprovado
+    expect((ex!.extractions!.facts ?? [])).toHaveLength(0); // fora do filtro → não aprovado
     const pend = await e.listReview({ status: "pendente" });
-    expect(pend.some((r) => r.dimension === "facts" && r.reason === "fora_da_receita")).toBe(true);
+    expect(pend.some((r) => r.dimension === "facts" && r.reason === "fora_do_filtro")).toBe(true);
   });
 
   it("2. fonte pausada → fail-closed", async () => {
@@ -97,7 +97,7 @@ describe.skipIf(!hasDb())("P1-C item 4 — extractOne gateado + fail-closed (DB 
     const page = await seedPage("pag-p1c-reex-semtag", []);
     await extractOne(BRAIN, page);
     const ex = await e.getExtraction("pag-p1c-reex-semtag");
-    // pass-through: a dim 'facts' (fora de qualquer receita) AINDA está nas extrações (não gateada)
+    // pass-through: a dim 'facts' (fora de qualquer regra) AINDA está nas extrações (não gateada)
     expect(ex!.extractions!.facts).toHaveLength(1);
     expect(ex!.extractions!.decisions).toHaveLength(1);
     const after = (await e.listReview({ status: "pendente", limit: 999 })).length;

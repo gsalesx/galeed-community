@@ -1,6 +1,6 @@
-/** M21 — REGRA DE OURO da ingestão com contrato: o que a receita reconhece E ancora vira fato
- *  carimbado; o que não casa vira hipótese na fila de revisão — nunca fato sozinho, nunca descarte
- *  silencioso (invariante #5). PURO no gate; IO só em approve/discard. Tenant-neutro: receita é DADO
+/** M21 — REGRA DE OURO da ingestão com contrato: o que as regras reconhecem E ancoram vira fato;
+ *  o que não casa vai pra revisar — nunca fato sozinho, nunca descarte
+ *  silencioso (invariante #5). PURO no gate; IO só em approve/discard. Tenant-neutro: regras (`filtro`) são DADO
  *  (zero ramo por canal/formato — invariante III). Ver ADR-016. */
 import { createHash } from "node:crypto";
 import { quoteIsGrounded } from "../../lib/quote-check.ts";
@@ -8,7 +8,7 @@ import { valueIsAnchored, textValueIsAnchored } from "../../lib/value-anchor.ts"
 import { entityIsVague } from "../../lib/vague-entity.ts";
 import {
   getEngine,
-  type SourceRecipe,
+  type SourceFilter,
   type ReviewItemRow,
   type ReviewReason,
 } from "../platform/engine.ts";
@@ -16,7 +16,7 @@ import { deriveIncremental } from "../retrieval/indexer.ts";
 import { freshVersion } from "../extraction/extract.ts";
 import { emitWebhookEvent } from "../platform/webhook-emit.ts"; // C2 — gancho review.pending (fail-soft)
 
-export interface RecipeGateResult {
+export interface FilterGateResult {
   approved: Record<string, any[]>; // claims que seguem pro putExtraction (com it.source_id injetado)
   rejected: ReviewItemRow[]; // status 'pendente', id determinístico (sha256 — ver reviewItemId)
   counts: { approved: number; rejected: number };
@@ -29,25 +29,25 @@ function reviewItemId(pageSlug: string, dim: string, quote: string, text: string
   return createHash("sha256").update(`${pageSlug}|${dim}|${quote}|${text}`).digest("hex").slice(0, 32);
 }
 
-/** O gate. `recipe === null` (job sem fonte) ⇒ pass-through BYTE-IDÊNTICO (approved = o próprio merged,
- *  rejected=[]) — é assim que o golden M9 e todo o caminho sem fonte NÃO mudam. Com receita, o critério
- *  é OBJETIVO (DESIGN-SPEC §3): dimensão fora da receita → 'fora_da_receita'; claim com triple só passa
+/** O gate. `filtro === null` (job sem fonte) ⇒ pass-through BYTE-IDÊNTICO (approved = o próprio merged,
+ *  rejected=[]) — é assim que o golden M9 e todo o caminho sem fonte NÃO mudam. Com regras (`filtro`), o critério
+ *  é OBJETIVO (DESIGN-SPEC §3): tipo fora das regras (`filtro`) → 'fora_do_filtro'; claim com triple só passa
  *  quote+número ancorados na fonte (MESMOS quoteIsGrounded/valueIsAnchored do indexer); claim sem triple
  *  só passa com quote verbatim. Mais rígido que o motor DE PROPÓSITO: sob contrato, triple não-ancorado
  *  vai pra FILA (hoje viraria fato 'nao-verificado' direto). PURA — sem IO/env/clock. */
-export function applyRecipeGate(
+export function applyFilterGate(
   merged: Record<string, any[]>,
-  recipe: SourceRecipe | null,
+  filtro: SourceFilter | null,
   sourceId: string,
   pageSlug: string,
   pageBody: string,
-): RecipeGateResult {
-  // MODO LIVRE = sem receita OU receita SEM fields. Fonte auto-criada por ingestor (WhatsApp,
-  // reuniões, chat…) nasce com fields:[] — "a receita pode ser criada depois na tela Fontes".
+): FilterGateResult {
+  // MODO LIVRE = sem regras (`filtro`) OU regras SEM fields. Fonte auto-criada por ingestor (WhatsApp,
+  // reuniões, chat…) nasce com fields:[] — "as regras podem ser criadas depois na tela Fontes".
   // Antes, fields:[] engatava o gate com allowlist VAZIA e rejeitava 100% da extração pra fila
   // de revisão (baseline D: approved=0 rejected=17 numa call estratégica) — beco silencioso.
-  // A receita só gateia quando DEFINE dimensões.
-  if (recipe === null || recipe.fields.length === 0) {
+  // As regras só gateiam quando DEFINEM tipos.
+  if (filtro === null || filtro.fields.length === 0) {
     const total = Object.values(merged).reduce(
       (n, arr) => n + (Array.isArray(arr) ? arr.length : 0),
       0,
@@ -55,7 +55,7 @@ export function applyRecipeGate(
     return { approved: merged, rejected: [], counts: { approved: total, rejected: 0 } };
   }
 
-  const fields = new Set(recipe.fields.map((f) => f.dimension));
+  const fields = new Set(filtro.fields.map((f) => f.dimension));
   const approved: Record<string, any[]> = {};
   for (const dim of Object.keys(merged)) approved[dim] = []; // mesmo shape do merged (dims preservadas)
   const rejected: ReviewItemRow[] = [];
@@ -77,7 +77,7 @@ export function applyRecipeGate(
 
       let reason: ReviewReason | null;
       // ── CADEIA DE GATES (M23-B — ORDEM CRAVADA, motivo mais ESPECÍFICO primeiro): ──
-      //   1. fora_da_receita       — a DIMENSÃO não está no contrato (independe do claim;
+      //   1. fora_do_filtro       — o TIPO não está nas regras (independe do claim;
       //                              é o motivo certo mesmo se o claim também for vago/solto)
       //   2. entidade_vaga         — o claim não tem DONO claro (LEI II do M23): sem dono,
       //                              discutir ancoragem é inútil — a mensagem pro revisor é
@@ -86,14 +86,14 @@ export function applyRecipeGate(
       //   4. nao_ancorado (âncora) — evidência presente mas NÃO confere com a fonte
       // Mexer na ordem MUDA o motivo que o humano lê na fila Revisar — editar ESTE bloco e
       // o espelho no indexer (derivePageFacts) JUNTOS (disciplina do C4/fix-1 a695ee7).
-      if (!fields.has(dim)) reason = "fora_da_receita";
+      if (!fields.has(dim)) reason = "fora_do_filtro";
       // M23-B/LEI II — espelho do indexer SEM a exceção review='aprovada' (aqui o claim é
       // PRÉ-decisão; o marcador só nasce no approveReviewItem). MESMO entityIsVague (lib
       // compartilhada, padrão quoteIsGrounded/valueIsAnchored). Sob contrato é mais RÍGIDO
       // que o motor de propósito (como o C4): vago vai pra FILA, não pra 'nao-verificado'.
       else if (hasTriple && entityIsVague(entity)) reason = "entidade_vaga";
       // P1-C (mata C4, lado gate): triple NÃO-numérico SEM context_quote E sem o value verbatim no
-      // body NUNCA vira fato sob contrato — vai pra fila como hipótese. PREDICADO CANÔNICO do P1-A
+      // body NUNCA vira fato sob contrato — vai pra fila pra revisar. PREDICADO CANÔNICO do P1-A
       // (indexer.ts), espelhado EXPRESSÃO-A-EXPRESSÃO (fix-1 do reconcile P1):
       // `value_num === null && quote === "" && !textValueIsAnchored(value, body)`.
       // value_num 0 É numérico e segue pro ramo de ancoragem (linha abaixo), igual ao indexer.
@@ -107,7 +107,7 @@ export function applyRecipeGate(
       else reason = quote && grounded ? null : "nao_ancorado";
 
       if (reason === null) {
-        approved[dim].push({ ...it, source_id: sourceId }); // carimbo viaja no meta do claim
+        approved[dim].push({ ...it, source_id: sourceId }); // source_id da fonte viaja no meta do claim
         nApproved++;
       } else {
         const text = String(it?.text || "");
@@ -131,18 +131,18 @@ export function applyRecipeGate(
   return { approved, rejected, counts: { approved: nApproved, rejected: rejected.length } };
 }
 
-/** Receita → texto de orientação pro prompt (determinístico, sem LLM). "" se receita null OU vazia
+/** Regras (`filtro`) → texto de orientação pro prompt (determinístico, sem LLM). "" se filtro null OU vazio
  *  (sem fields e sem guidance) ⇒ prompt IDÊNTICO ao atual. */
-export function recipeGuidance(recipe: SourceRecipe | null): string {
-  if (!recipe) return "";
-  const fields = Array.isArray(recipe.fields) ? recipe.fields : [];
-  if (!fields.length && !recipe.guidance) return "";
+export function filterGuidance(filtro: SourceFilter | null): string {
+  if (!filtro) return "";
+  const fields = Array.isArray(filtro.fields) ? filtro.fields : [];
+  if (!fields.length && !filtro.guidance) return "";
   return (
-    "\n\nRECEITA DESTA FONTE (contrato do tenant — priorize estes campos):\n" +
+    "\n\nFILTRO DESTA FONTE (contrato do tenant — priorize estes campos):\n" +
     fields
       .map((f) => `- ${f.dimension}: ${f.label}${f.area ? ` (área destino: ${f.area})` : ""}`)
       .join("\n") +
-    (recipe.guidance ? `\n${recipe.guidance}` : "")
+    (filtro.guidance ? `\n${filtro.guidance}` : "")
   );
 }
 
@@ -195,7 +195,7 @@ export async function approveReviewItem(home: string, id: string, decidedBy: str
   if (item.status === "aprovada") return; // idempotente: aprovar 2× = no-op
   if (item.status !== "pendente") throw new Error("este item já foi decidido.");
 
-  // ── M24-B/LEI III: hipótese do SONHO nunca vira fato. ─────────────────────────────────
+  // ── M24-B/LEI III: item do SONHO pra revisar nunca vira fato. ─────────────────────────────────
   // Aprovar = registrar a decisão (CAS one-shot); a ARESTA tipada materializa no entityGraph
   // (postgres.ts lê os 'conexao_sugerida' aprovados — a fila é a fonte DURÁVEL, invariante #5,
   // e sobrevive a resetIndex/replaceDerived). NADA de extração/derive aqui: o caminho
@@ -268,10 +268,10 @@ export const LOTE_PORQUE = {
 } as const;
 
 /** M25-A — gate DETERMINÍSTICO de ancoragem de um claim SALVO (a LEI: decisão humana é por
- *  LOTE, ancoragem é por ITEM). É a cadeia do applyRecipeGate SEM o passo 1 (fora_da_receita):
- *  a decisão de lote do humano É a resposta à pergunta da dimensão; vagueza/evidência/âncora
+ *  LOTE, ancoragem é por ITEM). É a cadeia do applyFilterGate SEM o passo 1 (fora_do_filtro):
+ *  a decisão de lote do humano É a resposta à pergunta do tipo; vagueza/evidência/âncora
  *  NUNCA são dispensadas (nota epistêmica P1-C — aprovação não inventa âncora). MESMA leitura
- *  de campos do derivePageFacts/applyRecipeGate — uma única semântica de claim no sistema;
+ *  de campos do derivePageFacts/applyFilterGate — uma única semântica de claim no sistema;
  *  mudou lá, muda AQUI JUNTO (disciplina C4/M23-B). PURA — sem IO/env/clock.
  *  `opts.vaguezaResolvida` (aprovação UNITÁRIA, achado criacao-de-fatos #4): a decisão humana POR
  *  ITEM é o resolvedor do referente vago (mesma exceção review='aprovada' do indexer/M23-B teste 4)
@@ -296,7 +296,7 @@ export function gateClaimAnchoring(
 
   // cadeia M23-B passos 2→4 (ordem CRAVADA — motivo mais específico primeiro):
   if (hasTriple && !opts.vaguezaResolvida && entityIsVague(entity)) return LOTE_PORQUE.entidade_vaga;
-  // C4 espelhado (mudou no indexer/applyRecipeGate, muda AQUI JUNTO): valor textual verbatim no
+  // C4 espelhado (mudou no indexer/applyFilterGate, muda AQUI JUNTO): valor textual verbatim no
   // body é evidência — achado criacao-de-fatos #5.
   if (hasTriple && value_num === null && quote === "" && !textValueIsAnchored(value, pageBody))
     return LOTE_PORQUE.sem_evidencia;

@@ -1,6 +1,6 @@
 /** M23-B/§5.D — gate de auto-contenção fim-a-fim na FILA (DB real :5434). Claim vago vai pra
  *  fila com reason='entidade_vaga'; entidade legítima nova deriva fato; round-trip do motivo
- *  pela coluna text (sem CHECK); aprovar → fato com selo (fluxo M21 intacto). Moldes:
+ *  pela coluna text (sem CHECK); aprovar → fato com status (fluxo M21 intacto). Moldes:
  *  p1c-contrato-reextract + p1c-contrato-aprovacao. llm.ts mocado PARCIAL (vi.mock + vi.hoisted). */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { hasDb, wipeBrain } from "./helpers/db.ts";
@@ -8,7 +8,7 @@ import { hasDb, wipeBrain } from "./helpers/db.ts";
 const BODY =
   "ata: ela escolheu o plano pocket nesta reunião; teobaldo vai ser o mentor da turma.";
 
-// mock PARCIAL: structured devolve out fixo (1 vago + 1 nome próprio novo, ambos na dim da receita);
+// mock PARCIAL: structured devolve out fixo (1 vago + 1 nome próprio novo, ambos no tipo das regras);
 // resolveExtractionProvider → "api". vi.hoisted p/ a factory ter o fixture sem TDZ.
 const mockOut = vi.hoisted(() => ({
   out: {
@@ -37,7 +37,7 @@ const SLUG = "pag-m23b-autocontencao";
 
 const SOURCE: SourceRow = {
   id: SRC, name: "Fonte M23-B", channel: "upload", type: "nota",
-  recipe: { fields: [{ dimension: "decisions", label: "Decisões", area: "" }], guidance: "" },
+  filtro: { fields: [{ dimension: "decisions", label: "Decisões", area: "" }], guidance: "" },
   default_sensitivity: "restrito", status: "ativa", last_read_at: null,
 };
 
@@ -90,7 +90,7 @@ describe.skipIf(!hasDb())("M23-B — fila de auto-contenção (DB real, LLM moca
 
   it("3. aprovar a hipótese vaga → fato com selo (fluxo M21 intacto)", async () => {
     const e = await getEngine(BRAIN);
-    // pega a hipótese vaga real gerada pelo extractOne no it.1
+    // pega o item pra revisar vago real gerado pelo extractOne no it.1
     const pend = await e.listReview({ status: "pendente" });
     const vago = pend.find((r) => r.source_slug === SLUG && r.reason === "entidade_vaga" && r.id !== "rev-m23b-roundtrip")!;
     await approveReviewItem(BRAIN, vago.id, "humano-m23b");

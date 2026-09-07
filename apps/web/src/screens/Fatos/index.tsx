@@ -6,7 +6,7 @@
  *  por entidade prova: "achava X mai→jun, virou Y jun→".
  *
  *  Dados (read-only; brain injetado pelo cliente):
- *    - api.facts(dim, { type, asOf, current, limit }) → fatos da dimensão
+ *    - api.facts(dim, { type, asOf, current, limit }) → fatos do tipo
  *    - api.timeline(entity, { pred })                 → história de uma entidade
  *
  *  M10/S4: a API agora tipa o retorno como FactItem[] (espelha bff-m9.ts). O claim
@@ -14,7 +14,7 @@
  *  são OMITIDOS, nada é inventado. valid_to vazio/null = fato VIGENTE (verdade atual).
  *  A timeline agrupa por (predicate, tier): cada tier é uma SÉRIE (degrau por degrau).
  *
- *  Controles: dimensão (dim), toggle "só vigentes" (current), data as-of.
+ *  Controles: tipo (dim), toggle "só vigentes" (current), data as-of.
  *  Clique numa linha → painel lateral com a linha do tempo daquela entidade.
  *  Estados: carregando (Skeleton), vazio, erro. Vigente vs expirado distinto.
  */
@@ -55,7 +55,7 @@ const DIMS: { key: string; label: string }[] = [
 ];
 
 const LIMIT = 200;
-// piso de exibição: fatos abaixo disso são SUSPEITOS (registrado sem âncora verbatim, ~0.10) —
+// piso de exibição: fatos abaixo disso são SEM PROVA (registrado sem âncora verbatim, ~0.10) —
 // escondidos por padrão. Casado com CONF_UNGROUNDED/CONF_REGISTERED do motor (indexer.ts).
 const SUSPEITO_MAX = 0.2;
 
@@ -64,7 +64,7 @@ function isVigente(f: Fact): boolean {
   return f.valid_to == null || f.valid_to === "";
 }
 
-/** status do selo → variante do StatusChip (tolerante a valores desconhecidos). */
+/** status (`Selo`) → variante do StatusChip (tolerante a valores desconhecidos). */
 function statusVariant(status?: string): StatusVariant {
   switch ((status || "").toLowerCase()) {
     case "fato":
@@ -110,8 +110,8 @@ export default function Fatos() {
 
   const [dim, setDim] = useState("decisions");
   const [currentOnly, setCurrentOnly] = useState(false);
-  // por padrão, esconde os SUSPEITOS (baixa certeza): observação textual sem âncora verbatim na
-  // fonte (~0.10). Os grounded (0.45+) e os claims (0.60+) aparecem. Toggle revela os suspeitos.
+  // por padrão, esconde os SEM PROVA (baixa certeza): observação textual sem âncora verbatim na
+  // fonte (~0.10). Os grounded (0.45+) e os claims (0.60+) aparecem. Toggle revela os sem prova.
   const [incluirSuspeitos, setIncluirSuspeitos] = useState(false);
   const [asOf, setAsOf] = useState("");
   // entidade selecionada → abre o painel de linha do tempo
@@ -131,13 +131,13 @@ export default function Fatos() {
   );
 
   const todos = useMemo(() => (Array.isArray(data) ? data : []), [data]);
-  // FILTRO INICIAL: esconde os suspeitos de baixa certeza (< 0.2 → registrado sem âncora). Toggle reabre.
+  // FILTRO INICIAL: esconde os sem prova de baixa certeza (< 0.2 → registrado sem âncora). Toggle reabre.
   // ORDEM: certeza do MAIOR pro menor (pela confiança JÁ decaída/exibida, não a crua do banco).
   const facts = useMemo(() => {
     const base = incluirSuspeitos ? todos : todos.filter((f) => (f.confidence ?? 0) >= SUSPEITO_MAX);
     return [...base].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
   }, [todos, incluirSuspeitos]);
-  const ocultos = todos.length - facts.length; // quantos suspeitos foram escondidos
+  const ocultos = todos.length - facts.length; // quantos sem prova foram escondidos
 
   // quais colunas têm dados em PELO MENOS um fato? (omitimos colunas vazias)
   const cols = useMemo(() => {
@@ -175,7 +175,7 @@ export default function Fatos() {
           marginBottom: 18,
         }}
       >
-        {/* dimensão */}
+        {/* tipo */}
         {DIMS.map((d) => (
           <Chip key={d.key} active={dim === d.key} onToggle={() => setDim(d.key)}>
             {d.label}
@@ -190,10 +190,10 @@ export default function Fatos() {
           Só vigentes
         </Chip>
 
-        {/* incluir suspeitos de baixa certeza (escondidos por padrão) */}
+        {/* incluir sem prova de baixa certeza (escondidos por padrão) */}
         <Chip active={incluirSuspeitos} onToggle={() => setIncluirSuspeitos((v) => !v)} style={{ gap: 6 }}>
           <Icon name="info" size={13} />
-          Incluir fatos de baixa certeza{!incluirSuspeitos && ocultos > 0 ? ` (${ocultos})` : ""}
+          Incluir sem prova{!incluirSuspeitos && ocultos > 0 ? ` (${ocultos})` : ""}
         </Chip>
 
         {/* as-of */}

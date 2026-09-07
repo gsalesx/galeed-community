@@ -411,7 +411,7 @@ async function main() {
       });
       emit(json, r, () =>
         r.forEach((f) => {
-          // fato bitemporal (tem entity) → selo rico; senão linha simples
+          // fato bitemporal (tem entity) → status rico; senão linha simples
           if (f.entity) console.log(`${factSeloHeader(f)}\n  ${f.text}`);
           else console.log(`• (${f.source_slug}) ${f.text}`);
         }),

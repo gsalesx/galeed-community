@@ -6,7 +6,7 @@ description: Use quando o aluno quiser entender o projeto Galeed — "como funci
 # Mapa do Galeed
 
 O Galeed é a memória do negócio: conteúdo cru entra por UM funil (dedupe + fila +
-extração de fatos com receita), vira fatos bitemporais com fonte citada, e sai por
+extração de fatos com filtro), vira fatos bitemporais com fonte citada, e sai por
 painel, API `/v1`, MCP e webhooks.
 
 ## O monorepo
@@ -25,7 +25,7 @@ painel, API `/v1`, MCP e webhooks.
 
 ```
 canal → ingestor.normalize() → fila (galeed_ingest_jobs) → worker extrai fatos
-      → receita/gate → fatos com selo → páginas + dossiês → painel / /v1 / MCP / espelho GitHub
+      → filtro/gate → fatos com selo → páginas + dossiês → painel / /v1 / MCP / espelho GitHub
 ```
 
 - **Ingestores**: `apps/server/src/core/ingestion/ingestors/` (1 arquivo cada — ver skill galeed-criar-ingestor).

@@ -12,7 +12,7 @@ import { SECTIONS } from "../data/toc";
 // índice e título vêm da fonte única (toc.ts) — sem hardcode que descole da nav.
 const meta = SECTIONS.find((s) => s.id === "arquitetura")!;
 
-// o selo epistêmico é uma PROJEÇÃO determinística dos campos que o fato já tem —
+// o status (`selo` na API) é uma PROJEÇÃO determinística dos campos que o fato já tem —
 // montado sem LLM, sem custo, sem latência. Este é o objeto que volta com cada trecho.
 const selo = `{
   "trecho": "Fechamos o plano em R$ 2.500/mês.",
@@ -40,7 +40,7 @@ const selo = `{
       <strong>entende</strong> o conteúdo: ele destila <strong>fatos
       estruturados</strong> &mdash; com número, unidade, período, validade no
       tempo e a entidade dona &mdash;, versiona a verdade sem nunca sobrescrever,
-      e devolve cada trecho com um <strong>selo</strong> que diz o que aquilo é,
+      e devolve cada trecho com um <strong>status</strong> que diz o que aquilo é,
       de onde veio, quando valeu e quanto confiar.
     </p>
   </div>
@@ -48,7 +48,7 @@ const selo = `{
   <Principle>
     <b>Memória bitemporal por extração.</b> O Galeed transforma texto cru em
     fatos tipados, datados e ancorados no dono certo &mdash; e nunca chuta.
-    Você só joga. Ele organiza.
+    Você só joga. Ele processa.
   </Principle>
 
   <!-- ============ DIAGRAMA DE ARQUITETURA DO SISTEMA ============ -->
@@ -58,7 +58,7 @@ const selo = `{
   <div class="sub">A esteira, em cinco etapas</div>
   <div class="prose">
     <p>
-      Por trás do verbo <strong>organiza</strong> roda uma esteira. Ela vive em
+      Por trás do verbo <strong>processa</strong> roda uma esteira. Ela vive em
       duas faixas: o que é <strong>barato e instantâneo</strong> acontece na
       hora, enquanto você espera; o que é <strong>caro</strong> &mdash; a única
       IA do caminho de escrita &mdash; roda em segundo plano e te avisa quando
@@ -166,10 +166,10 @@ const selo = `{
       jogo. Assim o fato ancora no dono certo &mdash; o seu preço não se mistura
       com o faturamento do cliente.
     </Field>
-    <Field key="receita de extração">
+    <Field key="regras da fonte">
       Cada fonte declara um contrato: o que extrair e o que conta como fato. O que
       casa vira <Chip variant="fact">fact</Chip>; o resto vira
-      <Chip variant="hypo">hypothesis</Chip> e espera revisão.
+      <Chip variant="hypo">hypothesis</Chip> e vai pra revisar.
     </Field>
     <Field key="bitemporalidade">
       Cada fato carrega <b>quando é verdade no mundo</b> (<code class="ic">valid_from</code> /
@@ -182,7 +182,7 @@ const selo = `{
       ganha um <code class="ic">valid_until</code>, e o novo aponta
       <code class="ic">supersedes</code>. <b>Nada se apaga.</b>
     </Field>
-    <Field key="selo epistêmico">
+    <Field key="status">
       Todo trecho volta com um cabeçalho determinístico &mdash; status, confiança,
       validade, proveniência, citação e por qual sinal foi achado. É projeção de
       campos que já existem: <b>zero IA, zero latência</b>.
@@ -209,7 +209,7 @@ const selo = `{
       explica</b> &mdash; o ciclo é quase todo determinístico, com teto de custo.
     </Field>
     <Field key="triagem / juiz da fila">
-      A hipótese cai numa fila de revisão. Um juiz <b>recomenda</b> aprovar ou
+      O que vai pra revisar cai numa fila. Um juiz <b>recomenda</b> aprovar ou
       descartar, com motivo e confiança, em lote &mdash; mas <b>nunca decide</b>.
       A aprovação é humana.
     </Field>
@@ -223,10 +223,10 @@ const selo = `{
   </Admonition>
 
   <!-- ============ O SELO COMO PROJEÇÃO ============ -->
-  <div class="sub">O selo é uma projeção, não uma opinião</div>
+  <div class="sub">O status é uma projeção, não uma opinião</div>
   <div class="prose">
     <p>
-      Vale insistir num ponto, porque é o coração do "nunca chuta": o selo não é
+      Vale insistir num ponto, porque é o coração do "nunca chuta": o status não é
       gerado pela IA. Ele é <strong>montado por código</strong> a partir dos
       campos que o fato já tem. Por isso custa zero, não adiciona latência e nunca
       contradiz o dado &mdash; é uma janela fiel sobre a memória, não um palpite
@@ -253,8 +253,8 @@ const selo = `{
       <li>
         <b>Anti-alucinação por construção.</b> Só vira fato o que casa com o
         contrato da fonte e tem prova (o trecho literal). Toda resposta carrega
-        fonte, data e confiança; uma hipótese jamais aparece como fato. E o selo
-        que carimba isso é determinístico &mdash; não sai do caminho rápido.
+        fonte, data e confiança; um item pra revisar jamais aparece como fato. E o status
+        que marca isso é determinístico &mdash; não sai do caminho rápido.
       </li>
       <li>
         <b>Governança por construção, não por política.</b> O sigilo é

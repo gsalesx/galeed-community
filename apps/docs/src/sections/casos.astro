@@ -153,12 +153,12 @@ const caso_d = askTabs(
         da última call, e seu agente de vendas não tem como lembrar disso na hora.
       </p>
       <p>
-        <strong>Como o Galeed resolve.</strong> A call já foi ingerida e virou fato
-        carimbado. O agente pergunta em português e recebe o preço com a fonte citada
+        <strong>Como o Galeed resolve.</strong> A call já foi ingerida e virou fato.
+        O agente pergunta em português e recebe o preço com a fonte citada
         — qual call, em que momento — sem você indexar nada à mão.
       </p>
       <CodeTabs tabs={caso_a} filename="o agente pergunta" />
-      <CodeBlock lang="json" filename="resposta · fato com selo" code={resp_a} />
+      <CodeBlock lang="json" filename="resposta · fato com status" code={resp_a} />
       <Admonition type="tip" flush>
         <b>Resultado.</b> O copiloto responde com o número exato e o atribui à call certa.
         Se o preço tivesse mudado, o Galeed devolveria o vigente e arquivaria o antigo.
@@ -222,7 +222,7 @@ const caso_d = askTabs(
       </p>
       <CodeTabs tabs={caso_d} filename="chave restrita à área de vendas" />
       <Principle>
-        <b>Você só joga. Ele organiza.</b> O escopo da chave é o único controle de acesso —
+        <b>Você só joga. Ele processa.</b> O escopo da chave é o único controle de acesso —
         a mesma pergunta entrega histórias diferentes para chaves diferentes, sem você
         montar nada por usuário.
       </Principle>

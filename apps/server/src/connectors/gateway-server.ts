@@ -504,8 +504,8 @@ export function startGatewayServer(bootHome = brainHome()) {
         // query pública → params internos (ver mapeamento no relatório).
         const statusParam = (u.searchParams.get("status") || "fact").toLowerCase();
         // MAJOR fix: o enum público desta rota é {fact, archived}. hypothesis NÃO é suportado aqui
-        // (a rota parte de dim:"decisions", que não contém hipóteses) — devolver fatos como se fossem
-        // hipóteses, ou silenciosamente [], mentiria. 400 explícito mantém doc (fatos.astro) e código
+        // (a rota parte de dim:"decisions", que não contém itens pra revisar) — devolver fatos como se fossem
+        // itens pra revisar, ou silenciosamente [], mentiria. 400 explícito mantém doc (fatos.astro) e código
         // COERENTES. hypothesis fica como roadmap, fora da fase 1.
         const VALID_STATUS = ["fact", "archived"];
         if (statusParam === "hypothesis") {
@@ -514,11 +514,11 @@ export function startGatewayServer(bootHome = brainHome()) {
         if (!VALID_STATUS.includes(statusParam)) {
           return send(res, 400, { error: "status inválido (use fact|archived)" });
         }
-        // `dim` público (default "decisions" = retrocompat byte-a-byte): as dimensões reais são
-        // definidas por receita/pack do tenant (inclusive em PT — "decisoes", "compromissos"…),
+        // `dim` público (default "decisions" = retrocompat byte-a-byte): os tipos reais são
+        // definidos por regras (`filtro`)/pack do tenant (inclusive em PT — "decisoes", "compromissos"…),
         // então NÃO há allowlist de valores: validamos só o FORMATO (o SQL do motor é parametrizado;
         // dim inexistente devolve [] honesto). Sem isso a borda pública só alcançava "decisions"
-        // hardcoded — e devolvia [] até pra decisões em cérebros com receitas PT.
+        // hardcoded — e devolvia [] até pra decisões em cérebros com regras PT.
         const dim = (u.searchParams.get("dim") || "decisions").toLowerCase();
         if (!DIM_RE.test(dim)) {
           return send(res, 400, { error: "dim inválida (use um nome de dimensão: a-z, 0-9, _; até 40 chars)" });
@@ -544,7 +544,7 @@ export function startGatewayServer(bootHome = brainHome()) {
         // `cursor` SÓ pode sair quando há MAIS itens IN-SCOPE além do slice. Antes: limit:undefined
         // pegava 200 crus, paginava pós-filtro e emitia cursor como se houvesse percorrido tudo.
         const rows = await factsHandler(brain, {
-          dim, // dimensão do query param (default "decisions" — retrocompat)
+          dim, // tipo do query param (default "decisions" — retrocompat)
           asOf,
           // current não vem do contrato público; asOf cobre o recorte temporal. Sem asOf = estado atual.
           limit: FACTS_UNIVERSE_MAX, // teto EXPLÍCITO do universo (documentado no contrato)
@@ -742,8 +742,8 @@ export function startGatewayServer(bootHome = brainHome()) {
         }
 
         // sensitivity (enum público) — validado; o mapeamento público→interno fica registrado. O
-        // pipeline de TEXTO ad-hoc (sem receita de fonte) não aceita nível por-job hoje: entra como
-        // 'restrito' (=secret) por fail-closed do capture, COERENTE com o contrato ("sem receita →
+        // pipeline de TEXTO ad-hoc (sem regras da fonte) não aceita nível por-job hoje: entra como
+        // 'restrito' (=secret) por fail-closed do capture, COERENTE com o contrato ("sem regras →
         // secret"). Enum inválido → 400.
         if (body.sensitivity !== undefined) {
           const s = typeof body.sensitivity === "string" ? body.sensitivity.toLowerCase() : "";
@@ -777,7 +777,7 @@ export function startGatewayServer(bootHome = brainHome()) {
         const { jobId } = await enqueueIngestJob({
           brain,
           kind: "text",
-          type: source, // o `source` público vira o `type` do job (a receita de extração do motor)
+          type: source, // o `source` público vira o `type` do job (o filtro de extração do motor)
           contentHash,
           textBody: content,
           jobDate,

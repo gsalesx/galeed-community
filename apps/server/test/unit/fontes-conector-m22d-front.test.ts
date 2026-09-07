@@ -23,7 +23,7 @@ function fonte(over: Partial<Source> = {}): Source {
     name: "Conta Azul",
     channel: "conta-azul",
     type: "vendas",
-    recipe: { fields: [] },
+    filtro: { fields: [] },
     default_sensitivity: "restrito",
     status: "ativa",
     last_read_at: null,

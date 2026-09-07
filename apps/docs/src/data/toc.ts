@@ -35,7 +35,7 @@ export const SECTIONS: TocSection[] = [
   { id: "ingestao", ix: "07", title: "Ingestão", group: "Referência da API", method: "post" },
   { id: "perguntar", ix: "08", title: "Perguntar", group: "Referência da API", method: "post" },
   { id: "fatos", ix: "09", title: "Fatos", group: "Referência da API", method: "get" },
-  { id: "fontes", ix: "10", title: "Fontes e receitas", group: "Referência da API" },
+  { id: "fontes", ix: "10", title: "Fontes e regras", group: "Referência da API" },
   { id: "mcp", ix: "11", title: "MCP: conecte qualquer IA", group: "Integração" },
   { id: "integracoes", ix: "12", title: "Integrações prontas", group: "Integração", method: "post" },
   { id: "webhooks", ix: "13", title: "Webhooks", group: "Integração" },

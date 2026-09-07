@@ -208,8 +208,8 @@ describe.skipIf(!hasDb())("C2 — ganchos de emissão de webhook no core", () =>
     await registerHook();
 
     const items: ReviewItemRow[] = [
-      mkItem("r1", "fora_da_receita"),
-      mkItem("r2", "fora_da_receita"),
+      mkItem("r1", "fora_do_filtro"),
+      mkItem("r2", "fora_do_filtro"),
       mkItem("r3", "entidade_vaga"),
     ];
     await addReviewItemsAndNotify(BRAIN, items);
@@ -224,7 +224,7 @@ describe.skipIf(!hasDb())("C2 — ganchos de emissão de webhook no core", () =>
     expect(dels.length).toBe(1);
     const p = dels[0].payload;
     expect(p.items).toBe(3);
-    expect(p.by_reason.fora_da_receita).toBe(2);
+    expect(p.by_reason.fora_do_filtro).toBe(2);
     expect(p.by_reason.entidade_vaga).toBe(1);
     expect(typeof p.at).toBe("string");
   });

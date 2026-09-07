@@ -392,11 +392,11 @@ export interface IngestJob {
 }
 
 // ---------------------------------------------------------------------------
-// Fontes com receita + fila de revisão (M21/S3 — espelham SourceRow/HypothesisView do BFF)
+// Fontes com filtro + fila de revisão (M21/S3 — espelham SourceRow/HypothesisView do BFF)
 // ---------------------------------------------------------------------------
 
-export interface SourceRecipeField { dimension: string; label: string; area: string }
-export interface SourceRecipe { fields: SourceRecipeField[]; guidance?: string; triage_profile?: string }
+export interface SourceFilterField { dimension: string; label: string; area: string }
+export interface SourceFilter { fields: SourceFilterField[]; guidance?: string; triage_profile?: string }
 /** M22-D — estado da conexão do conector (espelha SourceConnectionView do M22-A §4.5, migração 29;
  *  nunca vem do /api/sources — é MESCLADO client-side via GET /api/connectors/status). */
 export type ConnectorStatus = "desconectado" | "conectado" | "erro";
@@ -471,13 +471,13 @@ export interface Source {
    *  ("conta-azul"/"gmail" — M22-A §2.3); o union literal vira aberto sem perder autocomplete. */
   channel: "upload" | "paste" | (string & {});
   type: string;
-  recipe: SourceRecipe; default_sensitivity: string; status: "ativa" | "pausada";
+  filtro: SourceFilter; default_sensitivity: string; status: "ativa" | "pausada";
   last_read_at: string | null; created_at?: string;
   pages_count?: number; facts_count?: number;
   /** M22-D — populado pelo MERGE client-side; nunca vem do /api/sources. */
   connector?: ConnectorState | null;
 }
-export type ReviewReason = "fora_da_receita" | "nao_ancorado" | "entidade_vaga" | "conexao_sugerida";
+export type ReviewReason = "fora_do_filtro" | "nao_ancorado" | "entidade_vaga" | "conexao_sugerida";
 export type ReviewStatus = "pendente" | "aprovada" | "descartada";
 /** M25-B (migração 32) — recomendação do juiz persistida no item ("" = juiz não passou por aqui). */
 export type JudgeRecomendacao = "" | "aprovar" | "descartar" | "humano";
@@ -510,7 +510,7 @@ export interface HypothesisGroup {
   count: number;
   decisao: string;       // frase PT pronta da decisão que o grupo representa (dono: M25-A)
   paginas?: number;          // §9.1.2 — nº de páginas afetadas (opcional, uso informativo)
-  dimensao_na_receita?: boolean; // §9.1.2 — a dim já está na receita da fonte (opcional)
+  dimensao_no_filtro?: boolean; // §9.1.2 — o tipo já está nas regras da fonte (opcional)
   amostra: Hypothesis[]; // até 3 itens (§9.1.2 — campo chama `amostra`, não `sample`)
   recomendacoes?: { aprovar: number; descartar: number; humano: number; sem_recomendacao: number };
 }
@@ -521,8 +521,8 @@ export interface BatchApproveResult {
   ja_decididos?: number; paginas_derivadas?: number;  // §9.1.4 — extras opcionais
 }
 export interface BatchDiscardResult { ok?: true; descartados: number; ja_decididos?: number }
-/** §9.1.3 — add-dimension devolve `receita_atualizada` + os números do re-gate. */
-export interface RecipeBatchResult extends BatchApproveResult { receita_atualizada: boolean }
+/** §9.1.3 — add-dimension devolve `filtro_atualizado` + os números do re-gate. */
+export interface FilterBatchResult extends BatchApproveResult { filtro_atualizado: boolean }
 
 /** M25-B — estimativa do juiz (read-only, zero LLM; §9.2.1). */
 export interface JudgeEstimate { itens: number; custo_usd_estimado: number; batch: boolean }
@@ -956,12 +956,12 @@ export const api = {
       ),
   },
 
-  // --- M21: Fontes com receita + fila de revisão (regra de ouro). ---
+  // --- M21: Fontes com filtro + fila de revisão (regra de ouro). ---
   sources: {
     list: () => get<Source[]>("/api/sources"),
-    create: (p: { name: string; channel: string; type: string; recipe?: SourceRecipe; defaultSensitivity?: string }) =>
+    create: (p: { name: string; channel: string; type: string; filtro?: SourceFilter; defaultSensitivity?: string }) =>
       post<Source>("/api/sources", p),
-    update: (id: string, p: { name?: string; type?: string; recipe?: SourceRecipe; defaultSensitivity?: string }) =>
+    update: (id: string, p: { name?: string; type?: string; filtro?: SourceFilter; defaultSensitivity?: string }) =>
       post<Source>(`/api/sources/${encodeURIComponent(id)}`, p),
     setStatus: (id: string, status: "ativa" | "pausada") =>
       post<Source>(`/api/sources/${encodeURIComponent(id)}/status`, { status }),
@@ -1011,7 +1011,7 @@ export const api = {
     discardGroup: (p: { reason: ReviewReason; dimension: string; source_id: string }) =>
       post<BatchDiscardResult>("/api/hypotheses/groups/discard", p),
     addDimToRecipe: (p: { source_id: string; dimension: string }) =>
-      post<RecipeBatchResult>("/api/hypotheses/groups/add-dimension", p),
+      post<FilterBatchResult>("/api/hypotheses/groups/add-dimension", p),
     // --- M25-B: juiz triador (recomenda, NUNCA aprova — invariante #5) ---
     // Polling = re-POST de `run()` (NÃO existe GET /judge/status — §9.2.2).
     judge: {

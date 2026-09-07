@@ -3,7 +3,7 @@
  *      `publishable()` o exclui ANTES da tradução (cobre /v1/facts E o facts[] do /v1/ask no
  *      mesmo ponto — o toPublic do gateway-server). Antes, publicStatus o rotulava "fact".
  *  (2) `dim` público do /v1/facts: valida só o FORMATO (DIM_RE) — as dims reais são definidas
- *      por receita/pack (inclusive em PT), então allowlist estática estaria errada.
+ *      por filtro/pack (inclusive em PT), então allowlist estática estaria errada.
  *  Testes PUROS (gateway-shape.ts não tem HTTP/IO) — nenhum teste pinava esse comportamento. */
 import { describe, it, expect } from "vitest";
 import { publishable, DIM_RE, toPublicFact, publicStatus } from "../../src/connectors/gateway-shape.ts";
@@ -55,7 +55,7 @@ describe("publishable — 'nao-verificado' nunca sai pela borda /v1", () => {
 });
 
 describe("DIM_RE — formato do parâmetro público dim do /v1/facts", () => {
-  it("aceita dims default (EN) e dims de pack/receita (PT)", () => {
+  it("aceita dims default (EN) e dims de pack/filtro (PT)", () => {
     for (const d of ["decisions", "facts", "quotes", "decisoes", "compromissos", "precos", "open_questions"]) {
       expect(DIM_RE.test(d), d).toBe(true);
     }
