@@ -33,7 +33,6 @@ export default function Acesso() {
     fetchPrincipals(signal),
   [current?.id]);
   const principals = (principalsQ.data ?? []).filter((p) => !isSystemPrincipal(p.id, p.label));
-  const logQ = useQuery<AccessLogEntry[]>("rbac:log", () => api.rbac.log(), [current?.id]);
   // áreas REAIS do cérebro (tags area: + grants) — nada de lista inventada no front.
   const areasQ = useQuery<AreaView[]>("rbac:areas", () => api.rbac.areas(), [current?.id]);
   const areas = areasQ.data ?? [];
@@ -47,6 +46,13 @@ export default function Acesso() {
   const [editing, setEditing] = useState<Principal | null>(null);
   const [freshToken, setFreshToken] = useState<string | null>(null);
   const [credsFor, setCredsFor] = useState<Principal | null>(null);
+  const [historicoOpen, setHistoricoOpen] = useState(false);
+  const precisaLog = historicoOpen || !!credsFor;
+  const logQ = useQuery<AccessLogEntry[]>(
+    precisaLog ? "rbac:log" : "rbac:log:idle",
+    () => (precisaLog ? api.rbac.log() : Promise.resolve([])),
+    [current?.id, precisaLog],
+  );
 
   // ver como vê
   const [viewAs, setViewAs] = useState<Principal | null>(null);
@@ -176,9 +182,12 @@ export default function Acesso() {
             No bot, a chave e o MCP saem daqui.
           </p>
         </div>
-        <Button variant="primary" icon={<Icon name="plus" size={15} />} onClick={openInvite}>
-          Convidar
-        </Button>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <Button onClick={() => setHistoricoOpen(true)}>Histórico</Button>
+          <Button variant="primary" icon={<Icon name="plus" size={15} />} onClick={openInvite}>
+            Convidar
+          </Button>
+        </div>
       </header>
 
       {/* KPIs */}
@@ -238,9 +247,13 @@ export default function Acesso() {
                 <AccessMatrix principals={principals} areas={areas} />
               )}
               <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)" }}>
-                <a href="#historico" style={{ fontSize: 13, color: "var(--accent-ink)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  Histórico de acesso <Icon name="arrow" size={14} />
-                </a>
+                <button
+                  type="button"
+                  onClick={() => setHistoricoOpen(true)}
+                  style={{ fontSize: 13, color: "var(--accent-ink)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: 0, padding: 0, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Abrir histórico <Icon name="arrow" size={14} />
+                </button>
               </div>
             </>
           )}
@@ -281,25 +294,25 @@ export default function Acesso() {
         </div>
       </div>
 
-      {/* histórico de acesso — alvo do link "#historico" */}
-      <section id="historico" style={{ marginTop: 28, scrollMarginTop: 70 }}>
-        <Card
-          padding={0}
-          header={
-            <div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Histórico de acesso</h3>
-              <span style={{ fontSize: 12.5, color: "var(--muted)" }}>Consultas e mudanças de acesso, mais recentes primeiro.</span>
-            </div>
-          }
-        >
+      <Modal
+        open={historicoOpen}
+        onClose={() => setHistoricoOpen(false)}
+        title="Histórico de acesso"
+        width={640}
+        footer={<Button variant="ghost" onClick={() => setHistoricoOpen(false)}>Fechar</Button>}
+      >
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--muted)" }}>
+          Consultas e mudanças de acesso, mais recentes primeiro.
+        </p>
+        <div style={{ maxHeight: "60vh", overflowY: "auto", margin: "0 -18px" }}>
           {logQ.loading && <p style={{ padding: "18px 20px", color: "var(--muted)" }}>Carregando…</p>}
           {logQ.error && <p style={{ padding: "18px 20px", color: "var(--danger)" }}>Não deu pra carregar o histórico: {logQ.error.message}</p>}
           {!logQ.loading && !logQ.error && (logQ.data ?? []).length === 0 && (
             <p style={{ padding: "28px 20px", textAlign: "center", color: "var(--muted)" }}>Nada por aqui ainda. Consultas e mudanças de acesso aparecem neste feed.</p>
           )}
           {!logQ.loading && !logQ.error && (logQ.data ?? []).map((e, i) => <HistoryRow key={`${e.ts}-${i}`} e={e} />)}
-        </Card>
-      </section>
+        </div>
+      </Modal>
 
       {/* wizard convidar / editar */}
       <InviteWizard

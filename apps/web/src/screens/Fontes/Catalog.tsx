@@ -192,7 +192,7 @@ export function Catalog({ onCreate, onConnect, fontes, onWhatsApp }: CatalogProp
                     cursor: "pointer",
                   }}
                 >
-                  Abrir
+                  Conectar
                 </button>
               ) : real ? (
                 <button

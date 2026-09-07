@@ -41,7 +41,7 @@ export function keepPendingCodes(next: EvolutionStatus, prev: EvolutionStatus | 
   };
 }
 
-export function WhatsAppEvolution({ setToast }: { setToast: ToastFn }) {
+export function WhatsAppEvolution({ setToast, embedded }: { setToast: ToastFn; embedded?: boolean }) {
   const stQ = useQuery("fontes:evolution", () => api.evolution.status(), []);
   const [busy, setBusy] = useState<string | null>(null);
   const [local, setLocal] = useState<Awaited<ReturnType<typeof api.evolution.connect>> | null>(null);
@@ -135,10 +135,10 @@ export function WhatsAppEvolution({ setToast }: { setToast: ToastFn }) {
 
   const digitsHint = number.replace(/\D/g, "");
 
-  return (
-    <Card padding="16px 18px 18px" style={{ marginBottom: 16 }}>
-      <EndpointHeader kind="WHATSAPP" title="WhatsApp (Evolution)" note="QR ou número" />
-      <p style={{ margin: "8px 0 12px", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
+  const body = (
+    <>
+      {!embedded && <EndpointHeader kind="WHATSAPP" title="WhatsApp (Evolution)" note="QR ou número" />}
+      <p style={{ margin: embedded ? "0 0 12px" : "8px 0 12px", fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
         Várias contas no mesmo cérebro. Cada uma tem instância e QR/código próprios — remover um
         número não derruba os outros nem apaga a memória.
       </p>
@@ -398,6 +398,13 @@ export function WhatsAppEvolution({ setToast }: { setToast: ToastFn }) {
           Desloga e apaga só este aparelho. Os outros números seguem. A memória do WhatsApp não é apagada.
         </p>
       </Modal>
+    </>
+  );
+
+  if (embedded) return body;
+  return (
+    <Card padding="16px 18px 18px" style={{ marginBottom: 16 }}>
+      {body}
     </Card>
   );
 }

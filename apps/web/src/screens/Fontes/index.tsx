@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Icon, Skeleton, Toast } from "../../ui";
+import { Button, Card, Icon, Modal, Skeleton, Toast } from "../../ui";
 import type { ToastTone } from "../../ui";
 import { ApiError, api } from "../../lib/api";
 import { useQuery } from "../../lib/useQuery";
@@ -101,6 +101,7 @@ export default function Fontes() {
   const [aguardando, setAguardando] = useState<string | null>(null);
   const [linkManual, setLinkManual] = useState<{ provider: string; url: string } | null>(null);
   const [conectorIndisponivel, setConectorIndisponivel] = useState<string | null>(null);
+  const [waOpen, setWaOpen] = useState(false);
   const catRef = useRef<HTMLDivElement>(null);
 
   // M22-D — a verdade da lista é /api/sources + /api/connectors/status mesclados (LEI 1/§2.3).
@@ -406,12 +407,10 @@ export default function Fontes() {
         fontes={sources}
         onCreate={(preset) => setDrawer({ mode: "criar", source: null, presetChannel: preset.channel })}
         onConnect={conectar}
-        onWhatsApp={() => document.getElementById("fontes-whatsapp")?.scrollIntoView({ behavior: "smooth" })}
+        onWhatsApp={() => setWaOpen(true)}
       />
 
-      <div id="fontes-whatsapp" style={{ scrollMarginTop: 70 }}>
-        <SecHeader>WhatsApp e entrada automática</SecHeader>
-        <WhatsAppEvolution setToast={setToast} />
+      <div style={{ marginTop: 22 }}>
         <WebhookIngest
           copy={(text, label) => {
             if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
@@ -419,6 +418,20 @@ export default function Fontes() {
           }}
         />
       </div>
+
+      <Modal
+        open={waOpen}
+        onClose={() => setWaOpen(false)}
+        title="Conectar WhatsApp"
+        width={560}
+        footer={
+          <Button variant="ghost" onClick={() => setWaOpen(false)}>
+            Fechar
+          </Button>
+        }
+      >
+        <WhatsAppEvolution setToast={setToast} embedded />
+      </Modal>
 
       {/* 6. drawer */}
       {drawer && (
