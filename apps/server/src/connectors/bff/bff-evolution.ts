@@ -21,6 +21,9 @@ import {
   webhookUrlFor,
 } from "../../core/platform/evolution.ts";
 import { BffError } from "./bff-common.ts";
+import { findSourceByProvider } from "../../core/ingestion/connector-ingest.ts";
+import { ingestorProviderKey, resolveIngestorSource } from "../../core/ingestion/ingestors/deliver.ts";
+import { evolutionWhatsappIngestor } from "../../core/ingestion/ingestors/evolution-whatsapp.ts";
 
 const PRINCIPAL_ID = "agent-whatsapp-evolution";
 const PRINCIPAL_LABEL = "WhatsApp (Evolution)";
@@ -59,6 +62,24 @@ export type EvolutionActionInput = {
   instanceName?: string;
   number?: string;
 };
+
+/** Fonte WhatsApp no connect (não espera a 1ª mensagem). Reusa se já existir. */
+async function ensureWhatsappSource(home: string): Promise<void> {
+  const id = await resolveIngestorSource(home, evolutionWhatsappIngestor);
+  const e = await getEngine(home);
+  const src = await e.getSource(id);
+  if (src && src.status === "pausada") await e.setSourceStatus(id, "ativa");
+}
+
+/** Último número saiu: fonte pausada. Crachá e memória ficam. */
+async function pauseWhatsappSourceIfOrphan(home: string): Promise<void> {
+  const left = await listEvolutionInstances(home);
+  if (left.length > 0) return;
+  const found = await findSourceByProvider(home, ingestorProviderKey(evolutionWhatsappIngestor.slug));
+  if (!found) return;
+  const e = await getEngine(home);
+  await e.setSourceStatus(found.sourceId, "pausada");
+}
 
 async function ensureBotPrincipal(home: string): Promise<void> {
   const e = await getEngine(home);
@@ -527,6 +548,7 @@ export async function evolutionConnectHandler(
   const number = parseNumber(input.number);
   try {
     const { token, rotated } = await ensureBotAndToken(home);
+    await ensureWhatsappSource(home);
     await reconcileFromEvolution(home);
     const existing = (await listEvolutionInstances(home)).map((r) => r.instanceName);
     const instanceName = await resolveTargetName(home, input, existing);
@@ -669,9 +691,13 @@ export async function evolutionDisconnectHandler(
   try {
     await deleteRemoteInstance(instanceName);
     await removeEvolutionInstance(home, instanceName);
+    await pauseWhatsappSourceIfOrphan(home);
     const cfg = await getEvolutionConfig(home);
+    const left = await listEvolutionInstances(home);
     return statusPack(home, cfg?.ingestToken ?? null, {
-      message: `Conta ${instanceName} desconectada. As outras seguem ativas.`,
+      message: left.length
+        ? `Número ${instanceName} removido. Os outros WhatsApps seguem ativos.`
+        : `Número ${instanceName} removido. A fonte WhatsApp ficou pausada — a memória permanece.`,
     });
   } catch (err) {
     if (err instanceof BffError) throw err;

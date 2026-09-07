@@ -13,7 +13,7 @@ import {
 } from "../../src/core/platform/evolution.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const ui = readFileSync(join(here, "../../../web/src/screens/Conectar/index.tsx"), "utf8");
+const ui = readFileSync(join(here, "../../../web/src/screens/Fontes/WhatsAppEvolution.tsx"), "utf8");
 
 describe("evolutionInstanceName", () => {
   it("slugifica o brain", () => {
@@ -82,7 +82,7 @@ describe("extractQrBase64", () => {
   });
 });
 
-describe("painel Conectar WhatsApp", () => {
+describe("painel Fontes WhatsApp", () => {
   it("lista contas, QR ou número e pairing code", () => {
     expect(ui).toContain("Adicionar WhatsApp");
     expect(ui).toContain("Conectar com número de telefone");
@@ -103,6 +103,13 @@ describe("BFF Evolution connect reuse", () => {
     expect(bff).toContain("authenticateTokenGlobal");
     expect(bff).toContain("ingest token reemitido");
     expect(bff).toContain("syncInstanceWebhooks");
+  });
+  it("cria a fonte WhatsApp no connect e não revoga o token ao remover um número", () => {
+    const bff = readFileSync(join(here, "../../src/connectors/bff/bff-evolution.ts"), "utf8");
+    expect(bff).toContain("ensureWhatsappSource");
+    expect(bff).toContain("resolveIngestorSource");
+    expect(bff).toContain("pauseWhatsappSourceIfOrphan");
+    expect(bff).not.toMatch(/revokeToken|revoke.*PRINCIPAL_ID/);
   });
 });
 

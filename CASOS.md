@@ -6,7 +6,7 @@ arquivo em `tools/casos/` que você pode **replayar na sua instância**:
 
 ```bash
 npm run caso -- --caso imobiliaria \
-  --token gld_live_SUA_CHAVE \            # chave com can_ingest (Conectar → gerar chave)
+  --token gld_live_SUA_CHAVE \            # chave com can_ingest (Acesso → bot → plugue)
   --email voce@empresa.com --senha ... \   # seu login do painel (quem pergunta é o dono)
   --brain imobiliaria
 ```

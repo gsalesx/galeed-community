@@ -19,6 +19,7 @@ export interface CatalogProps {
   onConnect: (provider: string) => void;
   /** M22-D — fontes já ligadas neste cérebro (pra saber se o provider já tem fonte conectada). */
   fontes: Source[];
+  onWhatsApp?: () => void;
 }
 
 /** Tints do mockup (icon tints .t-*). Os que não têm token viram oklch literal do mockup. */
@@ -51,6 +52,7 @@ interface ProvCard {
   channel?: "upload" | "paste";
   /** M22-D — presente = conector vivo (Conectar/Abrir); chave opaca pro BFF (provider_config_key). */
   provider?: string;
+  whatsapp?: boolean;
 }
 
 /** Opções funcionais: 2 reais (upload/paste) e 2 conectores Nango vivos (conta-azul, google-mail).
@@ -75,6 +77,18 @@ const CARDS: ProvCard[] = [
     icon: "info",
     tint: "blue",
     channel: "paste",
+  },
+  {
+    nome: "WhatsApp",
+    what: (
+      <>
+        Vários números no mesmo cérebro: <Hint>QR · código · remover um sem apagar memória</Hint>
+      </>
+    ),
+    tag: "conversas",
+    icon: "info",
+    tint: "green",
+    whatsapp: true,
   },
   {
     nome: "Conta Azul",
@@ -102,7 +116,7 @@ const CARDS: ProvCard[] = [
   },
 ];
 
-export function Catalog({ onCreate, onConnect, fontes }: CatalogProps) {
+export function Catalog({ onCreate, onConnect, fontes, onWhatsApp }: CatalogProps) {
   return (
     <div
       style={{
@@ -115,7 +129,7 @@ export function Catalog({ onCreate, onConnect, fontes }: CatalogProps) {
         const real = c.channel !== undefined;
         const conectorAtivo = c.provider ? fonteDoProvider(fontes, c.provider) : undefined;
         const jaConectado = conectorAtivo?.connector?.status === "conectado";
-        const hover = real || c.provider !== undefined;
+        const hover = real || c.provider !== undefined || !!c.whatsapp;
         return (
           <div
             key={c.nome}
@@ -161,7 +175,26 @@ export function Catalog({ onCreate, onConnect, fontes }: CatalogProps) {
               <span className="mono" style={{ fontSize: 10, color: "var(--faint)" }}>
                 {c.tag}
               </span>
-              {real ? (
+              {c.whatsapp ? (
+                <button
+                  type="button"
+                  className="fts-ligar"
+                  onClick={() => onWhatsApp?.()}
+                  style={{
+                    border: "1px solid var(--border-strong)",
+                    background: "var(--surface)",
+                    borderRadius: 7,
+                    padding: "5px 12px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--accent-ink)",
+                    fontFamily: "var(--font)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Abrir
+                </button>
+              ) : real ? (
                 <button
                   type="button"
                   className="fts-ligar"

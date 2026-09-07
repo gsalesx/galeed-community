@@ -41,7 +41,7 @@ Guia narrativo: `INGESTORES.md` (raiz). Esta skill é a receita executável.
 5. **Teste unitário** (normalize é puro — sem banco): crie
    `apps/server/test/unit/ingestors-<slug>.test.ts` no padrão de `ingestors-chat.test.ts`.
    Rode da RAIZ do repo: `npm test`.
-6. **Teste vivo**: `npm run dev` + chave com `can_ingest` (painel → Conectar) e:
+6. **Teste vivo**: `npm run dev` + chave com `can_ingest` (painel → Acesso) e:
    ```bash
    curl -X POST "http://localhost:8790/v1/ingestors/<slug>" \
      -H "Authorization: Bearer gld_live_..." -H "Content-Type: application/json" \

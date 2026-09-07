@@ -6,7 +6,8 @@ description: Use quando o aluno quiser plugar uma IA/agente no cérebro — "con
 # Conectar uma IA ao cérebro
 
 Três portas, da mais simples pra mais crua. Em TODAS: a chave `gld_live_...` nasce no
-painel (**Conectar → chaves do cérebro**) e o escopo viaja com ela.
+painel (**Acesso → bot → plugue**) e o escopo viaja com ela. Motores de LLM (ChatGPT)
+ficam em **Conectar**.
 
 ## A regra nº 1 (causa 90% dos "responde vazio")
 
@@ -20,7 +21,7 @@ ele simplesmente não vê.
 ```json
 { "mcpServers": { "galeed": {
     "command": "npx", "args": ["-y", "@galeed/mcp"],
-    "env": { "GALEED_KEY": "gld_live_...", "GALEED_URL": "https://seu-galeed" } } } }
+    "env": { "GALEED_TOKEN": "gld_live_...", "GALEED_API_URL": "https://galeed.guilhermesales.com/v1" } } } }
 ```
 
 Template pronto: `mcp.json.example` (raiz). O pacote é HTTP-only (`apps/mcp/`, README lá):
@@ -52,5 +53,5 @@ n8n e Zapier têm skill própria (galeed-n8n, galeed-zapier).
 | respostas vazias / `withheld` alto | bot sem acesso total (regra nº 1) |
 | 401 | chave revogada/errada; god-token (API_TOKEN) NÃO autentica no `/v1` por design |
 | 403 no ingest | chave sem `can_ingest` |
-| MCP não conecta | `GALEED_URL` sem https/host errado; teste `curl $URL/v1/ingestors` com a chave |
+| MCP não conecta | `GALEED_API_URL` sem https/host errado; teste `curl $GALEED_API_URL/ingestors` com a chave |
 | agente "esquece" | o Galeed é a memória — mande o agente GRAVAR decisões via `galeed_ingest` |

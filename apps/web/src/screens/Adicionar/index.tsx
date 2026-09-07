@@ -14,7 +14,7 @@
  *   1. page-head   — h1 + subtítulo + tese curta (Tempo 1 / Tempo 2)
  *   2. seletor tipo + dropzone — escolhe o tipo, depois solta arquivo/texto
  *   3. fila        — itens reais → na fila / processando (progresso) / pronto / erro + "de onde veio"
- *   4. automática  — card discreto que aponta pra Conectar (fonte única de verdade da API/webhook)
+ *   4. automática  — card discreto que aponta pra Fontes (WhatsApp, webhook, ingestores)
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -443,7 +443,7 @@ export default function Adicionar() {
         )}
       </section>
 
-      {/* 4. Ingestão automática — discreto, aponta pra Conectar (fonte única de verdade) */}
+      {/* 4. Ingestão automática — discreto, aponta pra Fontes */}
       <section style={{ marginTop: 36 }}>
         <Card padding="14px 18px" style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span
@@ -456,14 +456,14 @@ export default function Adicionar() {
             <div style={{ fontSize: 14, fontWeight: 600 }}>Ingestão automática</div>
             <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
               Notetaker, e-mail, WhatsApp ou automações (Zapier/Make) podem mandar cada evento direto pro
-              cérebro pela API. As instruções completas estão em Conectar.
+              cérebro pela API. WhatsApp e webhook estão em Fontes; a chave do bot, em Acesso.
             </p>
           </div>
           <Link
-            to="/app/conectar"
+            to="/app/fontes"
             style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, color: "var(--accent-ink)", textDecoration: "none", whiteSpace: "nowrap" }}
           >
-            Abrir Conectar →
+            Abrir Fontes →
           </Link>
         </Card>
       </section>

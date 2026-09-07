@@ -15,7 +15,8 @@ import { emitWebhookEvent } from "../platform/webhook-emit.ts"; // C2 — gancho
  *                       claim (lease_until = now()+lease, attempts+1)
  *  queued ────────────────────────────────▶ processing ──▶ findable ──▶ digesting ──┬──▶ done
  *    ▲                                          │              │            │       │
- *    │   reaper: lease expirado, attempts < N   │              │            │       ├──▶ error      (falha definitiva; sem retry — markJobError)
+ *    │   reaper: lease expirado, attempts < N   │              │            │       ├──▶ error      (falha definitiva — markJobError)
+ *    │   LLM: requeueJobAfterLlmFailure         │              │            │       │
  *    └──────────────(backoff exponencial)───────┴──────────────┴────────────┘       │
  *                                                                                   └──▶ batch_submitted ──▶ batch_harvesting ──▶ done
  *        reaper: lease expirado, attempts ≥ N ──▶ dead   (terminal, motivo legível)         (SEM lease: resumível via batch_id — M16)
@@ -24,7 +25,10 @@ import { emitWebhookEvent } from "../platform/webhook-emit.ts"; // C2 — gancho
  *    em queued = "inelegível pra claim até" (backoff do reaper). null em queued = elegível já.
  *  • batch_submitted/batch_harvesting NÃO são governados por lease (esperam a Anthropic por minutos/horas;
  *    a resumibilidade deles é o batch_id persistido + claimPollableBatches). markJobBatchSubmitted LIMPA o lease.
- *  • done/error/dead/digested são terminais; o reaper nunca os toca. error continua SEM retry automático (v1).
+ *  • done/error/dead/digested são terminais; o reaper nunca os toca.
+ *  • Falha transitória de LLM (cadeia esgotada, 429, timeout, auth) NÃO vai pra error:
+ *    requeueJobAfterLlmFailure devolve o job a queued com lease_until no futuro; o poll
+ *    existente retoma. error = falha de conteúdo/pipeline, sem retry automático.
  *  • attempts = nº de vezes que o job foi CLAIMADO (incrementa no claim, não no reaper). */
 export type IngestJobStatus =
   | "queued"
@@ -237,7 +241,7 @@ function defaultLeaseMs(): number {
   return Number.isFinite(n) && n > 0 ? n : 900_000; // 15 min
 }
 
-/** Claim ATÔMICO do próximo job queued ELEGÍVEL (lease_until null ou vencido — backoff do reaper).
+/** Claim ATÔMICO do próximo job queued ELEGÍVEL (lease_until null ou vencido — backoff do reaper ou da LLM).
  *  Grava lease_until = now()+leaseMs e attempts+1. Default do lease: GALEED_JOB_LEASE_MS (15 min).
  *  `for update skip locked` garante que dois claims concorrentes nunca pegam o mesmo job. */
 export async function claimNextJob(leaseMs = defaultLeaseMs()): Promise<IngestJob | null> {
@@ -434,6 +438,25 @@ export async function markJobError(jobId: string, message: string): Promise<void
            finished_at = now(),
            lease_until = null
      where id = ${jobId} and status <> 'dead'`;
+}
+
+/** LLM caiu (ou a cadeia esgotou): o blob fica, o job VOLTA pra fila com backoff.
+ *  Worker já faz poll — sem scheduler novo. Backoff 1–15 min, crescente; não vira lixo. */
+export async function requeueJobAfterLlmFailure(jobId: string, message: string): Promise<void> {
+  const sql = await db();
+  const base = Number(process.env.GALEED_LLM_BACKOFF_MS) > 0 ? Number(process.env.GALEED_LLM_BACKOFF_MS) : 60_000;
+  const cap = Number(process.env.GALEED_LLM_BACKOFF_CAP_MS) > 0 ? Number(process.env.GALEED_LLM_BACKOFF_CAP_MS) : 15 * 60_000;
+  const note = `IA indisponível — o material ficou na esteira e volto a tentar. ${message}`.slice(0, 800);
+  await sql.unsafe(
+    `update galeed_ingest_jobs
+        set status = 'queued',
+            finished_at = null,
+            error_message = $2,
+            message = $2,
+            lease_until = now() + make_interval(secs => least($3, $4 * power(2, greatest(attempts, 1) - 1)) / 1000.0)
+      where id = $1 and status <> 'dead'`,
+    [jobId, note, cap, base],
+  );
 }
 
 /** M21/S2 — resolve o job dono de um lote (batch_id é único por submit). É como o harvest

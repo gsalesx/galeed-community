@@ -25,7 +25,7 @@ tem credencial, smoke (`npm run smoke`) e publicação.
 
 - A app é **privada**: o aluno entra pelo **link de convite** da turma (quem publica é a
   Accelera: `npx zapier push` + `npx zapier users:links`).
-- Credencial: URL do Galeed (sem `/v1`) + chave `gld_live_...` de **Conectar**.
+- Credencial: URL do Galeed (sem `/v1`) + chave `gld_live_...` de **Acesso**.
 - O Galeed precisa estar acessível na internet (o Zapier chama VOCÊ) — Docker com domínio,
   ou túnel (cloudflared/ngrok) pra testar.
 

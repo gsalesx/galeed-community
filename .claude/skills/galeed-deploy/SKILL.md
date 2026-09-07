@@ -70,7 +70,7 @@ público** (a ferramenta chama VOCÊ) — pra testar sem domínio, use um túnel
   banco — tema avançado, NÃO é requisito pra produção do aluno.
 - Painéis prefixam nomes: confirme com `docker ps | grep db` e `docker volume ls | grep blobs`
   antes de escrever o cron de backup.
-- **Pós-deploy**: criar conta no domínio → gerar chave em Conectar → religar integrações
+- **Pós-deploy**: criar conta no domínio → gerar chave em Acesso → religar integrações
   (Zapier/n8n apontando pra URL nova; bots de leitura com **acesso total** em Acesso) →
   conferir em Adicionar que um upload de teste sai de "na fila" (worker vivo).
 

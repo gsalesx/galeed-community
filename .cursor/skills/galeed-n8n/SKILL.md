@@ -19,7 +19,7 @@ planilha/tabela · payload cru pra qualquer slug) + memória (perguntar · busca
 ## Credencial "Galeed API"
 
 - URL do Galeed **sem** `/v1` — n8n em Docker + Galeed no host = `http://host.docker.internal:8790`.
-- Chave `gld_live_...` do painel (**Conectar → chaves**), com `can_ingest` pra ingerir.
+- Chave `gld_live_...` do painel (**Acesso → bot → plugue**), com `can_ingest` pra ingerir.
 - Botão de testar credencial chama `GET /v1/ingestors` — se listar, conexão ok.
 - Bot vai **ler** (Perguntar/Buscar fatos)? Convide em **Acesso → "Todas as áreas
   (acesso total)"** — senão o modo livre é invisível (fail-closed) e a resposta vem vazia.

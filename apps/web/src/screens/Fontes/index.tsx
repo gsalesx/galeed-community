@@ -24,6 +24,8 @@ import { useQuery } from "../../lib/useQuery";
 import { fmtNumber, relativeTime } from "../../lib/format";
 import { useBrain } from "../../lib/auth";
 import { Catalog } from "./Catalog";
+import { WhatsAppEvolution } from "./WhatsAppEvolution";
+import { WebhookIngest } from "./WebhookIngest";
 import { SourceDrawer } from "./SourceDrawer";
 import {
   anexarEstadoConector,
@@ -220,8 +222,8 @@ export default function Fontes() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}>Fontes</h1>
           <p style={{ margin: "3px 0 0", color: "var(--muted)", fontSize: 13.5, maxWidth: "62ch" }}>
-            De onde a informação entra. Cada fonte tem a sua <b>receita</b>: o cérebro sabe exatamente o que extrair
-            dali, e o resto não vira fato.
+            De onde a informação entra. WhatsApp, upload, conectores e webhook alimentam a memória.
+            Cada fonte tem a sua <b>receita</b>: o resto não vira fato.
           </p>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 9 }}>
@@ -404,7 +406,19 @@ export default function Fontes() {
         fontes={sources}
         onCreate={(preset) => setDrawer({ mode: "criar", source: null, presetChannel: preset.channel })}
         onConnect={conectar}
+        onWhatsApp={() => document.getElementById("fontes-whatsapp")?.scrollIntoView({ behavior: "smooth" })}
       />
+
+      <div id="fontes-whatsapp" style={{ scrollMarginTop: 70 }}>
+        <SecHeader>WhatsApp e entrada automática</SecHeader>
+        <WhatsAppEvolution setToast={setToast} />
+        <WebhookIngest
+          copy={(text, label) => {
+            if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+            setToast({ msg: label || "Copiado.", tone: "neutral" });
+          }}
+        />
+      </div>
 
       {/* 6. drawer */}
       {drawer && (

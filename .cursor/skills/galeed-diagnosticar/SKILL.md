@@ -17,7 +17,7 @@ assíncrono — a maioria dos "bugs" é worker parado, escopo ou janela.
 | Ingeriu mas extraiu ZERO fatos | painel → Saúde; terminal do worker | sem `ANTHROPIC_API_KEY` e sem binário `claude`; ou job em `error` na fila |
 | Bot/integração responde vazio | painel → Acesso | chave sem **acesso total** — modo livre é invisível pra escopo por área (fail-closed) |
 | 401 na API `/v1` | — | chave revogada/errada; god-token não vale na borda pública |
-| 403 ao ingerir | painel → Conectar | chave sem `can_ingest` |
+| 403 ao ingerir | painel → Acesso | chave sem `can_ingest` |
 | Busca ruim/nada acha | `.env` | sem `OPENAI_API_KEY` = busca por palavra-chave (semântica desligada) |
 | Espelho GitHub parado | Ajustes → GitHub do cérebro (status/erro da última sync) | PAT expirado/sem contents:write; 5xx do GitHub re-tenta sozinho no próximo tick (~2 min) |
 | Arquivo não some da `entrada/` | fila (painel → Adicionar) | só some quando o job fica `done`; formato não aceito nunca é apagado |

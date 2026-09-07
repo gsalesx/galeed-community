@@ -452,6 +452,17 @@ export interface CodexOauthStart {
   userCode: string;
   interval: number;
 }
+export type LlmSlotId = "chatgpt" | "anthropic" | "openai" | "qwen";
+export interface LlmSlotView {
+  id: LlmSlotId;
+  enabled: boolean;
+  ready: boolean;
+  hint: string;
+}
+export interface LlmChainView {
+  slots: LlmSlotView[];
+  message: string;
+}
 export interface Source {
   id: string; name: string;
   /** "upload" | "paste" para fontes manuais; fontes-conector chegam com o channel do SEED
@@ -970,6 +981,10 @@ export const api = {
     start: () => post<CodexOauthStart>("/api/llm/codex/start", {}),
     poll: () => post<CodexOauthStatus>("/api/llm/codex/poll", {}),
     disconnect: () => post<{ connected: false }>("/api/llm/codex/disconnect", {}),
+  },
+  llmChain: {
+    status: () => get<LlmChainView>("/api/llm/chain"),
+    save: (slots: { id: LlmSlotId; enabled: boolean }[]) => put<LlmChainView>("/api/llm/chain", { slots }),
   },
   hypotheses: {
     // `list` GANHA filtros ADITIVOS (reason/dimension/source_id) — defesa em profundidade do

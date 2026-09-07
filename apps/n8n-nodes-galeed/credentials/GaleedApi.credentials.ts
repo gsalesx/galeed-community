@@ -32,7 +32,7 @@ export class GaleedApi implements ICredentialType {
 			typeOptions: { password: true },
 			default: '',
 			description:
-				'Gere no painel em Conectar → chaves do cérebro. Pra ingerir, a chave precisa da capacidade can_ingest.',
+				'Gere no painel em Acesso → bot → plugue. Pra ingerir, a chave precisa da capacidade can_ingest.',
 			required: true,
 		},
 	];

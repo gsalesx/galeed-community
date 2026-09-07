@@ -22,7 +22,7 @@ ref **não duplica** nada.
 ## Credencial
 
 - **URL do Galeed** (sem `/v1`) — ex.: `https://galeed.suaempresa.com.br`
-- **Chave** `gld_live_...` gerada no painel em **Conectar → chaves do cérebro**
+- **Chave** `gld_live_...` gerada no painel em **Acesso** (popup do bot)
   (precisa de `can_ingest` pra ingerir)
 
 > Pra usar o **Perguntar**, convide o bot em **Acesso** com **"Todas as áreas

@@ -69,6 +69,7 @@ import {
   codexPollHandler,
   codexDisconnectHandler,
 } from "./bff/bff-codex-oauth.ts";
+import { llmChainStatusHandler, llmChainSaveHandler } from "./bff/bff-llm-chain.ts";
 import { gateAndDebit, grantTrial, billingEnabled, CREDIT_COST, listLedger, getSpendCap, setSpendCap, topupRemainingOfBrain, type GateResult } from "../core/platform/credits.ts";
 import { assertEntitledByBrain } from "../core/platform/entitlement.ts";
 import { resolveProvider, subscriptionAvailableAsync } from "../lib/llm.ts";
@@ -321,13 +322,16 @@ import { getEngine } from "../core/platform/engine.ts";
 // M10/S3: o shape de leitura dos principais (toPrincipalShape/labelOfArea/uiLevelOf) foi EXTRAÍDO p/
 // ./bff-rbac-shape.ts no reconcile — os handlers de ESCRITA (bff-rbac-write.ts) reusam o MESMO shape.
 import { toPrincipalShape, labelOfArea } from "./bff/bff-rbac-shape.ts";
+import { isSystemPrincipal } from "../core/access/system-principals.ts";
 
-/** /api/rbac/principals real: cada principal do brain + seu grant + tokens. */
+/** /api/rbac/principals real: cada principal do brain + seu grant + tokens.
+ *  Bots de sistema (ex. WhatsApp Evolution) ficam no DB pro webhook, mas não entram na lista. */
 async function rbacPrincipals(home: string): Promise<unknown[]> {
   const e = await getEngine(home);
   const principals = await e.allPrincipals();
   const out: unknown[] = [];
   for (const p of principals) {
+    if (isSystemPrincipal(p.id)) continue;
     const grant = await e.getGrant(p.id);
     const tokens = await e.tokensOf(p.id);
     out.push(toPrincipalShape(p, grant, tokens));
@@ -903,6 +907,15 @@ export function startWebServer() {
       if (path === "/api/llm/codex/disconnect" && method === "POST") {
         const { home } = await requireBrain(req, u);
         return send(res, 200, await codexDisconnectHandler(home));
+      }
+      if (path === "/api/llm/chain" && method === "GET") {
+        const { home } = await requireBrain(req, u);
+        return send(res, 200, await llmChainStatusHandler(home));
+      }
+      if (path === "/api/llm/chain" && method === "PUT") {
+        const { home } = await requireBrain(req, u);
+        const b = await readJsonBody(req);
+        return send(res, 200, await llmChainSaveHandler(home, b as any));
       }
 
       // --- GITHUB SYNC (github-sync.ts): espelho organizado pra pessoas + entrada por diff. ---

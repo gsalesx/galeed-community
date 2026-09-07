@@ -70,5 +70,5 @@ convite com `npx zapier users:links` (ou Developer Platform → Sharing) e mande
 Quem clicar passa a ver a app "Galeed" no editor de Zaps. Publicação no diretório público
 (beta/review da Zapier) é opcional e pode vir depois.
 
-**Credencial na app**: URL do Galeed (sem `/v1`) + chave `gld_...` de **Conectar**. Pra usar
+**Credencial na app**: URL do Galeed (sem `/v1`) + chave `gld_...` de **Acesso**. Pra usar
 o "Perguntar", convide o bot em **Acesso** com **"Todas as áreas (acesso total)"**.

@@ -2,7 +2,7 @@
  *  Renderiza dentro do <main> do AppShell (page head + KPIs + grid).
  *  Dados via api.rbac.* — o RBAC é real no BFF (cria principal + grant + log de governança
  *  de verdade); o que era mock ficava só na apresentação do front. Fail-closed é a regra de ouro. */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Button,
   Card,
@@ -22,6 +22,8 @@ import { relativeTime } from "../../lib/format";
 import { dotDeArea, lockText, SENS_TO_CODE } from "./data";
 import { InviteWizard, type InviteResult } from "./InviteWizard";
 import { ViewAsOverlay } from "./ViewAsOverlay";
+import { BotCredsModal } from "./BotCredsModal";
+import { isSystemPrincipal } from "../../lib/system-principals";
 
 export default function Acesso() {
   // deps [current?.id]: trocar de cérebro REFAZ as consultas (sem isso a tela mostrava
@@ -30,7 +32,7 @@ export default function Acesso() {
   const principalsQ = useQuery<Principal[]>("rbac:principals", (signal) =>
     fetchPrincipals(signal),
   [current?.id]);
-  const principals = principalsQ.data ?? [];
+  const principals = (principalsQ.data ?? []).filter((p) => !isSystemPrincipal(p.id, p.label));
   const logQ = useQuery<AccessLogEntry[]>("rbac:log", () => api.rbac.log(), [current?.id]);
   // áreas REAIS do cérebro (tags area: + grants) — nada de lista inventada no front.
   const areasQ = useQuery<AreaView[]>("rbac:areas", () => api.rbac.areas(), [current?.id]);
@@ -44,7 +46,7 @@ export default function Acesso() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editing, setEditing] = useState<Principal | null>(null);
   const [freshToken, setFreshToken] = useState<string | null>(null);
-  const [freshTokenLabel, setFreshTokenLabel] = useState<string | null>(null); // label do bot recém-criado, pro toast no fim do fluxo
+  const [credsFor, setCredsFor] = useState<Principal | null>(null);
 
   // ver como vê
   const [viewAs, setViewAs] = useState<Principal | null>(null);
@@ -60,7 +62,6 @@ export default function Acesso() {
   // rotacionar / remover de vez
   const [rotating, setRotating] = useState<Principal | null>(null);
   const [removing, setRemoving] = useState<Principal | null>(null);
-  const [freshRotated, setFreshRotated] = useState<string | null>(null);
   const rotateMut = useMutation<string, { token: string; principal: Principal }>((principalId) =>
     api.rbac.rotateToken(principalId),
   );
@@ -102,9 +103,11 @@ export default function Acesso() {
       try {
         const t = await tokenMut.mutate(saved.id);
         setFreshToken(t.token);
-        setFreshTokenLabel(r.body.label);
+        setWizardOpen(false);
+        setCredsFor(t.principal ?? saved);
         principalsQ.refetch();
-        return; // mantém o modal no aviso de token
+        logQ.refetch();
+        return;
       } catch {
         /* emissão da chave falhou; o principal já foi criado, segue sem travar o fluxo */
       }
@@ -119,8 +122,16 @@ export default function Acesso() {
   async function confirmRevoke() {
     if (!revoking) return;
     await revokeMut.mutate(revoking.p.id);
+    setFreshToken(null);
+    if (credsFor?.id === revoking.p.id) {
+      setCredsFor({
+        ...credsFor,
+        tokens: credsFor.tokens.map((t) => ({ ...t, revoked: true })),
+      });
+    }
     setRevoking(null);
     principalsQ.refetch();
+    logQ.refetch();
     setToast({ msg: `Chave do ${revoking.p.label} revogada.`, tone: "danger" });
   }
 
@@ -128,8 +139,10 @@ export default function Acesso() {
     if (!rotating) return;
     try {
       const r = await rotateMut.mutate(rotating.id);
-      setFreshRotated(r.token);
+      setFreshToken(r.token);
+      if (r.principal) setCredsFor(r.principal);
       principalsQ.refetch();
+      logQ.refetch();
     } catch (e) {
       setToast({ msg: `Não deu pra rotacionar: ${(e as Error).message}`, tone: "danger" });
     } finally {
@@ -150,11 +163,6 @@ export default function Acesso() {
     }
   }
 
-  function copyToken(t: string) {
-    if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(t).catch(() => {});
-    setToast({ msg: "Chave copiada.", tone: "neutral" });
-  }
-
   const empty = !principalsQ.loading && principals.length === 0;
 
   return (
@@ -164,7 +172,8 @@ export default function Acesso() {
         <div>
           <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-.025em" }}>Quem vê o quê</h1>
           <p style={{ margin: "6px 0 0", fontSize: 14.5, color: "var(--muted)", maxWidth: 560, lineHeight: 1.5 }}>
-            Cada pessoa ou bot só vê a parte do cérebro que você liberou. O resto fica trancado, sozinho.
+            Quem vê o quê — e o plugue do agente. Cada pessoa ou bot só vê o que você liberou.
+            No bot, a chave e o MCP saem daqui.
           </p>
         </div>
         <Button variant="primary" icon={<Icon name="plus" size={15} />} onClick={openInvite}>
@@ -220,9 +229,8 @@ export default function Acesso() {
                       p={p}
                       onEdit={() => openEdit(p)}
                       onViewAs={() => setViewAs(p)}
-                      onRevoke={(t) => setRevoking({ p, token: t })}
-                      onRotate={() => setRotating(p)}
                       onRemove={() => setRemoving(p)}
+                      onCreds={p.kind === "agent" ? () => { setFreshToken(null); setCredsFor(p); } : undefined}
                     />
                   ))}
                 </div>
@@ -301,20 +309,36 @@ export default function Acesso() {
         editing={editing}
         onSubmit={handleSubmit}
         saving={inviteMut.loading || tokenMut.loading}
-        freshToken={freshToken}
-        onCopyToken={copyToken}
-        onDoneToken={() => {
-          setFreshToken(null);
-          setWizardOpen(false);
-          setToast({
-            msg: `Acesso criado pra ${freshTokenLabel ?? "o bot"}. Avise a pessoa você mesmo.`,
-            tone: "ok",
-          });
-          setFreshTokenLabel(null);
-        }}
       />
 
       {/* ver como ela vê */}
+      <BotCredsModal
+        open={!!credsFor}
+        onClose={() => { setCredsFor(null); setFreshToken(null); }}
+        principal={credsFor}
+        freshToken={freshToken}
+        history={(logQ.data ?? []).filter((e) => e.principal_id === credsFor?.id)}
+        generating={tokenMut.loading}
+        onCopy={(text, label) => {
+          if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+          setToast({ msg: label || "Copiado.", tone: "neutral" });
+        }}
+        onGenerate={async () => {
+          if (!credsFor) return;
+          try {
+            const t = await tokenMut.mutate(credsFor.id);
+            setFreshToken(t.token);
+            setCredsFor(t.principal);
+            principalsQ.refetch();
+            logQ.refetch();
+          } catch (e) {
+            setToast({ msg: `Não deu pra gerar a chave: ${(e as Error).message}`, tone: "danger" });
+          }
+        }}
+        onRevoke={(tok) => credsFor && setRevoking({ p: credsFor, token: tok })}
+        onRotate={() => credsFor && setRotating(credsFor)}
+      />
+
       <ViewAsOverlay
         open={!!viewAs}
         onClose={() => setViewAs(null)}
@@ -342,27 +366,6 @@ export default function Acesso() {
           <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>
             Gerar uma chave nova para <b>{rotating.label}</b>? A chave atual <b>para de funcionar na hora</b> — o agente precisa receber a nova.
           </p>
-        )}
-      </Modal>
-
-      {/* chave nova (mostrada UMA vez) */}
-      <Modal
-        open={!!freshRotated}
-        onClose={() => setFreshRotated(null)}
-        title="Nova chave gerada"
-        width={520}
-        footer={<Button variant="ghost" onClick={() => setFreshRotated(null)}>Já guardei</Button>}
-      >
-        {freshRotated && (
-          <div>
-            <p style={{ margin: "0 0 12px", fontSize: 13, lineHeight: 1.45 }}>
-              Copie agora — <b>esta é a única vez</b> que a chave aparece inteira. A anterior já não vale.
-            </p>
-            <div className="mono" style={{ padding: "11px 13px", borderRadius: 10, background: "var(--ink)", color: "oklch(90% 0.015 240)", fontSize: 12.5, wordBreak: "break-all" }}>
-              {freshRotated}
-            </div>
-            <Button variant="secondary" style={{ marginTop: 10 }} onClick={() => copyToken(freshRotated)}>Copiar a chave</Button>
-          </div>
         )}
       </Modal>
 
@@ -470,14 +473,13 @@ function ViewToggle({ view, onChange }: { view: "list" | "matrix"; onChange: (v:
 }
 
 function PrincipalRow({
-  p, onEdit, onViewAs, onRevoke, onRotate, onRemove,
+  p, onEdit, onViewAs, onRemove, onCreds,
 }: {
   p: Principal;
   onEdit: () => void;
   onViewAs: () => void;
-  onRevoke: (t: Token) => void;
-  onRotate: () => void;
   onRemove: () => void;
+  onCreds?: () => void;
 }) {
   const code: LockLevel = SENS_TO_CODE[p.grant.sensitivity_max];
   const human = p.kind === "human";
@@ -553,14 +555,9 @@ function PrincipalRow({
 
       {/* ações */}
       <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-        {!human && activeToken && (
-          <IconBtn label="Rotacionar chave" onClick={onRotate}>
-            <Icon name="round" size={15} />
-          </IconBtn>
-        )}
-        {!human && activeToken && (
-          <IconBtn label="Revogar chave" onClick={() => onRevoke(activeToken)} danger>
-            <Icon name="x" size={15} />
+        {onCreds && (
+          <IconBtn label="Como conecta" onClick={onCreds}>
+            <Icon name="arrow" size={15} />
           </IconBtn>
         )}
         <IconBtn label="Ver como ele/ela vê" onClick={onViewAs}>

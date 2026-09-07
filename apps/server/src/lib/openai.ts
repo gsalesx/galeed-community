@@ -18,6 +18,45 @@ function normalize(v: Float32Array): Float32Array {
 
 /** Chat completion curto (OpenAI) — usado p/ query expansion/HyDE no retrieve (barato, gpt-4o-mini).
  *  Timeout + retry. Retorna texto; "" em falha (chamador decide o fallback). */
+/** Chat que LANÇA em timeout/429/5xx/auth — pra cadeia de fallback do extract/ask. */
+export async function openaiLlmText(
+  prompt: string,
+  system: string,
+  opts: { model?: string; maxTokens?: number } = {},
+): Promise<string> {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY não definida.");
+  const body = JSON.stringify({
+    model: opts.model || process.env.OPENAI_MODEL || "gpt-4o-mini",
+    messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
+    max_tokens: opts.maxTokens ?? Number(process.env.MAX_OUTPUT_TOKENS || 4000),
+    temperature: 0,
+  });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 120_000);
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+      body,
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`OpenAI ${res.status}: ${t.slice(0, 300)}`);
+    }
+    const j: any = await res.json();
+    const text = (j.choices?.[0]?.message?.content || "").trim();
+    if (!text) throw new Error("OpenAI: resposta vazia.");
+    return text;
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") throw new Error("OpenAI timeout");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function chatComplete(prompt: string, system: string, opts: { model?: string; maxTokens?: number } = {}): Promise<string> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return "";

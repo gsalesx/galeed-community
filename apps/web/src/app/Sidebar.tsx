@@ -3,8 +3,8 @@
  *  236px, sticky abaixo da topbar, scroll interno. Itens de nav na ORDEM e com os
  *  LABELS exatos do mockup, agrupados:
  *    (topo)         Início · Buscar(memória) · Perguntar · Fatos · Adicionar(só joga)
- *    Quem vê o quê  Acesso
- *    Pra quem desenv. Conectar · Saúde · Ajustes
+ *    Quem vê o quê  Acesso (quem vê + plugue do agente)
+ *    Pra quem desenv. Conectar (motores do cérebro) · Saúde · Ajustes
  *  Item ativo: fundo --accent-soft + texto --accent-ink (via NavLink isActive).
  *  Rodapé: card de ajuda "Como o Galeed funciona?".
  */
@@ -39,17 +39,17 @@ const GROUPS: NavGroup[] = [
       { to: "/app/perguntar", label: "Perguntar", icon: "chevron" },
       { to: "/app/fatos", label: "Fatos", icon: "check" },
       { to: "/app/adicionar", label: "Adicionar", count: "só joga", icon: "plus" },
-      { to: "/app/fontes", label: "Fontes", count: "receitas", icon: "arrow" },
+      { to: "/app/fontes", label: "Fontes", count: "alimenta", icon: "arrow" },
     ],
   },
   {
     title: "Quem vê o quê",
-    items: [{ to: "/app/acesso", label: "Acesso", icon: "lock-closed" }],
+    items: [{ to: "/app/acesso", label: "Acesso", count: "plugue", icon: "lock-closed" }],
   },
   {
     title: "Pra quem desenvolve",
     items: [
-      { to: "/app/conectar", label: "Conectar", icon: "arrow" },
+      { to: "/app/conectar", label: "Conectar", count: "motores", icon: "arrow" },
       { to: "/app/saude", label: "Saúde", icon: "clock" },
       { to: "/app/ajustes", label: "Ajustes", icon: "info" },
     ],

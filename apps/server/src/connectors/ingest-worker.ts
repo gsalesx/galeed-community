@@ -1,6 +1,7 @@
 #!/usr/bin/env -S npx tsx
 /** M12/S4 — WORKER dedicado de ingestão (ADR-006, decisão #1: processo SEPARADO, não loop no BFF).
- *  Loop: claimNextJob → processBlobJob → markJobDone | markJobError → repete; backoff quando vazio.
+ *  Loop: claimNextJob → processBlobJob → markJobDone | requeueJobAfterLlmFailure | markJobError →
+ *  repete; backoff quando vazio. LLM transitória = espera na fila (não vira error).
  *  Resiliente (job que falha não derruba o worker) + graceful shutdown (SIGINT/SIGTERM). `npm run worker`. */
 // Carrega .env (como o cli.ts): o worker precisa de ANTHROPIC_API_KEY (extração) e OPENAI_API_KEY
 // (embeddings/buildIndex). Sem isto, depender só do env exportado é frágil — sem OPENAI = 0 vetores =
@@ -15,6 +16,7 @@ import {
   updateJobProgress,
   markJobDone,
   markJobError,
+  requeueJobAfterLlmFailure,
   markJobFindable,
   markJobDigesting,
   closeIngestQueue,
@@ -30,6 +32,7 @@ import {
   type IngestJob,
 } from "../core/ingestion/ingest-queue.ts";
 import { processBlobJob } from "../core/ingestion/process-blob-job.ts";
+import { isTransientLlmError } from "../lib/llm.ts";
 import { runRepairSweep } from "../core/ingestion/repair.ts"; // P0-C — varredura de reparo (C3b/M3a)
 import { getBatch } from "../lib/batch-client.ts"; // M16/S1 — GET /v1/messages/batches/{id}
 import { harvestExtractionBatch } from "../core/ingestion/batch-extract.ts"; // M16/S3 — recupera + deriva
@@ -140,8 +143,13 @@ export async function runIngestWorker(opts: WorkerOpts = {}): Promise<void> {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await markJobError(job.id, message); // ← resiliência: job falho não derruba o loop
-      log("error", { jobId: job.id, message });
+      if (isTransientLlmError(message)) {
+        await requeueJobAfterLlmFailure(job.id, message);
+        log("llm-wait", { jobId: job.id, message });
+      } else {
+        await markJobError(job.id, message);
+        log("error", { jobId: job.id, message });
+      }
     } finally {
       activeJobId = null;
     }

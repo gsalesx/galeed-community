@@ -329,7 +329,9 @@ export async function connectorCreateHandler(home: string, body: ConnectorCreate
   return { sourceId: row.id, providerConfigKey: pck, name: row.name };
 }
 
-/** GET /api/connectors/status — estado DERIVADO das conexões do brain (pro front D mesclar client-side). */
+/** GET /api/connectors/status — estado DERIVADO das conexões do brain (pro front D mesclar client-side).
+ *  Ingestores (whatsapp etc.) usam provider_config_key sintético — não são Nango. */
 export async function connectorsStatusHandler(home: string): Promise<SourceConnectionView[]> {
-  return listSourceConnections(home);
+  const rows = await listSourceConnections(home);
+  return rows.filter((r) => !r.providerConfigKey.startsWith("ingestor:"));
 }

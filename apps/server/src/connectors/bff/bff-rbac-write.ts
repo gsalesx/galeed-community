@@ -14,6 +14,13 @@ import { accountByEmail, brainsOf, removeBrainMembership } from "../../core/acce
 // M10 (reconcile): BffError UNIFICADO + shape de leitura EXTRAÍDO de web-server.ts (bff-rbac-shape.ts).
 import { BffError } from "./bff-common.ts";
 import { toPrincipalShape } from "./bff-rbac-shape.ts";
+import { isSystemPrincipal } from "../../core/access/system-principals.ts";
+
+function rejectSystemPrincipal(principalId: string): void {
+  if (isSystemPrincipal(principalId)) {
+    throw new BffError(403, "este bot é interno do WhatsApp — não é um agente gerenciável.");
+  }
+}
 
 export { BffError }; // re-export p/ compat dos imports existentes de "./bff-rbac-write.ts"
 
@@ -100,6 +107,7 @@ export async function rbacInvite(home: string, body: Record<string, unknown>): P
 /** POST /api/rbac/grant → substitui o grant de um principal existente. Devolve o Principal atualizado. */
 export async function rbacGrant(home: string, body: Record<string, unknown>): Promise<unknown> {
   const principalId = reqStr(body.principalId, "principalId");
+  rejectSystemPrincipal(principalId);
   const sensitivityMax = reqLevel(body.sensitivityMax);
   const e = await getEngine(home);
   if (!(await e.getPrincipal(principalId))) throw new BffError(404, "principal não encontrado");
@@ -111,6 +119,7 @@ export async function rbacGrant(home: string, body: Record<string, unknown>): Pr
 /** POST /api/rbac/token → emite token CRU (1×) + devolve o principal. */
 export async function rbacTokenIssue(home: string, body: Record<string, unknown>): Promise<unknown> {
   const principalId = reqStr(body.principalId, "principalId");
+  rejectSystemPrincipal(principalId);
   const e = await getEngine(home);
   if (!(await e.getPrincipal(principalId))) throw new BffError(404, "principal não encontrado");
   const label = typeof body.label === "string" ? body.label.trim() : undefined;
@@ -128,6 +137,7 @@ export async function rbacTokenRevoke(
   params: { principalId: string; actor?: string },
 ): Promise<unknown> {
   const principalId = reqStr(params.principalId, "principalId");
+  rejectSystemPrincipal(principalId);
   const e = await getEngine(home);
   for (const t of await e.tokensOf(principalId)) {
     if (!t.revoked) await e.revokeToken(t.token_hash);
@@ -161,6 +171,7 @@ async function logGov(home: string, ev: { event: string; principalId: string; ac
 /** POST /api/rbac/token/rotate → revoga a(s) chave(s) ATIVA(s) do principal e emite uma nova. Devolve o cru 1×. */
 export async function rbacTokenRotate(home: string, body: Record<string, unknown>, actor?: string): Promise<unknown> {
   const principalId = reqStr(body.principalId, "principalId");
+  rejectSystemPrincipal(principalId);
   const e = await getEngine(home);
   if (!(await e.getPrincipal(principalId))) throw new BffError(404, "principal não encontrado");
   for (const t of await e.tokensOf(principalId)) {
@@ -175,6 +186,7 @@ export async function rbacTokenRotate(home: string, body: Record<string, unknown
 /** DELETE /api/rbac/principal?id=<id> → remove de vez (grant+tokens+principal; pessoa perde o membership do brain). */
 export async function rbacPrincipalRemove(home: string, body: Record<string, unknown>, actor?: string): Promise<unknown> {
   const principalId = reqStr(body.principalId, "principalId");
+  rejectSystemPrincipal(principalId);
   const e = await getEngine(home);
   const p = await e.getPrincipal(principalId);
   if (!p) throw new BffError(404, "principal não encontrado");

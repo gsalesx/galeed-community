@@ -23,7 +23,7 @@ Todo ingestor registrado ganha **automaticamente** um webhook público:
 
 ```
 POST /v1/ingestors/<slug>
-Authorization: Bearer gld_live_SUA_CHAVE        (chave com can_ingest — gere em Conectar)
+Authorization: Bearer gld_live_SUA_CHAVE        (chave com can_ingest — gere em Acesso)
 ```
 
 > A ferramenta não deixa configurar header? Use `?token=gld_live_...` na URL como fallback
@@ -49,7 +49,7 @@ curl -X POST "$GALEED/v1/ingestors/texto" \
 
 ### `evolution-whatsapp` — WhatsApp via Evolution API (self-hosted)
 **Caminho fácil (local):** suba `docker compose --profile app --profile evolution up -d --build`
-e use o painel **Conectar → WhatsApp (Evolution)** — o Galeed cria a instância, mostra o QR
+e use o painel **Fontes → WhatsApp (Evolution)** — o Galeed cria a instância, mostra o QR
 e configura o webhook sozinho.
 
 Na mão: na sua instância Evolution, configure o webhook do evento **MESSAGES_UPSERT** apontando para

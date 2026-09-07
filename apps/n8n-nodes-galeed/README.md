@@ -40,7 +40,7 @@ Docker, use `http://host.docker.internal:8790` como URL na credencial.
 ## Credencial
 
 **Galeed API**: a URL do seu Galeed (sem `/v1`) + a chave `gld_...` gerada no painel em
-**Conectar → chaves do cérebro**. O botão de testar credencial lista os ingestores.
+**Acesso → bot → plugue**. O botão de testar credencial lista os ingestores.
 
 > **Importante**: pro bot LER o cérebro (Perguntar/Buscar fatos), convide-o em **Acesso**
 > marcando **"Todas as áreas (acesso total)"** — é o recomendado pra integrações. Sem isso,
