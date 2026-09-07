@@ -17,8 +17,8 @@
  *
  *  Cliques: cite → abre a fonte (por ora só registra no console); entidade → sem destino (Mapa removido).
  */
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Button,
   Card,
@@ -74,12 +74,13 @@ const LEGENDA: { label: string; sub: string; dot: string }[] = [
 // ---------------------------------------------------------------------------
 
 export default function Buscar() {
-  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { current } = useBrain();
 
   // termo digitado (controla o input) vs. termo submetido (dispara o retrieve)
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
+  const seededQ = useRef<string | null>(null);
 
   // time-travel: toggle + data as-of (ISO yyyy-mm-dd)
   const [timeTravel, setTimeTravel] = useState(false);
@@ -147,6 +148,17 @@ export default function Buscar() {
     submit(s);
   }
 
+  // ?q= (CommandK, Dossiê, /app/buscar → redirect) dispara o retrieve uma vez
+  useEffect(() => {
+    const q = params.get("q");
+    if (q && q.trim() && seededQ.current !== q) {
+      seededQ.current = q;
+      setDraft(q);
+      submit(q.trim());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
   // cite → abre o ORIGINAL VERBATIM da fonte (GET /api/source, gateado pelo RBAC no BFF).
   function openSource(hit: RetrieveHit) {
     window.open(sourceUrl(hit.slug), "_blank", "noopener");
@@ -165,10 +177,7 @@ export default function Buscar() {
     <div>
       {/* ── PAGE HEAD ──────────────────────────────────────────── */}
       <header style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: "-.025em", margin: 0 }}>
-          Buscar na memória
-        </h1>
-        <p style={{ fontSize: 14, color: "var(--muted)", margin: "6px 0 0" }}>
+        <p style={{ fontSize: 14, color: "var(--muted)", margin: 0 }}>
           Pergunte do seu jeito. Toda resposta vem com selo: de onde veio e o quanto pode confiar.
         </p>
       </header>

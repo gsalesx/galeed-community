@@ -16,7 +16,7 @@
  *  de derrubar a rota inteira.
  */
 import { lazy, Suspense, type ComponentType } from "react";
-import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { createBrowserRouter, Navigate, Outlet, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { Loading } from "../ui";
 import { AppShell } from "./AppShell";
@@ -35,11 +35,9 @@ function lazyScreen(loader: () => Promise<ScreenModule>, nome: string) {
 const Entrar = lazyScreen(() => import("../screens/Entrar/index"), "Entrar");
 const CriarConta = lazyScreen(() => import("../screens/CriarConta/index"), "Criar conta");
 const Painel = lazyScreen(() => import("../screens/Painel/index"), "Início");
-const Buscar = lazyScreen(() => import("../screens/Buscar/index"), "Buscar");
-const Perguntar = lazyScreen(() => import("../screens/Perguntar/index"), "Perguntar");
+const Encontrar = lazyScreen(() => import("../screens/Perguntar/Unificado"), "Encontrar");
 const Fatos = lazyScreen(() => import("../screens/Fatos/index"), "Fatos");
 const Dossie = lazyScreen(() => import("../screens/Dossie/index"), "Dossiê");
-const Adicionar = lazyScreen(() => import("../screens/Adicionar/index"), "Adicionar");
 const Fontes = lazyScreen(() => import("../screens/Fontes/index"), "Fontes");
 const Revisar = lazyScreen(() => import("../screens/Revisar/index"), "Revisar");
 const CriarCerebro = lazyScreen(() => import("../screens/CriarCerebro/index"), "Criar cérebro");
@@ -77,6 +75,15 @@ function PublicScreen({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Loading label="Carregando…" style={{ margin: 40 }} />}>{children}</Suspense>;
 }
 
+/** /app/perguntar e /app/buscar → /app/encontrar (preserva query; buscar força modo=buscar). */
+function RedirectEncontrar({ modoBuscar }: { modoBuscar?: boolean }) {
+  const [params] = useSearchParams();
+  const next = new URLSearchParams(params);
+  if (modoBuscar) next.set("modo", "buscar");
+  const qs = next.toString();
+  return <Navigate to={qs ? `/app/encontrar?${qs}` : "/app/encontrar"} replace />;
+}
+
 export const router = createBrowserRouter([
   // públicas (sem shell) — edição community: sem landing; a raiz é o login.
   { path: "/", element: <Navigate to="/entrar" replace /> },
@@ -103,12 +110,13 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <Painel /> },
-          { path: "buscar", element: <Buscar /> },
-          { path: "perguntar", element: <Perguntar /> },
+          { path: "encontrar", element: <Encontrar /> },
+          { path: "buscar", element: <RedirectEncontrar modoBuscar /> },
+          { path: "perguntar", element: <RedirectEncontrar /> },
           { path: "fatos", element: <Fatos /> },
           // Dossiê: a página da ENTIDADE (decisões com porquê acima de números) — desenho do PO.
           { path: "dossie/:entity", element: <Dossie /> },
-          { path: "adicionar", element: <Adicionar /> },
+          { path: "adicionar", element: <Navigate to="/app/fontes?manual=1" replace /> },
           { path: "fontes", element: <Fontes /> },
           { path: "revisar", element: <Revisar /> },
           { path: "acesso", element: <Acesso /> },

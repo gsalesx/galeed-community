@@ -14,7 +14,6 @@ import { useBrain } from "../../lib/auth";
 import { api, type AskAnswer, type RetrieveHit } from "../../lib/api";
 
 // --- copy real (perguntar.md §1, §6, §7, §10) ---
-const EYEBROW = "Perguntar ao cérebro";
 const SUB =
   "Escreva como você falaria com uma pessoa do time. O cérebro junta tudo que sabe e responde com a fonte, o quanto dá pra confiar e o que mudou no tempo.";
 const FOOTHINT_STRONG = "Toda resposta vem com a fonte.";
@@ -194,18 +193,6 @@ export default function Perguntar() {
     <div style={{ maxWidth: 780, margin: "0 auto", width: "100%" }}>
       {/* HERO — fica fixo no topo da coluna de chat */}
       <header style={{ padding: "8px 0 24px" }}>
-        <div
-          className="mono"
-          style={{
-            fontSize: 11.5,
-            letterSpacing: ".06em",
-            textTransform: "uppercase",
-            color: "var(--accent-ink)",
-            marginBottom: 10,
-          }}
-        >
-          {EYEBROW}
-        </div>
         <h1
           style={{
             fontSize: "clamp(28px,4vw,40px)",
@@ -516,7 +503,7 @@ function AnswerBody({ answer }: { answer: AskAnswer }) {
               key={hit.slug}
               selo={hit.selo}
               elevated
-              citeHref={hit.selo?.cite ? `/app/buscar?q=${encodeURIComponent(hit.title)}&slug=${encodeURIComponent(hit.slug)}` : undefined}
+              citeHref={hit.selo?.cite ? `/app/encontrar?modo=buscar&q=${encodeURIComponent(hit.title)}&slug=${encodeURIComponent(hit.slug)}` : undefined}
             >
               <span>{hit.excerpt ?? hit.title}</span>
             </Seal>

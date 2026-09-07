@@ -4,7 +4,7 @@
  *  extrair dali, e o resto vira HIPÓTESE na fila de revisão (regra de ouro / ADR-016).
  *
  *  Estrutura (ordem EXATA do mockup):
- *   1. page-head  — h1 + parágrafo + "Ligar uma fonte" (scrolla pro catálogo)
+ *   1. page-head  — h1 + parágrafo + "Adicionar manualmente" (popup) + "Organizando" (fila)
  *   2. banner     — a regra que evita invenção (texto literal)
  *   3. strip      — "N trechos não casaram…" (só com pendente>0) → /app/revisar
  *   4. lista      — "Ligadas neste cérebro N": cards com receita em chips + stats reais
@@ -16,7 +16,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Card, Icon, Modal, Skeleton, Toast } from "../../ui";
 import type { ToastTone } from "../../ui";
 import { ApiError, api } from "../../lib/api";
@@ -28,6 +28,7 @@ import { WhatsAppEvolution } from "./WhatsAppEvolution";
 import { WebhookIngest } from "./WebhookIngest";
 import { SourceDrawer } from "./SourceDrawer";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
+import { FilaLista, IngestForm, useIngestFila } from "../Adicionar/ingest";
 import {
   anexarEstadoConector,
   descricaoDaSync,
@@ -100,6 +101,7 @@ function ehWhatsapp(s: Source): boolean {
 
 export default function Fontes() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { current } = useBrain();
   const sourcesQ = useQuery<Source[]>("fontes", () => api.sources.list(), [current?.id]);
   const countsQ = useQuery("fontes-fila", () => api.hypotheses.count(), [current?.id]);
@@ -107,6 +109,9 @@ export default function Fontes() {
   const connStatusQ = useQuery("fontes-conn", () => api.sources.connectorsStatus(), [current?.id]);
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [toast, setToast] = useState<{ msg: string; tone: ToastTone } | null>(null);
+  const [manualOpen, setManualOpen] = useState(() => searchParams.get("manual") === "1");
+  const [filaOpen, setFilaOpen] = useState(false);
+  const ingest = useIngestFila({ onToast: (t) => setToast(t) });
   // M22-D — estado do fluxo de conexão (client-side; morre no reload — LEI 1).
   const [aguardando, setAguardando] = useState<string | null>(null);
   const [linkManual, setLinkManual] = useState<{ provider: string; url: string } | null>(null);
@@ -210,8 +215,21 @@ export default function Fontes() {
     return seen;
   }, [sources]);
 
+  useEffect(() => {
+    if (searchParams.get("manual") === "1") setManualOpen(true);
+  }, [searchParams]);
+
   function irAoCatalogo() {
     catRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function fecharManual() {
+    setManualOpen(false);
+    if (searchParams.get("manual") === "1") {
+      const next = new URLSearchParams(searchParams);
+      next.delete("manual");
+      setSearchParams(next, { replace: true });
+    }
   }
 
   function fecharDrawer() {
@@ -287,8 +305,16 @@ export default function Fontes() {
           </p>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 9 }}>
-          <Button variant="primary" icon={<Icon name="plus" size={15} />} onClick={irAoCatalogo}>
-            Ligar uma fonte
+          <Button onClick={() => setFilaOpen(true)}>
+            Organizando
+            {ingest.organizando > 0 ? (
+              <span className="num" style={{ marginLeft: 6, color: "var(--muted)" }}>
+                {ingest.organizando}
+              </span>
+            ) : null}
+          </Button>
+          <Button variant="primary" icon={<Icon name="plus" size={15} />} onClick={() => setManualOpen(true)}>
+            Adicionar manualmente
           </Button>
         </div>
       </div>
@@ -483,6 +509,42 @@ export default function Fontes() {
       </div>
 
       <Modal
+        open={manualOpen}
+        onClose={fecharManual}
+        title="Adicionar manualmente"
+        width={640}
+        footer={
+          <Button variant="ghost" onClick={fecharManual}>
+            Fechar
+          </Button>
+        }
+        style={{ maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+      >
+        <div style={{ maxHeight: "64vh", overflowY: "auto", margin: "0 -18px", padding: "0 18px" }}>
+          <IngestForm ingest={ingest} />
+        </div>
+      </Modal>
+
+      <Modal
+        open={filaOpen}
+        onClose={() => setFilaOpen(false)}
+        title={`Organizando${ingest.fila.length > 0 ? ` (${ingest.fila.length})` : ""}`}
+        width={640}
+        footer={
+          <Button variant="ghost" onClick={() => setFilaOpen(false)}>
+            Fechar
+          </Button>
+        }
+      >
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--muted)" }}>
+          Uploads e textos na fila do worker, mais recentes primeiro. Remover tira só aquele envio.
+        </p>
+        <div style={{ maxHeight: "60vh", overflowY: "auto", margin: "0 -18px", padding: "0 18px" }}>
+          <FilaLista ingest={ingest} />
+        </div>
+      </Modal>
+
+      <Modal
         open={waOpen}
         onClose={() => setWaOpen(false)}
         title="Conectar WhatsApp"
@@ -545,7 +607,7 @@ export default function Fontes() {
 
       {/* toasts */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 80 }}>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 1100 }}>
           <Toast tone={toast.tone} onClose={() => setToast(null)}>
             {toast.msg}
           </Toast>

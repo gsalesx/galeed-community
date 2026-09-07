@@ -89,6 +89,13 @@ describe("painel Fontes WhatsApp", () => {
     expect(ui).toContain("keepPendingCodes");
     expect(ui).toContain("Pedir código");
   });
+  it("não oferece leitura de conversas antigas", () => {
+    expect(ui).not.toContain("Ler conversas antigas");
+    expect(ui).not.toContain("Todos os números ligados");
+    expect(ui).not.toContain("Marcar números específicos");
+    expect(ui).not.toContain("readHistory");
+    expect(ui).not.toContain("historyPick");
+  });
 });
 
 describe("BFF Evolution connect reuse", () => {
@@ -110,6 +117,12 @@ describe("BFF Evolution connect reuse", () => {
     expect(bff).toContain("resolveIngestorSource");
     expect(bff).toContain("pauseWhatsappSourceIfOrphan");
     expect(bff).not.toMatch(/revokeToken|revoke.*PRINCIPAL_ID/);
+  });
+  it("webhook segue só MESSAGES_UPSERT — sem job de histórico", () => {
+    const bff = readFileSync(join(here, "../../src/connectors/bff/bff-evolution.ts"), "utf8");
+    expect(bff).toContain('events: ["MESSAGES_UPSERT"]');
+    expect(bff).toContain("sem histórico automático");
+    expect(bff).not.toMatch(/MESSAGES_SET|CHATS_SET|syncFullHistory|evolution\/history/);
   });
 });
 

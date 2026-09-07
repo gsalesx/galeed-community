@@ -144,7 +144,8 @@ function dueWebhookSync(force: boolean): boolean {
   return true;
 }
 
-/** Payload webhook v2.3 — envelope `{ webhook }` (sem ele: "instance requires property webhook"). */
+/** Payload webhook v2.3 — envelope `{ webhook }` (sem ele: "instance requires property webhook").
+ *  Só MESSAGES_UPSERT daqui pra frente: sem histórico automático. */
 function webhookPayload(token: string) {
   return {
     enabled: true,

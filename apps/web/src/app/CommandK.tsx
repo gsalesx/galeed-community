@@ -72,13 +72,13 @@ export function CommandK({ open, onClose }: CommandKProps) {
   function goSearchPage() {
     const term = q.trim();
     onClose();
-    navigate(`/app/buscar${term ? `?q=${encodeURIComponent(term)}` : ""}`);
+    navigate(`/app/encontrar?modo=buscar${term ? `&q=${encodeURIComponent(term)}` : ""}`);
   }
 
   function openHit(hit: RetrieveHit) {
     const term = q.trim();
     onClose();
-    navigate(`/app/buscar?q=${encodeURIComponent(term)}&slug=${encodeURIComponent(hit.slug)}`);
+    navigate(`/app/encontrar?modo=buscar&q=${encodeURIComponent(term)}&slug=${encodeURIComponent(hit.slug)}`);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -96,7 +96,7 @@ export function CommandK({ open, onClose }: CommandKProps) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Buscar na memória" width={560}>
+    <Modal open={open} onClose={onClose} title="Encontrar" width={560}>
       <div ref={wrapRef} onKeyDown={onKeyDown}>
         <SearchInput
           value={q}
@@ -118,7 +118,7 @@ export function CommandK({ open, onClose }: CommandKProps) {
             <p className="muted" style={{ fontSize: 13.5, padding: "8px 2px" }}>
               Nada encontrado para “{q.trim()}”.{" "}
               <button type="button" onClick={goSearchPage} style={linkBtn}>
-                Abrir busca completa →
+                Abrir Encontrar →
               </button>
             </p>
           )}

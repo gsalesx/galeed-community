@@ -43,6 +43,7 @@ import { sourceHandler } from "./bff/bff-blob.ts"; // M11/S3 — fonte verbatim 
 import { onboardingStart, onboardingReply, onboardingConfirm } from "./bff/bff-onboarding.ts"; // M11/S4 — onboarding de contexto
 import { ingestHandler } from "./bff/bff-ingest.ts"; // M11/S5 → M12: import assíncrono (enfileira)
 import { listJobsHandler, getJobHandler } from "./bff/bff-jobs.ts"; // M12 — status da fila de ingestão
+import { deleteManualIngestHandler } from "./bff/bff-ingest-delete.ts"; // exclusão de upload/colar manual
 import { saudeHandler } from "./bff/bff-saude.ts"; // saúde real: sono + armazenamento + fila por status
 import { lixeiraHandler, restaurarHandler } from "./bff/bff-lixeira.ts"; // lixeira de páginas (ver + restaurar)
 // M21/S3 — fontes com receita + fila de revisão (regra de ouro). Handlers PUROS; o BFF só roteia.
@@ -957,6 +958,11 @@ export function startWebServer() {
         const { home } = await requireBrain(req, u);
         const jobId = decodeURIComponent(path.slice("/api/ingest/jobs/".length));
         return send(res, 200, await getJobHandler(home, jobId));
+      }
+      if (path.startsWith("/api/ingest/jobs/") && method === "DELETE") {
+        const { home } = await requireBrain(req, u);
+        const jobId = decodeURIComponent(path.slice("/api/ingest/jobs/".length));
+        return send(res, 200, await deleteManualIngestHandler(home, jobId));
       }
 
       // --- LIXEIRA (escrita): restaurar página arquivada — "nada é apagado; dá pra trazer de volta".

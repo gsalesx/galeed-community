@@ -482,9 +482,6 @@ export function SourceDrawer({
           <Rule icon="info" hyp>
             O que não casar vai para Revisar. Você aprova ou descarta. Nada vira fato sozinho.
           </Rule>
-          <p style={{ margin: "0 0 8px", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
-            Para virar fato, tem que dar para ler no texto o quê e de quem. Se faltar, vai para Revisar.
-          </p>
           <Rule icon="lock-closed">
             <span>
               Entra {SENS_LABEL[sens] ?? "Secreto"}. O seletor muda o cadeado desta fonte. Quem pode ver:{" "}

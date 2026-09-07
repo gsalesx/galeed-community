@@ -92,7 +92,7 @@ export default function Painel() {
   function goAsk(q: string) {
     const query = q.trim();
     if (!query) return;
-    navigate(`/app/perguntar?q=${encodeURIComponent(query)}`);
+    navigate(`/app/encontrar?q=${encodeURIComponent(query)}`);
   }
   function onAskSubmit(e: FormEvent) {
     e.preventDefault();
@@ -131,9 +131,9 @@ export default function Painel() {
           <Button
             variant="secondary"
             icon={<Icon name="search" size={15} />}
-            onClick={() => navigate("/app/buscar")}
+            onClick={() => navigate("/app/encontrar")}
           >
-            Buscar
+            Encontrar
           </Button>
           <Button
             variant="primary"
@@ -221,7 +221,7 @@ export default function Painel() {
             loading={lastSearch.loading}
             error={lastSearch.error}
             onRetry={lastSearch.refetch}
-            onSuggest={() => (lastQuery ? goAsk(lastQuery) : navigate("/app/buscar"))}
+            onSuggest={() => (lastQuery ? goAsk(lastQuery) : navigate("/app/encontrar"))}
             onAccess={() => navigate("/app/acesso")}
           />
         </>
@@ -782,7 +782,7 @@ function EmptySearch({ onSuggest, query }: { onSuggest: () => void; query: strin
           : `Nada encontrado para “${query}”.`}
       </p>
       <Button variant="primary" icon={<Icon name="search" size={15} />} onClick={onSuggest}>
-        {semBusca ? "Fazer uma busca" : `Perguntar: ${query}`}
+        {semBusca ? "Encontrar" : `Encontrar: ${query}`}
       </Button>
     </Card>
   );

@@ -1,11 +1,11 @@
 /** CriarConta (signup) — tela pública (sem shell). M8.
  *
  *  Card central: Brand + título "Criar conta" + campos
- *  (nome · email · senha · confirmação · nome do primeiro brain opcional)
- *  → signup real via useAuth().signup({name,email,password,brainName?}).
- *  Sucesso → /criar-cerebro (onboarding conversacional); se o brain veio no
- *  signup, direto → /app. Validação client com erros inline,
- *  estado loading, erro do servidor (email já existe → mensagem útil).
+ *  (nome · email · senha · confirmação)
+ *  → signup real via useAuth().signup({name,email,password}) — sem brain.
+ *  Sucesso → /criar-cerebro (o mesmo wizard do "+ Novo cérebro").
+ *  Validação client com erros inline, estado loading, erro do servidor
+ *  (email já existe → mensagem útil).
  *
  *  Convenção ARCHITECTURE §3: export default sem props; dados via lib/auth.
  */
@@ -15,8 +15,6 @@ import { Brand, Button, Card, Icon } from "../../ui";
 import { useAuth } from "../../lib/auth";
 import { ApiError } from "../../lib/api";
 
-// sugestão amigável pro primeiro brain (campo opcional)
-const BRAIN_SUGGESTION = "Meu cérebro";
 const MIN_PASSWORD = 8;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -35,7 +33,6 @@ export default function CriarConta() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [brainName, setBrainName] = useState("");
 
   const [errors, setErrors] = useState<Errors>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -70,10 +67,9 @@ export default function CriarConta() {
         name: name.trim(),
         email: email.trim(),
         password,
-        brainName: brainName.trim() || undefined,
       });
-      // com brain criado no signup vai direto ao console; sem, cai no wizard conversacional
-      navigate(brainName.trim() ? "/app" : "/criar-cerebro", { replace: true });
+      // a conta nasce SEM cérebro — o wizard de /criar-cerebro é o onboarding do 1º também
+      navigate("/criar-cerebro", { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         // o BFF sinaliza email duplicado por status (409) ou pela mensagem
@@ -207,15 +203,6 @@ export default function CriarConta() {
                 setConfirm(v);
                 revalidate();
               }}
-            />
-            <Field
-              label="Nome do primeiro cérebro"
-              optional
-              type="text"
-              placeholder={BRAIN_SUGGESTION}
-              value={brainName}
-              hint={`Opcional — se deixar em branco, criamos "${BRAIN_SUGGESTION}".`}
-              onChange={setBrainName}
             />
 
             <Button

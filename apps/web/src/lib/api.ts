@@ -387,6 +387,8 @@ export interface IngestJob {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /** true só em upload/colar da UI Adicionar — WhatsApp/conector não vêm com Remover. */
+  canDelete?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -948,6 +950,10 @@ export const api = {
       post<EnqueueResult>("/api/ingest", { kind: "text", ...p }),
     jobs: () => get<IngestJob[]>("/api/ingest/jobs"),
     job: (id: string) => get<IngestJob>(`/api/ingest/jobs/${encodeURIComponent(id)}`),
+    remove: (id: string) =>
+      del<{ deleted: true; jobId: string; slugs: string[]; facts: number; pages: number }>(
+        `/api/ingest/jobs/${encodeURIComponent(id)}`,
+      ),
   },
 
   // --- M21: Fontes com receita + fila de revisão (regra de ouro). ---
@@ -960,7 +966,8 @@ export const api = {
     setStatus: (id: string, status: "ativa" | "pausada") =>
       post<Source>(`/api/sources/${encodeURIComponent(id)}/status`, { status }),
     /** M22-D — cria/obtém a fonte-conector do provider (idempotente; 503 = ambiente sem Nango). */
-    connectorCreate: (p: { provider: string }) => post<Source>("/api/sources/connector", p),
+    connectorCreate: (p: { provider: string }) =>
+      post<Source>("/api/sources/connector", { providerConfigKey: p.provider }),
     /** M22-D — abre a connect session do Nango pra fonte (404/400/503/502 → ApiError com PT). */
     connectStart: (id: string) => post<ConnectStart>(`/api/sources/${encodeURIComponent(id)}/connect`),
     /** M22-D — estado de conexão das fontes-conector (A §4.7; o front mescla em Source.connector). */

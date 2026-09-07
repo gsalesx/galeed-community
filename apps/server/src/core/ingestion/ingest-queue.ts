@@ -497,6 +497,16 @@ export async function getJob(home: string, jobId: string): Promise<IngestJob | n
   return rowToJob(rows[0]);
 }
 
+/** Apaga 1 job DO BRAIN. false se não existe ou não é do brain. */
+export async function deleteJob(home: string, jobId: string): Promise<boolean> {
+  const sql = await db();
+  const rows = (await sql`
+    delete from galeed_ingest_jobs
+     where brain = ${home} and id = ${jobId}
+     returning id`) as any[];
+  return rows.length > 0;
+}
+
 // ---------- P0-C — reaper (a fila sobrevive a crash) + reparo (detecção) ----------
 
 /** P0-C — defaults do reaper. */

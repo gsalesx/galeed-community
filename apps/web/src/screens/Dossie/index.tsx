@@ -179,8 +179,8 @@ export default function Dossie() {
             Pode haver menções soltas em conversas e documentos — a busca encontra mesmo sem fato tipado.
           </p>
           <div style={{ display: "flex", gap: 10 }}>
-            <Button variant="primary" onClick={() => navigate(`/app/buscar?q=${encodeURIComponent(pretty(slug))}`)}>
-              Buscar na memória
+            <Button variant="primary" onClick={() => navigate(`/app/encontrar?modo=buscar&q=${encodeURIComponent(pretty(slug))}`)}>
+              Encontrar
             </Button>
             <Button onClick={() => navigate("/app/adicionar")}>Adicionar material</Button>
           </div>

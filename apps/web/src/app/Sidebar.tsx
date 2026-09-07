@@ -2,7 +2,7 @@
  *
  *  236px, sticky abaixo da topbar, scroll interno. Itens de nav na ORDEM e com os
  *  LABELS exatos do mockup, agrupados:
- *    (topo)         Início · Buscar(memória) · Perguntar · Fatos · Adicionar(só joga)
+ *    (topo)         Início · Encontrar · Fatos · Fontes(alimenta)
  *    Quem vê o quê  Acesso (quem vê + plugue do agente)
  *    Pra quem desenv. Conectar (motores do cérebro) · Saúde · Ajustes
  *  Item ativo: fundo --accent-soft + texto --accent-ink (via NavLink isActive).
@@ -35,10 +35,8 @@ const GROUPS: NavGroup[] = [
   {
     items: [
       { to: "/app", label: "Início", icon: "info", end: true },
-      { to: "/app/buscar", label: "Buscar", count: "memória", icon: "search" },
-      { to: "/app/perguntar", label: "Perguntar", icon: "chevron" },
+      { to: "/app/encontrar", label: "Encontrar", icon: "search" },
       { to: "/app/fatos", label: "Fatos", icon: "check" },
-      { to: "/app/adicionar", label: "Adicionar", count: "só joga", icon: "plus" },
       { to: "/app/fontes", label: "Fontes", count: "alimenta", icon: "arrow" },
     ],
   },
